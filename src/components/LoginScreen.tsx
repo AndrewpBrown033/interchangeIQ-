@@ -417,6 +417,47 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
       onLoginSuccess('Coach', 'coach@interchangeiq.com');
       return;
     }
+
+    // 1.5. Special Admin Auto-Login & Enrollment (for andrewpbrown@me.com and andrewpbrown33@gmail.com)
+    const isAdminEmail = enteredEmail === 'andrewpbrown@me.com' || enteredEmail === 'andrewpbrown33@gmail.com';
+    if (isAdminEmail) {
+      const nameForAdmin = 'Coach Andrew';
+      const existingKey = registeredKeys.find(k => k.email.toLowerCase() === enteredEmail);
+      if (!existingKey) {
+        const newKey: PasskeyRecord = {
+          id: `pass_admin_${Math.random().toString(36).substr(2, 9)}`,
+          email: enteredEmail,
+          userName: nameForAdmin,
+          registeredAt: Date.now(),
+          passcode: '1111',
+          biometricType: 'face',
+          password: password
+        };
+        setRegisteredKeys((prev) => {
+          const next = [...prev, newKey];
+          localStorage.setItem('iiq_registered_passkeys', JSON.stringify(next));
+          return next;
+        });
+        setSelectedKey(newKey);
+        try {
+          await setDoc(doc(db, 'passkeys', newKey.id), newKey);
+        } catch (fsErr) {
+          console.warn("Could not save admin passkey to Firestore:", fsErr);
+        }
+      } else if (existingKey.password !== password) {
+        // If they enter a different password, dynamically update it to let them in and keep it in sync
+        existingKey.password = password;
+        setRegisteredKeys([...registeredKeys]);
+        localStorage.setItem('iiq_registered_passkeys', JSON.stringify(registeredKeys));
+        try {
+          await setDoc(doc(db, 'passkeys', existingKey.id), existingKey);
+        } catch (fsErr) {
+          console.warn("Could not update admin passkey in Firestore:", fsErr);
+        }
+      }
+      onLoginSuccess(nameForAdmin, enteredEmail);
+      return;
+    }
     
     // 2. Check local registeredKeys
     let found = registeredKeys.find(k => k.email.toLowerCase() === enteredEmail);
