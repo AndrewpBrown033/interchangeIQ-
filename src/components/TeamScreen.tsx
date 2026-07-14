@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
-import { POSITION_GROUPS } from '../constants';
-import { Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, FileSpreadsheet, Check, X } from 'lucide-react';
+import { POSITION_GROUPS, POSITIONS } from '../constants';
+import { Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, FileSpreadsheet, Check, X, Flame, Sparkles, Clock, Activity } from 'lucide-react';
 
 interface TeamScreenProps {
   players: Player[];
@@ -157,6 +157,72 @@ export default function TeamScreen({
         onUpdateLineup(nextLineup);
       }
     }
+  };
+
+  const handleSimulatePlaytime = (playerId: string) => {
+    const randomActive = Math.floor(Math.random() * 1500) + 1200; // 1200 to 2700 seconds (20 to 45 mins)
+    const randomBench = Math.floor(Math.random() * 600) + 300;   // 300 to 900 seconds
+    
+    const p = players.find(player => player.id === playerId);
+    if (!p) return;
+
+    let candidateSlots: string[] = [];
+    if (p.positions && p.positions.length > 0) {
+      candidateSlots = p.positions;
+    } else if (p.primaryZone && POSITION_GROUPS[p.primaryZone]) {
+      candidateSlots = POSITION_GROUPS[p.primaryZone];
+    } else {
+      candidateSlots = ['C', 'ROV', 'RR', 'FF', 'FB'];
+    }
+
+    const simulatedSlotTimes: Record<string, number> = {};
+    let remainingActive = randomActive;
+    
+    const slotsToUse = candidateSlots.slice(0, 3);
+    if (slotsToUse.length === 0) {
+      slotsToUse.push('C');
+    }
+
+    slotsToUse.forEach((slot, idx) => {
+      if (idx === slotsToUse.length - 1) {
+        simulatedSlotTimes[slot] = remainingActive;
+      } else {
+        const portion = Math.floor(randomActive * (0.4 + Math.random() * 0.3)); // 40% to 70%
+        const allocated = Math.min(portion, remainingActive);
+        simulatedSlotTimes[slot] = allocated;
+        remainingActive -= allocated;
+      }
+    });
+
+    onUpdatePlayers(
+      players.map(player => {
+        if (player.id === playerId) {
+          return {
+            ...player,
+            active: randomActive,
+            bench: randomBench,
+            slotTimes: simulatedSlotTimes
+          };
+        }
+        return player;
+      })
+    );
+  };
+
+  const handleClearPlaytime = (playerId: string) => {
+    onUpdatePlayers(
+      players.map(player => {
+        if (player.id === playerId) {
+          return {
+            ...player,
+            active: 0,
+            bench: 0,
+            slotTimes: {}
+          };
+        }
+        return player;
+      })
+    );
   };
 
   // CSV parsing logic for Excel imports
@@ -565,6 +631,162 @@ export default function TeamScreen({
                       </p>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* HEATMAP SECTOR */}
+              <div className="border-t border-gray-100 pt-6 mt-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Flame className="w-4 h-4 text-orange-500 animate-pulse" />
+                      Live Match Heatmap
+                    </h4>
+                    <p className="text-xs text-gray-400 font-medium">
+                      Visually displays player's occupancy intensity across slots during the match.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSimulatePlaytime(activePlayer.id)}
+                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black rounded-lg transition active:scale-95 cursor-pointer flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-600" />
+                      Simulate Match Playtime
+                    </button>
+                    {activePlayer.slotTimes && Object.keys(activePlayer.slotTimes).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearPlaytime(activePlayer.id)}
+                        className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 text-[10px] font-black rounded-lg transition cursor-pointer"
+                      >
+                        Reset Data
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Heatmap visualization and Stats side-by-side or stacked */}
+                <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
+                  {/* Mini-Field Heatmap Container */}
+                  <div className="xl:col-span-3 bg-gray-50 border border-gray-100 p-4 rounded-2xl flex flex-col items-center justify-center">
+                    <div className="relative w-full max-w-[420px] aspect-[1.3] mx-auto rounded-[35%] overflow-hidden border-4 border-white shadow-md bg-[radial-gradient(ellipse_at_center,#2EB46E_0%,#1B8C4F_55%,#0B5C36_100%)] p-2 select-none">
+                      {/* AFL Field lines */}
+                      <div className="absolute inset-3 border border-white/20 rounded-[35%] pointer-events-none"></div>
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border border-white/20 rounded-full pointer-events-none"></div>
+                      <div className="absolute left-[27%] top-[35%] w-[46%] h-[30%] border border-white/20 pointer-events-none"></div>
+
+                      {/* Map slots */}
+                      {POSITIONS.map(([slotName, label, x, y]) => {
+                        const playerSlotTimes = activePlayer.slotTimes || {};
+                        const secondsSpent = playerSlotTimes[slotName] || 0;
+                        const activeTimesArray = Object.values(playerSlotTimes);
+                        const maxTime = activeTimesArray.length > 0 ? Math.max(...activeTimesArray) : 0;
+                        const hasHeat = secondsSpent > 0;
+                        const heatRatio = maxTime > 0 ? secondsSpent / maxTime : 0;
+
+                        return (
+                          <div
+                            key={slotName}
+                            style={{ left: `${x}%`, top: `${y}%` }}
+                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none"
+                          >
+                            {/* Heat Glow Ring */}
+                            {hasHeat && (
+                              <div
+                                className="absolute rounded-full blur-[8px] sm:blur-[12px] opacity-80 animate-pulse transition-all duration-500"
+                                style={{
+                                  width: `${20 + heatRatio * 32}px`,
+                                  height: `${20 + heatRatio * 32}px`,
+                                  backgroundColor: `rgba(${230 + heatRatio * 25}, ${110 - heatRatio * 70}, 30, ${0.4 + heatRatio * 0.5})`,
+                                  boxShadow: `0 0 ${12 + heatRatio * 16}px rgba(${240 + heatRatio * 15}, 100, 0, ${0.3 + heatRatio * 0.4})`
+                                }}
+                              />
+                            )}
+
+                            {/* Label box */}
+                            {hasHeat ? (
+                              <div className="relative z-10 flex flex-col items-center bg-black/60 backdrop-blur-xs px-1.5 py-0.5 rounded border border-white/20 shadow-xs">
+                                <span className="text-[7px] sm:text-[9px] font-black text-white leading-none tracking-tight">{slotName}</span>
+                                <span className="text-[6px] sm:text-[8px] font-black text-amber-300 leading-none mt-0.5">
+                                  {Math.round(secondsSpent / 60)}m
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="relative z-10 flex flex-col items-center bg-white/5 border border-white/10 px-1 py-0.5 rounded-sm">
+                                <span className="text-[6px] sm:text-[8px] font-bold text-white/30 leading-none">{slotName}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Heatmap Stats Cards */}
+                  <div className="xl:col-span-2 space-y-3.5">
+                    <div className="bg-gradient-to-br from-[#FAFBFF] to-[#F4F6FF] border border-blue-50/50 p-4 rounded-2xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-[var(--blue)]" />
+                        <span className="text-[11px] font-extrabold uppercase text-[var(--blue)] tracking-wider">
+                          Active Game Duration
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">On Field</p>
+                          <p className="text-lg font-black text-gray-800">
+                            {activePlayer.active ? `${Math.floor(activePlayer.active / 60)} mins` : '0 mins'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">On Bench</p>
+                          <p className="text-lg font-black text-gray-800">
+                            {activePlayer.bench ? `${Math.floor(activePlayer.bench / 60)} mins` : '0 mins'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50/65 border border-gray-200/50 p-4 rounded-2xl space-y-2">
+                      <span className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider block">
+                        Position Heat Analysis
+                      </span>
+                      {activePlayer.slotTimes && Object.keys(activePlayer.slotTimes).length > 0 ? (
+                        <div className="space-y-2 pt-1">
+                          {Object.entries(activePlayer.slotTimes)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([slot, secs], index) => {
+                              const pct = Math.round((secs / (activePlayer.active || 1)) * 100);
+                              return (
+                                <div key={slot} className="space-y-1">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-extrabold text-gray-700 flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                      {slot} ({POSITIONS.find(([sn]) => sn === slot)?.[1] || slot})
+                                    </span>
+                                    <span className="font-black text-gray-900">{Math.round(secs / 60)} mins ({pct}%)</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        index === 0 ? 'bg-gradient-to-r from-orange-500 to-red-500' : 'bg-orange-400'
+                                      }`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 font-medium italic py-2">
+                          No slot occupancy times captured yet. Simulate match minutes or start the match timer.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </>

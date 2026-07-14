@@ -9,6 +9,7 @@ export interface Player {
   active: number; // in seconds
   bench: number;  // in seconds
   note: string;
+  slotTimes?: Record<string, number>;
 }
 
 export interface ScoreDetail {

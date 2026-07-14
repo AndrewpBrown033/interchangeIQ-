@@ -527,9 +527,14 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
       <div className="w-full max-w-md bg-white border border-gray-200 rounded-3xl shadow-xl shadow-gray-200/40 p-6 relative z-10 space-y-6">
         
         {/* Brand logo & header */}
-        <div className="text-center space-y-2 pt-2">
-          <div className="inline-flex p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl text-white shadow-lg shadow-blue-500/20 text-2xl font-black">
-            🏉
+        <div className="text-center space-y-2 pt-2 flex flex-col items-center">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/15 border border-indigo-50 flex items-center justify-center bg-indigo-950">
+            <img 
+              src="/src/assets/images/simple_app_icon_1784032609149.jpg" 
+              alt="InterchangeIQ" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">InterchangeIQ</h2>
           <p className="text-xs text-gray-500 font-semibold">
@@ -883,15 +888,6 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
                       <Lock className="w-4 h-4" />
                       <span>Sign In with Password</span>
                     </button>
-
-                    <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 text-[10px] text-blue-800 font-semibold space-y-1">
-                      <span className="font-black uppercase tracking-wider block">💡 Demo Account Credentials</span>
-                      <p className="leading-relaxed">
-                        If you haven't enrolled yet, switch to <b>Enroll New Device</b>, or use the demo credentials:<br />
-                        User ID: <span className="font-bold underline">coach@interchangeiq.com</span><br />
-                        Password: <span className="font-bold underline">coach123</span>
-                      </p>
-                    </div>
                   </form>
                 ) : registeredKeys.length > 0 ? (
                   isUsingPasscode ? (
@@ -1066,35 +1062,12 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
                       <div className="flex-grow border-t border-gray-200"></div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex">
                       <button
                         onClick={() => setIsRegistering(true)}
-                        className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-[10px] font-black rounded-lg transition"
+                        className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black rounded-xl transition cursor-pointer"
                       >
                         Enroll Passkey
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Quick register a simulated mock coach with defaults for demoing
-                          const mock: PasskeyRecord = {
-                            id: 'mock_coach',
-                            email: 'coach@interchangeiq.com',
-                            userName: 'Coach',
-                            registeredAt: Date.now(),
-                            passcode: '1111',
-                            biometricType: 'face'
-                          };
-                          setRegisteredKeys((prev) => {
-                            const next = [...prev, mock];
-                            localStorage.setItem('iiq_registered_passkeys', JSON.stringify(next));
-                            return next;
-                          });
-                          setSelectedKey(mock);
-                          setErrorMessage(null);
-                        }}
-                        className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded-lg transition"
-                      >
-                        Pre-seed Demo Account
                       </button>
                     </div>
                   </div>

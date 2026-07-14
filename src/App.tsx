@@ -858,8 +858,13 @@ export default function App() {
           onClick={() => setActiveTab('summary')}
           className="flex items-center gap-2 cursor-pointer focus:outline-none text-left"
         >
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--navy)] to-[var(--blue)] text-white flex items-center justify-center font-black">
-            🏉
+          <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center bg-indigo-950 shrink-0">
+            <img 
+              src="/src/assets/images/simple_app_icon_1784032609149.jpg" 
+              alt="InterchangeIQ" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <span className="font-black text-sm tracking-tight text-[var(--navy)]">InterchangeIQ</span>
         </button>
@@ -898,8 +903,13 @@ export default function App() {
               }}
               className="flex items-center gap-3 cursor-pointer text-left focus:outline-none"
             >
-              <div className="w-9 h-9 bg-gradient-to-br from-[var(--navy)] to-[var(--blue)] text-white rounded-xl flex items-center justify-center font-black">
-                🏉
+              <div className="w-9 h-9 rounded-xl overflow-hidden border border-gray-100 flex items-center justify-center bg-indigo-950 shrink-0">
+                <img 
+                  src="/src/assets/images/simple_app_icon_1784032609149.jpg" 
+                  alt="InterchangeIQ" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               {!sidebarCollapsed && (
                 <div>

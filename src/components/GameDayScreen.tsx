@@ -401,9 +401,15 @@ export default function GameDayScreen({
         // Update player timers
         const updatedPlayers = players.map((p) => {
           if (p.status !== 'available') return p;
-          const isOnField = Object.values(lineup).includes(p.id);
-          if (isOnField) {
-            return { ...p, active: p.active + 1 };
+          const currentSlot = Object.keys(lineup).find((key) => lineup[key] === p.id);
+          if (currentSlot) {
+            const nextSlotTimes = { ...(p.slotTimes || {}) };
+            nextSlotTimes[currentSlot] = (nextSlotTimes[currentSlot] || 0) + 1;
+            return {
+              ...p,
+              active: p.active + 1,
+              slotTimes: nextSlotTimes,
+            };
           } else {
             return { ...p, bench: p.bench + 1 };
           }

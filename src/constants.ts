@@ -29,13 +29,13 @@ export const POSITION_GROUPS: Record<string, string[]> = {
 };
 
 export const DEFAULT_PLAYERS: Player[] = [
-  { id: 'p1', name: 'Alex Morgan', nick: '', number: '7', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'p2', name: 'Bella Hart', nick: '', number: '12', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'p3', name: 'Chloe Nguyen', nick: '', number: '18', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'p4', name: 'Daisy King', nick: '', number: '22', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'p5', name: 'Evie Brown', nick: '', number: '31', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'p6', name: 'Frankie Lee', nick: '', number: '44', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'p7', name: 'Georgia Smith', nick: '', number: '55', positions: ['RUCK'], primaryZone: 'RUCK', status: 'available', active: 0, bench: 0, note: '' },
+  { id: 'p1', name: 'Alex Morgan', nick: '', number: '7', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1980, bench: 720, note: '', slotTimes: { 'C': 1200, 'ROV': 480, 'RR': 300 } },
+  { id: 'p2', name: 'Bella Hart', nick: '', number: '12', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1620, bench: 1080, note: '', slotTimes: { 'FF': 1020, 'FP-L': 600 } },
+  { id: 'p3', name: 'Chloe Nguyen', nick: '', number: '18', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 2200, bench: 500, note: '', slotTimes: { 'CHB': 1400, 'HB-L': 800 } },
+  { id: 'p4', name: 'Daisy King', nick: '', number: '22', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1800, bench: 900, note: '', slotTimes: { 'W-L': 1100, 'W-R': 700 } },
+  { id: 'p5', name: 'Evie Brown', nick: '', number: '31', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1500, bench: 1200, note: '', slotTimes: { 'CHF': 900, 'HF-R': 600 } },
+  { id: 'p6', name: 'Frankie Lee', nick: '', number: '44', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 2040, bench: 660, note: '', slotTimes: { 'FB': 1440, 'BP-R': 600 } },
+  { id: 'p7', name: 'Georgia Smith', nick: '', number: '55', positions: ['RUCK'], primaryZone: 'RUCK', status: 'available', active: 2300, bench: 400, note: '', slotTimes: { 'R': 2300 } },
   { id: 'p8', name: 'Harper Jones', nick: '', number: '5', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '' },
   { id: 'p9', name: 'Indie Patel', nick: '', number: '9', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 0, bench: 0, note: '' },
   { id: 'p10', name: 'Jess Taylor', nick: '', number: '14', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 0, bench: 0, note: '' },
