@@ -904,7 +904,7 @@ export default function App() {
               {!sidebarCollapsed && (
                 <div>
                   <h1 className="text-sm font-black text-[var(--navy)] tracking-tight">InterchangeIQ</h1>
-                  <span className="text-[10px] text-[var(--muted)] font-bold">AFL System v1.2</span>
+                  <span className="text-[10px] text-[var(--muted)] font-bold">making coaching easier v1.3.0</span>
                 </div>
               )}
             </button>

@@ -1063,7 +1063,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
 
             {/* Informational Footer links */}
             <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
-              <span className="text-[9px] font-bold text-gray-400 tracking-wider">v1.2.0</span>
+              <span className="text-[9px] font-bold text-gray-400 tracking-wider">v1.3.0</span>
               <div className="flex items-center gap-1.5 text-gray-400">
                 <HelpCircle className="w-3.5 h-3.5" />
                 <span className="text-[9px] font-semibold">WebAuthn SECURE 256</span>
