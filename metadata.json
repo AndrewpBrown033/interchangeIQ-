@@ -1,0 +1,6 @@
+{
+  "name": "InterchangeIQ",
+  "description": "AFL Lineup Management, Scoring, Rotations, and Training Drill Library System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

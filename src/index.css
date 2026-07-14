@@ -1,0 +1,431 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  --navy: #2B2F3A;
+  --blue: #4C6FFF;
+  --cyan: #00C8E6;
+  --green: #16a765;
+  --red: #e5484d;
+  --amber: #ffb020;
+  --bg: #F5F6FA;
+  --line: #ECEEF3;
+  --muted: #8A8F9C;
+  --ink: #171923;
+  --shadow: 0 8px 22px rgba(23,25,35,.06);
+}
+
+[data-theme="forest"] {
+  --navy: #1D3327;
+  --blue: #127A42;
+  --cyan: #5FE3A0;
+  --bg: #F2F8F4;
+}
+
+[data-theme="sunset"] {
+  --navy: #3A2A1D;
+  --blue: #C2410C;
+  --cyan: #FDBA74;
+  --bg: #FFF8F0;
+}
+
+[data-theme="royal"] {
+  --navy: #241C3A;
+  --blue: #7C3AED;
+  --cyan: #C4B5FD;
+  --bg: #F7F5FF;
+}
+
+[data-theme="bright"] {
+  --navy: #20222A;
+  --blue: #F0502A;
+  --cyan: #6EC6FF;
+  --bg: #FAFAFB;
+  --line: #EAEAED;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  margin: 0;
+  /* Support iOS rubber-banding & scroll bounce elegantly */
+  -webkit-overflow-scrolling: touch;
+  /* Prevent magnifying lens zoom trigger on swift taps */
+  touch-action: manipulation;
+}
+
+/* iOS Safe Area Padding and Margin utilities */
+.safe-padding-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-padding-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-margin-top {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-margin-bottom {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Optimizations for modern notch screens (iPhone 12, 13, 14, 15, 16) and iPads */
+@supports (padding: max(0px)) {
+  .ios-header {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .ios-sidebar {
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .ios-main {
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Custom Field and Slot Styles */
+.field {
+  height: 640px;
+  max-width: 920px;
+  margin: 0 auto;
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center,#2EB46E 0%,#1B8C4F 55%,#0B5C36 100%);
+  border: 6px solid #fff;
+  box-shadow: 0 14px 32px rgba(11,18,56,.22);
+}
+
+.field::before {
+  content: '';
+  position: absolute;
+  inset: 42px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.field::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150px;
+  height: 150px;
+  transform: translate(-50%, -50%);
+  border: 3px solid rgba(255,255,255,0.4);
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.field .centre-square {
+  position: absolute;
+  left: 27%;
+  top: 35%;
+  width: 46%;
+  height: 33%;
+  border: 3px solid rgba(255,255,255,0.4);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.slot {
+  position: absolute;
+  width: 144px;
+  min-height: 58px;
+  height: 58px;
+  padding: 4px 6px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgba(255, 255, 255, 0.55);
+  color: #fff;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+@media (max-width: 640px) {
+  .slot {
+    width: 78px;
+    min-height: 54px;
+    height: 54px;
+    padding: 2px 4px;
+    border-radius: 8px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+}
+
+.slot.key {
+  transform: translate(-50%, -50%) scale(1.03);
+  z-index: 7;
+}
+
+@media (max-width: 640px) {
+  .slot.key {
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+}
+
+.slot.selected, .chip-mini.selected, tr.selected {
+  outline: 3px solid var(--amber) !important;
+  outline-offset: 1px;
+}
+
+.chip-mini {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 9px;
+  padding: 4px 6px;
+  min-height: 34px;
+  box-shadow: 0 6px 14px rgba(11,18,56,.22);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.chip-mini.fatigued {
+  box-shadow: 0 0 0 3px var(--red), 0 6px 14px rgba(11,18,56,.22);
+}
+
+.chip-mini.fresh {
+  box-shadow: 0 0 0 3px var(--green), 0 6px 14px rgba(11,18,56,.22);
+}
+
+.chip-mini.swap-out {
+  box-shadow: 0 0 0 3px #e5484d, 0 6px 14px rgba(11,18,56,.22) !important;
+}
+
+.chip-mini.swap-in {
+  box-shadow: 0 0 0 3px #16a765, 0 6px 14px rgba(11,18,56,.22) !important;
+}
+
+.chip-mini.guided-out {
+  animation: swapPulseRed 1s infinite;
+  box-shadow: 0 0 0 4px #e5484d, 0 6px 14px rgba(11,18,56,.22) !important;
+}
+
+.chip-mini.guided-in {
+  animation: swapPulseGreen 1s infinite;
+  box-shadow: 0 0 0 4px #16a765, 0 6px 14px rgba(11,18,56,.22) !important;
+}
+
+@keyframes swapPulseRed {
+  0% { outline: 0 solid rgba(229,72,77,.4) }
+  50% { outline: 6px solid rgba(229,72,77,.25) }
+  100% { outline: 0 solid rgba(229,72,77,.4) }
+}
+
+@keyframes swapPulseGreen {
+  0% { outline: 0 solid rgba(22,167,101,.4) }
+  50% { outline: 6px solid rgba(22,167,101,.25) }
+  100% { outline: 0 solid rgba(22,167,101,.4) }
+}
+
+.num-badge {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 950;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zone-fwd { background: #E5484D; }
+.zone-mid { background: var(--blue); }
+.zone-def { background: var(--green); }
+.zone-ruck { background: #8B5CF6; }
+.zone-bench { background: var(--navy); }
+
+/* Training Add-On Animations */
+.iiq-route {
+  animation: iiqRouteDash 1.15s linear infinite;
+}
+.iiq-footy {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: iiqFootyPulse 1.35s ease-in-out infinite;
+}
+
+.motion-paused .iiq-route, .motion-paused .iiq-footy {
+  animation-play-state: paused !important;
+}
+
+@keyframes iiqRouteDash {
+  to { stroke-dashoffset: -32; }
+}
+
+@keyframes iiqFootyPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
+/* Touch Targets for Mobile */
+@media (max-width: 760px) {
+  .btn, button {
+    min-height: 44px;
+  }
+  .field {
+    height: 560px;
+  }
+}
+
+/* AFL Goal Posts and markings */
+.goal-line-top {
+  position: absolute;
+  top: 4%;
+  left: 42%;
+  width: 16%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.goal-line-bottom {
+  position: absolute;
+  top: 96%;
+  left: 42%;
+  width: 16%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.goal-square-top {
+  position: absolute;
+  top: 4%;
+  left: 47.3%;
+  width: 5.4%;
+  height: 6%;
+  border-left: 2px solid rgba(255, 255, 255, 0.4);
+  border-right: 2px solid rgba(255, 255, 255, 0.4);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.goal-square-bottom {
+  position: absolute;
+  top: 90%;
+  left: 47.3%;
+  width: 5.4%;
+  height: 6%;
+  border-left: 2px solid rgba(255, 255, 255, 0.4);
+  border-right: 2px solid rgba(255, 255, 255, 0.4);
+  border-top: 2px solid rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.goal-post {
+  position: absolute;
+  width: 4px;
+  background: linear-gradient(to right, #ffffff 0%, #eaeaea 50%, #d5d5d5 100%);
+  border-radius: 2px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* White padding protector at the base of the post, classic AFL! */
+.goal-post::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 12px;
+  background: #ffffff;
+  border: 1px solid #c0c0c0;
+  border-radius: 2px;
+}
+
+/* The central goal posts are taller */
+.goal-post.main {
+  height: 48px;
+}
+
+/* The outer behind posts are shorter */
+.goal-post.behind {
+  height: 32px;
+}
+
+/* Specific post placements for Top and Bottom ends */
+.goal-post.top-left-behind { left: 42%; top: calc(4% - 32px); }
+.goal-post.top-left-main { left: 47.3%; top: calc(4% - 48px); }
+.goal-post.top-right-main { left: 52.7%; top: calc(4% - 48px); }
+.goal-post.top-right-behind { left: 58%; top: calc(4% - 32px); }
+
+.goal-post.bottom-left-behind { left: 42%; top: calc(96% - 32px); }
+.goal-post.bottom-left-main { left: 47.3%; top: calc(96% - 48px); }
+.goal-post.bottom-right-main { left: 52.7%; top: calc(96% - 48px); }
+.goal-post.bottom-right-behind { left: 58%; top: calc(96% - 32px); }
+
+@media (max-width: 760px) {
+  .goal-post.main {
+    height: 38px;
+  }
+  .goal-post.behind {
+    height: 24px;
+  }
+  .goal-post::after {
+    width: 6px;
+    height: 9px;
+  }
+  .goal-post.top-left-behind { top: calc(4% - 24px); }
+  .goal-post.top-left-main { top: calc(4% - 38px); }
+  .goal-post.top-right-main { top: calc(4% - 38px); }
+  .goal-post.top-right-behind { top: calc(4% - 24px); }
+
+  .goal-post.bottom-left-behind { top: calc(96% - 24px); }
+  .goal-post.bottom-left-main { top: calc(96% - 38px); }
+  .goal-post.bottom-right-main { top: calc(96% - 38px); }
+  .goal-post.bottom-right-behind { top: calc(96% - 24px); }
+}

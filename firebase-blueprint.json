@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "TeamState": {
+      "title": "TeamState",
+      "description": "The complete synchronization state for a single sports team",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "players": { "type": "array" },
+        "lineup": { "type": "object" },
+        "score": { "type": "object" },
+        "gameInfo": { "type": "object" },
+        "rotations": { "type": "array" },
+        "plans": { "type": "array" },
+        "history": { "type": "array" },
+        "savedLineups": { "type": "array" },
+        "drills": { "type": "array" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profile information for a coach or administrator",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "teamIds": { "type": "array" }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/teams/{teamId}": {
+      "schema": "TeamState",
+      "description": "Stores all real-time and active states for a specific team"
+    },
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "Stores user roles and assigned team memberships"
+    }
+  }
+}
