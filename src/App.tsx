@@ -24,7 +24,7 @@ import LoginScreen from './components/LoginScreen';
 // Lucide Icons
 import {
   LayoutDashboard, Play, RefreshCw, Users, History, BarChart3,
-  BookOpen, Shield, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut
+  BookOpen, Shield, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert
 } from 'lucide-react';
 
 // Helper functions to serialize/deserialize Drill steps to avoid nested arrays in Firestore
@@ -279,6 +279,11 @@ export default function App() {
   // Passkey Biometrics Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('iiq_authenticated') === 'true';
+  });
+
+  // Session Inactivity Timeout state
+  const [isTimedOut, setIsTimedOut] = useState<boolean>(() => {
+    return localStorage.getItem('iiq_session_timed_out') === 'true';
   });
 
   // Firebase integration states
@@ -626,6 +631,46 @@ export default function App() {
     setAuditLogs((prev) => [entry, ...prev].slice(0, 200));
   };
 
+  // Inactivity timeout handling (10 minutes)
+  useEffect(() => {
+    if (!isAuthenticated || isTimedOut) return;
+
+    let timeoutTimer: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutTimer);
+      // 10 minutes = 10 * 60 * 1000 = 600,000 ms
+      timeoutTimer = setTimeout(() => {
+        localStorage.removeItem('iiq_authenticated');
+        localStorage.setItem('iiq_session_timed_out', 'true');
+        setIsAuthenticated(false);
+        setIsTimedOut(true);
+        logAudit('Session automatically terminated due to 10 minutes of complete inactivity.');
+      }, 600000);
+    };
+
+    resetTimer();
+
+    const activityEvents = [
+      'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'
+    ];
+
+    const handleUserActivity = () => {
+      resetTimer();
+    };
+
+    activityEvents.forEach(event => {
+      window.addEventListener(event, handleUserActivity);
+    });
+
+    return () => {
+      clearTimeout(timeoutTimer);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, handleUserActivity);
+      });
+    };
+  }, [isAuthenticated, isTimedOut]);
+
   // Click & Focus Tab Reset logic (Training button opens library view!)
   const handleSelectTab = (tabId: string) => {
     setActiveTab(tabId);
@@ -828,6 +873,43 @@ export default function App() {
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ];
 
+  if (isTimedOut) {
+    return (
+      <div className="min-h-screen bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950 via-slate-950 to-slate-950 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl p-10 flex flex-col items-center justify-center border border-slate-100">
+          
+          {/* Shield Icon Container */}
+          <div className="w-20 h-20 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mb-8">
+            <ShieldAlert className="w-10 h-10 text-blue-600" strokeWidth={2.0} />
+          </div>
+
+          {/* Heading */}
+          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-950 text-center mb-4 tracking-tight">
+            Session Securely Terminated
+          </h1>
+
+          {/* Description */}
+          <p className="text-sm md:text-base text-slate-500 font-medium leading-relaxed text-center mb-10 max-w-md px-2">
+            For your security, your <span className="font-semibold text-gray-800">InterchangeIQ</span> cloud connection was logged out due to 10 minutes of complete inactivity. Your local database state has been cleared from memory.
+          </p>
+
+          {/* Action Button */}
+          <button
+            onClick={() => {
+              localStorage.removeItem('iiq_session_timed_out');
+              setIsTimedOut(false);
+              setIsAuthenticated(false);
+            }}
+            className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/10 hover:shadow-xl transition-all duration-200 text-center cursor-pointer text-base"
+          >
+            Sign In Again
+          </button>
+
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <LoginScreen
@@ -858,13 +940,8 @@ export default function App() {
           onClick={() => setActiveTab('summary')}
           className="flex items-center gap-2 cursor-pointer focus:outline-none text-left"
         >
-          <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center bg-indigo-950 shrink-0">
-            <img 
-              src="/src/assets/images/simple_app_icon_1784032609149.jpg" 
-              alt="InterchangeIQ" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+          <div className="w-8 h-8 rounded-lg bg-white border border-gray-150 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+            <TrendingUp className="w-5 h-5" strokeWidth={2.5} />
           </div>
           <span className="font-black text-sm tracking-tight text-[var(--navy)]">InterchangeIQ</span>
         </button>
@@ -903,13 +980,8 @@ export default function App() {
               }}
               className="flex items-center gap-3 cursor-pointer text-left focus:outline-none"
             >
-              <div className="w-9 h-9 rounded-xl overflow-hidden border border-gray-100 flex items-center justify-center bg-indigo-950 shrink-0">
-                <img 
-                  src="/src/assets/images/simple_app_icon_1784032609149.jpg" 
-                  alt="InterchangeIQ" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="w-9 h-9 rounded-xl bg-white border border-gray-150 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+                <TrendingUp className="w-5.5 h-5.5" strokeWidth={2.5} />
               </div>
               {!sidebarCollapsed && (
                 <div>
@@ -1121,6 +1193,13 @@ export default function App() {
               localStorage.removeItem('iiq_authenticated');
               setIsAuthenticated(false);
               logAudit('Locked screen manually to verify passkey biometrics.');
+            }}
+            onSimulateTimeout={() => {
+              localStorage.removeItem('iiq_authenticated');
+              localStorage.setItem('iiq_session_timed_out', 'true');
+              setIsAuthenticated(false);
+              setIsTimedOut(true);
+              logAudit('Simulated 10 minutes of complete inactivity to trigger session secure termination.');
             }}
           />
         )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AuditLogEntry } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Fingerprint } from 'lucide-react';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Fingerprint, ShieldAlert } from 'lucide-react';
 
 interface SettingsScreenProps {
   currentTheme: string;
@@ -12,6 +12,7 @@ interface SettingsScreenProps {
   auditLogs: AuditLogEntry[];
   onClearLogs: () => void;
   onLockSystem: () => void;
+  onSimulateTimeout: () => void;
 }
 
 export default function SettingsScreen({
@@ -24,6 +25,7 @@ export default function SettingsScreen({
   auditLogs,
   onClearLogs,
   onLockSystem,
+  onSimulateTimeout,
 }: SettingsScreenProps) {
   const THEMES = [
     { id: 'classic', name: 'Classic Navy', colors: ['#0B1238', '#1F36C7', '#00C8E6'] },
@@ -109,13 +111,23 @@ export default function SettingsScreen({
               Secure your InterchangeIQ tablet or phone dashboard using secure iOS/macOS passkeys. Once enabled, you will be prompted for Face ID or Touch ID upon opening.
             </p>
 
-            <button
-              onClick={onLockSystem}
-              className="px-4 py-2.5 text-xs font-black bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer"
-            >
-              <Fingerprint className="w-4 h-4 text-emerald-400" />
-              <span>Lock Screen & Test Passkey Gate</span>
-            </button>
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                onClick={onLockSystem}
+                className="px-4 py-2.5 text-xs font-black bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer"
+              >
+                <Fingerprint className="w-4 h-4 text-emerald-400" />
+                <span>Lock Screen & Test Passkey Gate</span>
+              </button>
+
+              <button
+                onClick={onSimulateTimeout}
+                className="px-4 py-2.5 text-xs font-black bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition flex items-center gap-2 cursor-pointer"
+              >
+                <ShieldAlert className="w-4 h-4 text-white" />
+                <span>Simulate Inactivity Timeout</span>
+              </button>
+            </div>
           </div>
         </div>
 

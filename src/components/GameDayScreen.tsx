@@ -229,6 +229,38 @@ export default function GameDayScreen({
     localStorage.setItem('iiq_haptic_pattern', hapticPattern);
   }, [hapticPattern]);
 
+  // Global listener to unlock iOS Safari Web Audio restrictions on any user gesture
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        const ctx = audioCtxRef.current;
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        // Play a short silent buffer to satisfy iOS auto-play gesture requirements
+        if (ctx) {
+          const buffer = ctx.createBuffer(1, 1, 22050);
+          const source = ctx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(ctx.destination);
+          source.start(0);
+        }
+      } catch (e) {
+        console.warn('Silent audio unlock failed', e);
+      }
+    };
+
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('touchstart', unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
   // Integrated Chime & Vibration Player
   const playSatisfactionChime = (triggerType: 'timer-end' | 'rotation-due' | 'test') => {
     if (!soundEnabled) return;
@@ -1075,9 +1107,7 @@ export default function GameDayScreen({
                       onChange={(e) => setHapticEnabled(e.target.checked)}
                       className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                     />
-                  </div>
-
-                  {hapticEnabled && (
+                        {hapticEnabled && (
                     <div className="mb-1">
                       <label className="text-[11px] font-semibold text-gray-500 block mb-1">Vibration Pattern</label>
                       <select
@@ -1089,9 +1119,14 @@ export default function GameDayScreen({
                         <option value="double-tap">💓 Heartbeat Rhythm</option>
                         <option value="intense">⚡ High Intensity (Timer Ends)</option>
                       </select>
-                      <p className="text-[9px] text-gray-400 leading-relaxed mt-2 font-semibold">
-                        * Note: iOS Safari restricts physical vibrations. Beautiful Web Audio chimes play flawlessly on all iPhones!
-                      </p>
+                      <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 mt-2">
+                        <p className="text-[10px] text-amber-800 leading-relaxed font-semibold">
+                          ⚠️ iPhone Vibration Tip:
+                        </p>
+                        <p className="text-[9px] text-amber-700 leading-relaxed mt-0.5 font-medium">
+                          Apple iOS restricts the <code className="font-mono">navigator.vibrate</code> API inside Safari/Chrome. Mechanical vibration is unavailable on iPhones, but high-quality sound alerts play beautifully!
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1104,9 +1139,20 @@ export default function GameDayScreen({
                     <Bell className="w-4 h-4 text-indigo-600 animate-bounce" />
                     <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Sideline Test Console</span>
                   </div>
-                  <p className="text-[10px] text-gray-500 leading-relaxed mb-3 font-medium">
-                    Test and verify your alert volumes. Click to unlock/activate Web Audio API on iPhones before kickoff.
-                  </p>
+                  <div className="space-y-1.5 mb-3">
+                    <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
+                      Test alert volumes below. Any screen tap will unlock the Web Audio device for background timer alarms.
+                    </p>
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-2.5">
+                      <p className="text-[10px] text-blue-800 leading-relaxed font-semibold">
+                        🔊 iPhone Sound Setup:
+                      </p>
+                      <p className="text-[9px] text-blue-700 leading-relaxed mt-0.5 font-medium">
+                        Ensure the physical <strong className="font-semibold">Ring/Silent switch</strong> on the side of your iPhone is set to <span className="font-semibold text-blue-900">Ring</span> (no orange line showing). If your iPhone is on silent, iOS will completely block the sound chimes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">

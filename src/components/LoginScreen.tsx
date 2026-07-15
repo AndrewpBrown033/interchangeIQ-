@@ -13,7 +13,8 @@ import {
   XCircle, 
   RefreshCw,
   HelpCircle,
-  ShieldAlert
+  ShieldAlert,
+  TrendingUp
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -528,13 +529,8 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
         
         {/* Brand logo & header */}
         <div className="text-center space-y-2 pt-2 flex flex-col items-center">
-          <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/15 border border-indigo-50 flex items-center justify-center bg-indigo-950">
-            <img 
-              src="/src/assets/images/simple_app_icon_1784032609149.jpg" 
-              alt="InterchangeIQ" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+          <div className="w-14 h-14 rounded-2xl bg-white border border-gray-150 flex items-center justify-center text-blue-600 shadow-sm">
+            <TrendingUp className="w-7 h-7" strokeWidth={2.5} />
           </div>
           <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">InterchangeIQ</h2>
           <p className="text-xs text-gray-500 font-semibold">
@@ -622,13 +618,27 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
             </div>
 
             {scanStatus !== 'success' && (
-              <button
-                type="button"
-                onClick={() => setScanType(scanType === 'face' ? 'fingerprint' : 'face')}
-                className="text-[10px] text-blue-600 hover:text-blue-700 font-black bg-blue-50 border border-blue-100/40 px-3 py-1.5 rounded-lg transition cursor-pointer"
-              >
-                Switch to {scanType === 'face' ? 'Touch ID Scan' : 'Face ID Scan'}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
+                <button
+                  type="button"
+                  onClick={() => setScanType(scanType === 'face' ? 'fingerprint' : 'face')}
+                  className="text-[10px] text-blue-600 hover:text-blue-700 font-black bg-blue-50 border border-blue-100/40 px-3 py-1.5 rounded-lg transition cursor-pointer"
+                >
+                  Switch to {scanType === 'face' ? 'Touch ID' : 'Face ID'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsScanning(false);
+                    setScanStatus('idle');
+                    setScanProgress(0);
+                    setErrorMessage('Apple Passkey authentication timed out (NotAllowedError: Request timed out). Please make sure Face ID / Touch ID or a device passcode is set up on your device under Settings, and try again.');
+                  }}
+                  className="text-[10px] text-amber-700 hover:text-amber-800 font-black bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-center gap-1"
+                >
+                  ⚠️ Simulate Timeout
+                </button>
+              </div>
             )}
 
             <button 
