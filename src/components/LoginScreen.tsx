@@ -249,7 +249,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Enroll New Device
+            Enroll New Account
           </button>
         </div>
 
@@ -310,15 +310,6 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
               <Lock className="w-4 h-4" />
               <span>{isLoading ? 'Verifying...' : 'Sign In'}</span>
             </button>
-
-            {/* Quick Demo Assist */}
-            <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex gap-2 items-start text-[11px] font-medium text-blue-800">
-              <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold block text-blue-900">Demo Mode:</span>
-                <span>Use <strong className="font-semibold">coach@interchangeiq.com</strong> with password <strong className="font-semibold">coach123</strong> to test the app.</span>
-              </div>
-            </div>
           </form>
         ) : (
           /* REGISTRATION FORM */
