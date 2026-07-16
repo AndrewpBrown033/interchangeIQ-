@@ -1,6 +1,6 @@
 import React from 'react';
 import { AuditLogEntry } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Fingerprint, ShieldAlert } from 'lucide-react';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert } from 'lucide-react';
 
 interface SettingsScreenProps {
   currentTheme: string;
@@ -101,14 +101,14 @@ export default function SettingsScreen({
             </div>
           </div>
 
-          {/* Biometrics & Passkey Security */}
+          {/* Account Security & Timeout */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
             <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
               <KeyRound className="w-4 h-4 text-[var(--blue)]" />
-              <span>Biometric Security (Passkey / Touch ID / Face ID)</span>
+              <span>Session Security & Timeout</span>
             </h3>
             <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-              Secure your InterchangeIQ tablet or phone dashboard using secure iOS/macOS passkeys. Once enabled, you will be prompted for Face ID or Touch ID upon opening.
+              Manage your dashboard session security. You can log out/lock the screen manually, or test the secure inactivity timeout.
             </p>
 
             <div className="flex flex-wrap gap-2.5">
@@ -116,8 +116,8 @@ export default function SettingsScreen({
                 onClick={onLockSystem}
                 className="px-4 py-2.5 text-xs font-black bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer"
               >
-                <Fingerprint className="w-4 h-4 text-emerald-400" />
-                <span>Lock Screen & Test Passkey Gate</span>
+                <Lock className="w-4 h-4 text-emerald-400" />
+                <span>Lock Screen & Log Out</span>
               </button>
 
               <button

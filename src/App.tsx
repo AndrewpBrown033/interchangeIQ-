@@ -1192,7 +1192,7 @@ export default function App() {
             onLockSystem={() => {
               localStorage.removeItem('iiq_authenticated');
               setIsAuthenticated(false);
-              logAudit('Locked screen manually to verify passkey biometrics.');
+              logAudit('Locked screen manually and logged out of session.');
             }}
             onSimulateTimeout={() => {
               localStorage.removeItem('iiq_authenticated');
