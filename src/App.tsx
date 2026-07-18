@@ -286,6 +286,26 @@ export default function App() {
     return localStorage.getItem('iiq_session_timed_out') === 'true';
   });
 
+  // Sound & Vibration State (Persisted in localStorage)
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('iiq_sound_enabled');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [soundVolume, setSoundVolume] = useState<number>(() => {
+    const saved = localStorage.getItem('iiq_sound_volume');
+    return saved !== null ? parseFloat(saved) : 0.8;
+  });
+  const [soundTone, setSoundTone] = useState<string>(() => {
+    return localStorage.getItem('iiq_sound_tone') || 'acoustic';
+  });
+  const [hapticEnabled, setHapticEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('iiq_haptic_enabled');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [hapticPattern, setHapticPattern] = useState<string>(() => {
+    return localStorage.getItem('iiq_haptic_pattern') || 'pulse';
+  });
+
   // Firebase integration states
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [cloudConnected, setCloudConnected] = useState(false);
@@ -320,6 +340,13 @@ export default function App() {
   useEffect(() => { localStorage.setItem('iiq_users', JSON.stringify(users)); }, [users]);
   useEffect(() => { if (activeTeamId) localStorage.setItem('iiq_active_team_id', activeTeamId); }, [activeTeamId]);
   useEffect(() => { localStorage.setItem('iiq_saved_lineups', JSON.stringify(savedLineups)); }, [savedLineups]);
+
+  // Sync sound & haptic preferences to localStorage
+  useEffect(() => { localStorage.setItem('iiq_sound_enabled', String(soundEnabled)); }, [soundEnabled]);
+  useEffect(() => { localStorage.setItem('iiq_sound_volume', String(soundVolume)); }, [soundVolume]);
+  useEffect(() => { localStorage.setItem('iiq_sound_tone', soundTone); }, [soundTone]);
+  useEffect(() => { localStorage.setItem('iiq_haptic_enabled', String(hapticEnabled)); }, [hapticEnabled]);
+  useEffect(() => { localStorage.setItem('iiq_haptic_pattern', hapticPattern); }, [hapticPattern]);
 
   // Firebase auth, profile sync, and session initialization
   useEffect(() => {
@@ -1121,6 +1148,11 @@ export default function App() {
             onSaveLineup={handleSaveLineup}
             onSelectPlayerId={setSelectedPlayerId}
             onNavigate={handleSelectTab}
+            soundEnabled={soundEnabled}
+            soundVolume={soundVolume}
+            soundTone={soundTone}
+            hapticEnabled={hapticEnabled}
+            hapticPattern={hapticPattern}
           />
         )}
         {activeTab === 'rotations' && (
@@ -1201,6 +1233,16 @@ export default function App() {
               setIsTimedOut(true);
               logAudit('Simulated 10 minutes of complete inactivity to trigger session secure termination.');
             }}
+            soundEnabled={soundEnabled}
+            onChangeSoundEnabled={setSoundEnabled}
+            soundVolume={soundVolume}
+            onChangeSoundVolume={setSoundVolume}
+            soundTone={soundTone}
+            onChangeSoundTone={setSoundTone}
+            hapticEnabled={hapticEnabled}
+            onChangeHapticEnabled={setHapticEnabled}
+            hapticPattern={hapticPattern}
+            onChangeHapticPattern={setHapticPattern}
           />
         )}
       </main>

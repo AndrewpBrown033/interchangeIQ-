@@ -45,6 +45,11 @@ interface GameDayScreenProps {
   onSaveLineup: () => void;
   onSelectPlayerId: (id: string | null) => void;
   onNavigate: (tabId: string) => void;
+  soundEnabled: boolean;
+  soundVolume: number;
+  soundTone: string;
+  hapticEnabled: boolean;
+  hapticPattern: string;
 }
 
 export default function GameDayScreen({
@@ -68,6 +73,11 @@ export default function GameDayScreen({
   onSaveLineup,
   onSelectPlayerId,
   onNavigate,
+  soundEnabled,
+  soundVolume,
+  soundTone,
+  hapticEnabled,
+  hapticPattern,
 }: GameDayScreenProps) {
   // Clock state
   const [clockRemaining, setClockRemaining] = useState(15 * 60);
@@ -187,47 +197,6 @@ export default function GameDayScreen({
 
   // Audio Context for beep alerts
   const audioCtxRef = useRef<AudioContext | null>(null);
-
-  // Sound & Vibration State (Persisted in localStorage)
-  const [soundEnabled, setSoundEnabled] = useState(() => {
-    const saved = localStorage.getItem('iiq_sound_enabled');
-    return saved !== null ? saved === 'true' : true;
-  });
-  const [soundVolume, setSoundVolume] = useState(() => {
-    const saved = localStorage.getItem('iiq_sound_volume');
-    return saved !== null ? parseFloat(saved) : 0.8;
-  });
-  const [soundTone, setSoundTone] = useState(() => {
-    return localStorage.getItem('iiq_sound_tone') || 'acoustic';
-  });
-  const [hapticEnabled, setHapticEnabled] = useState(() => {
-    const saved = localStorage.getItem('iiq_haptic_enabled');
-    return saved !== null ? saved === 'true' : true;
-  });
-  const [hapticPattern, setHapticPattern] = useState(() => {
-    return localStorage.getItem('iiq_haptic_pattern') || 'pulse';
-  });
-
-  // Persist settings changes
-  useEffect(() => {
-    localStorage.setItem('iiq_sound_enabled', String(soundEnabled));
-  }, [soundEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem('iiq_sound_volume', String(soundVolume));
-  }, [soundVolume]);
-
-  useEffect(() => {
-    localStorage.setItem('iiq_sound_tone', soundTone);
-  }, [soundTone]);
-
-  useEffect(() => {
-    localStorage.setItem('iiq_haptic_enabled', String(hapticEnabled));
-  }, [hapticEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem('iiq_haptic_pattern', hapticPattern);
-  }, [hapticPattern]);
 
   // Global listener to unlock iOS Safari Web Audio restrictions on any user gesture
   useEffect(() => {
@@ -1028,168 +997,6 @@ export default function GameDayScreen({
             </div>
 
             {/* Sound & Vibration Preferences */}
-            <div className="mt-4 pt-4 border-t border-gray-150 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" onClick={(e) => e.stopPropagation()}>
-              
-              {/* Sound Settings Column */}
-              <div className="bg-white p-3 rounded-xl border border-gray-100 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    {soundEnabled ? (
-                      <Volume2 className="w-4 h-4 text-emerald-600 animate-pulse" />
-                    ) : (
-                      <VolumeX className="w-4 h-4 text-gray-400" />
-                    )}
-                    <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Audio Chime Alerts</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-[11px] font-semibold text-gray-500">Enable Chimes</label>
-                    <input
-                      type="checkbox"
-                      checked={soundEnabled}
-                      onChange={(e) => setSoundEnabled(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                    />
-                  </div>
-
-                  {soundEnabled && (
-                    <>
-                      <div className="mb-3">
-                        <label className="text-[11px] font-semibold text-gray-500 block mb-1">Chime Sound Style</label>
-                        <select
-                          value={soundTone}
-                          onChange={(e) => setSoundTone(e.target.value)}
-                          className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg p-1.5 font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        >
-                          <option value="acoustic">🔔 Acoustic Chime (Rich Harmonics)</option>
-                          <option value="marimba">🪵 Warm Marimba (Soft Wood Tap)</option>
-                          <option value="digital">⚡ Digital Alert (Tech Blip)</option>
-                          <option value="classic">🔊 Classic Beep (Standard Sine)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-[11px] font-semibold text-gray-500">Volume</label>
-                          <span className="text-[10px] font-mono font-bold text-indigo-600">{Math.round(soundVolume * 100)}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.05"
-                          value={soundVolume}
-                          onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
-                          className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Haptics Settings Column */}
-              <div className="bg-white p-3 rounded-xl border border-gray-100 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Smartphone className="w-4 h-4 text-indigo-600" />
-                    <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Haptic Vibration</span>
-                  </div>
-
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex flex-col">
-                      <label className="text-[11px] font-semibold text-gray-500">Enable Vibration</label>
-                      <span className="text-[9px] text-gray-400 font-medium font-mono">Mobile Haptics</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={hapticEnabled}
-                      onChange={(e) => setHapticEnabled(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                    />
-                        {hapticEnabled && (
-                    <div className="mb-1">
-                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">Vibration Pattern</label>
-                      <select
-                        value={hapticPattern}
-                        onChange={(e) => setHapticPattern(e.target.value)}
-                        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg p-1.5 font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value="pulse">📳 Standard Pulse (Alerts)</option>
-                        <option value="double-tap">💓 Heartbeat Rhythm</option>
-                        <option value="intense">⚡ High Intensity (Timer Ends)</option>
-                      </select>
-                      <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 mt-2">
-                        <p className="text-[10px] text-amber-800 leading-relaxed font-semibold">
-                          ⚠️ iPhone Vibration Tip:
-                        </p>
-                        <p className="text-[9px] text-amber-700 leading-relaxed mt-0.5 font-medium">
-                          Apple iOS restricts the <code className="font-mono">navigator.vibrate</code> API inside Safari/Chrome. Mechanical vibration is unavailable on iPhones, but high-quality sound alerts play beautifully!
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Instant Test Console Column */}
-              <div className="bg-gradient-to-br from-indigo-50/50 to-blue-50/50 p-3 rounded-xl border border-indigo-100/60 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Bell className="w-4 h-4 text-indigo-600 animate-bounce" />
-                    <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Sideline Test Console</span>
-                  </div>
-                  <div className="space-y-1.5 mb-3">
-                    <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
-                      Test alert volumes below. Any screen tap will unlock the Web Audio device for background timer alarms.
-                    </p>
-                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-2.5">
-                      <p className="text-[10px] text-blue-800 leading-relaxed font-semibold">
-                        🔊 iPhone Sound Setup:
-                      </p>
-                      <p className="text-[9px] text-blue-700 leading-relaxed mt-0.5 font-medium">
-                        Ensure the physical <strong className="font-semibold">Ring/Silent switch</strong> on the side of your iPhone is set to <span className="font-semibold text-blue-900">Ring</span> (no orange line showing). If your iPhone is on silent, iOS will completely block the sound chimes.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSatisfactionChime('test');
-                      playSatisfactionVibration('test');
-                    }}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-[11px] font-black tracking-wider shadow-xs transition uppercase flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    ⚡ Test Quick Score Tap
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSatisfactionChime('rotation-due');
-                      playSatisfactionVibration('rotation-due');
-                    }}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl text-[11px] font-black tracking-wider shadow-xs transition uppercase flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    🔁 Test Rotation Alert
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSatisfactionChime('timer-end');
-                      playSatisfactionVibration('timer-end');
-                    }}
-                    className="w-full py-2 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl text-[11px] font-black tracking-wider shadow-xs transition uppercase flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    🚨 Test Timer Alarm
-                  </button>
-                </div>
-              </div>
-
-            </div>
           </div>
         )}
       </div>

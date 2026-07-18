@@ -31,7 +31,7 @@ export default function RotationsScreen({
   const [editingRotation, setEditingRotation] = useState<Rotation | null>(null);
 
   // Rotation Form states
-  const [formQuarter, setFormQuarter] = useState<number>(1);
+  const [selectedQuarters, setSelectedQuarters] = useState<number[]>([1]);
   const [formMinute, setFormMinute] = useState<number>(5);
   const [formType, setFormType] = useState<'bench' | 'onfield'>('bench');
   const [formOutId, setFormOutId] = useState<string>('');
@@ -135,7 +135,7 @@ export default function RotationsScreen({
 
   const handleOpenAddRotation = () => {
     setEditingRotation(null);
-    setFormQuarter(1);
+    setSelectedQuarters([1]);
     setFormMinute(5);
     setFormType('bench');
 
@@ -153,7 +153,7 @@ export default function RotationsScreen({
 
   const handleOpenEditRotation = (rot: Rotation) => {
     setEditingRotation(rot);
-    setFormQuarter(rot.quarter);
+    setSelectedQuarters([rot.quarter]);
     setFormMinute(rot.minute);
     setFormType(rot.type);
     setFormOutId(rot.outId);
@@ -173,6 +173,10 @@ export default function RotationsScreen({
       setFormError('You cannot select the same player for both sides.');
       return;
     }
+    if (selectedQuarters.length === 0) {
+      setFormError('Please select at least one quarter.');
+      return;
+    }
 
     const outPlayer = players.find((p) => p.id === formOutId);
     const inPlayer = players.find((p) => p.id === formInId);
@@ -183,28 +187,29 @@ export default function RotationsScreen({
     const inText = formType === 'bench' ? `ON #${inPlayer.number} ${inPlayer.name}` : `Pos B #${inPlayer.number} ${inPlayer.name}`;
 
     if (editingRotation) {
-      onUpdateRotations(
-        rotations.map((r) =>
-          r.id === editingRotation.id
-            ? {
-                ...r,
-                quarter: formQuarter,
-                minute: formMinute,
-                type: formType,
-                outId: formOutId,
-                inId: formInId,
-                out: outText,
-                inn: inText,
-                note: formNote.trim(),
-              }
-            : r
-        )
+      const firstQ = selectedQuarters[0];
+      const otherQuarters = selectedQuarters.slice(1);
+
+      const updatedRotations = rotations.map((r) =>
+        r.id === editingRotation.id
+          ? {
+              ...r,
+              quarter: firstQ,
+              minute: formMinute,
+              type: formType,
+              outId: formOutId,
+              inId: formInId,
+              out: outText,
+              inn: inText,
+              note: formNote.trim(),
+            }
+          : r
       );
-    } else {
-      const newRot: Rotation = {
+
+      const additionalRots: Rotation[] = otherQuarters.map((q) => ({
         id: `rot-${Date.now()}-${Math.random()}`,
         planId: currentPlan.id,
-        quarter: formQuarter,
+        quarter: q,
         minute: formMinute,
         type: formType,
         outId: formOutId,
@@ -214,8 +219,25 @@ export default function RotationsScreen({
         note: formNote.trim(),
         applied: false,
         status: 'scheduled',
-      };
-      onUpdateRotations([...rotations, newRot]);
+      }));
+
+      onUpdateRotations([...updatedRotations, ...additionalRots]);
+    } else {
+      const newRots: Rotation[] = selectedQuarters.map((q) => ({
+        id: `rot-${Date.now()}-${Math.random()}`,
+        planId: currentPlan.id,
+        quarter: q,
+        minute: formMinute,
+        type: formType,
+        outId: formOutId,
+        inId: formInId,
+        out: outText,
+        inn: inText,
+        note: formNote.trim(),
+        applied: false,
+        status: 'scheduled',
+      }));
+      onUpdateRotations([...rotations, ...newRots]);
     }
 
     setShowRotationModal(false);
@@ -462,37 +484,53 @@ export default function RotationsScreen({
             )}
 
             <div className="space-y-4 text-xs font-semibold text-gray-600">
-              <div className="grid grid-cols-2 gap-3">
-                {/* Quarter */}
-                <div>
-                  <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
-                    Quarter
-                  </label>
-                  <select
-                    value={formQuarter}
-                    onChange={(e) => setFormQuarter(parseInt(e.target.value, 10))}
-                    className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none focus:ring-1 focus:ring-[var(--blue)] text-sm font-bold text-[var(--ink)]"
-                  >
-                    {[1, 2, 3, 4].map((q) => (
-                      <option key={q} value={q}>Quarter {q}</option>
-                    ))}
-                  </select>
+              {/* Quarter Selection Toggles */}
+              <div>
+                <label className="block mb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                  Select Quarters
+                </label>
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4].map((q) => {
+                    const selected = selectedQuarters.includes(q);
+                    return (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => {
+                          if (selected) {
+                            if (selectedQuarters.length > 1) {
+                              setSelectedQuarters(selectedQuarters.filter(item => item !== q));
+                            }
+                          } else {
+                            setSelectedQuarters([...selectedQuarters, q].sort());
+                          }
+                        }}
+                        className={`flex-1 py-2 text-xs font-black rounded-xl border transition ${
+                          selected
+                            ? 'bg-[var(--blue)] text-white border-[var(--blue)]'
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Q{q}
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
-                {/* Minute mark */}
-                <div>
-                  <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
-                    Time (Minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="15"
-                    value={formMinute}
-                    onChange={(e) => setFormMinute(parseInt(e.target.value, 10) || 0)}
-                    className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)]"
-                  />
-                </div>
+              {/* Minute mark */}
+              <div>
+                <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                  Time (Minutes)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="15"
+                  value={formMinute}
+                  onChange={(e) => setFormMinute(parseInt(e.target.value, 10) || 0)}
+                  className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)]"
+                />
               </div>
 
               {/* Rotation type */}

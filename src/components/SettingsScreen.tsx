@@ -1,6 +1,6 @@
 import React from 'react';
 import { AuditLogEntry } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert } from 'lucide-react';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert, Volume2, VolumeX, Smartphone, Bell } from 'lucide-react';
 
 interface SettingsScreenProps {
   currentTheme: string;
@@ -13,6 +13,16 @@ interface SettingsScreenProps {
   onClearLogs: () => void;
   onLockSystem: () => void;
   onSimulateTimeout: () => void;
+  soundEnabled: boolean;
+  onChangeSoundEnabled: (enabled: boolean) => void;
+  soundVolume: number;
+  onChangeSoundVolume: (volume: number) => void;
+  soundTone: string;
+  onChangeSoundTone: (tone: string) => void;
+  hapticEnabled: boolean;
+  onChangeHapticEnabled: (enabled: boolean) => void;
+  hapticPattern: string;
+  onChangeHapticPattern: (pattern: string) => void;
 }
 
 export default function SettingsScreen({
@@ -26,6 +36,16 @@ export default function SettingsScreen({
   onClearLogs,
   onLockSystem,
   onSimulateTimeout,
+  soundEnabled,
+  onChangeSoundEnabled,
+  soundVolume,
+  onChangeSoundVolume,
+  soundTone,
+  onChangeSoundTone,
+  hapticEnabled,
+  onChangeHapticEnabled,
+  hapticPattern,
+  onChangeHapticPattern,
 }: SettingsScreenProps) {
   const THEMES = [
     { id: 'classic', name: 'Classic Navy', colors: ['#0B1238', '#1F36C7', '#00C8E6'] },
@@ -34,6 +54,184 @@ export default function SettingsScreen({
     { id: 'royal', name: 'Royal Purple', colors: ['#1E1240', '#7C3AED', '#C4B5FD'] },
     { id: 'bright', name: 'Bright Light', colors: ['#181B24', '#F0502A', '#6EC6FF'] },
   ];
+
+  // Audio Context for settings test alerts
+  const audioCtxRef = React.useRef<AudioContext | null>(null);
+
+  // Global listener to unlock iOS Safari Web Audio restrictions on any user gesture
+  React.useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        const ctx = audioCtxRef.current;
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        // Play a short silent buffer to satisfy iOS auto-play gesture requirements
+        if (ctx) {
+          const buffer = ctx.createBuffer(1, 1, 22050);
+          const source = ctx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(ctx.destination);
+          source.start(0);
+        }
+      } catch (e) {
+        console.warn('Silent audio unlock failed', e);
+      }
+    };
+
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('touchstart', unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
+  // Settings screen test chime and vibration player
+  const playSatisfactionChime = (triggerType: 'timer-end' | 'rotation-due' | 'test') => {
+    if (!soundEnabled) return;
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      const mainVolume = soundVolume;
+      const now = ctx.currentTime;
+
+      const playTone = (freq: number, startDelay: number, duration: number, type: OscillatorType = 'sine', decayMult = 1.0) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        const startTime = now + startDelay;
+        gainNode.gain.setValueAtTime(0.0001, startTime);
+        
+        // Attack
+        gainNode.gain.linearRampToValueAtTime(mainVolume * 0.35, startTime + 0.015);
+        // Decay
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration * decayMult);
+
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.05);
+      };
+
+      if (triggerType === 'rotation-due') {
+        if (soundTone === 'acoustic') {
+          playTone(587.33, 0.0, 0.45, 'sine');
+          playTone(587.33 * 1.5, 0.0, 0.3, 'sine');
+          playTone(880.00, 0.12, 0.55, 'sine');
+          playTone(880.00 * 1.5, 0.12, 0.4, 'sine');
+        } else if (soundTone === 'marimba') {
+          playTone(440.00, 0.0, 0.18, 'triangle');
+          playTone(554.37, 0.08, 0.22, 'triangle');
+        } else if (soundTone === 'digital') {
+          playTone(1046.50, 0.0, 0.08, 'square');
+          playTone(1567.98, 0.08, 0.12, 'square');
+        } else {
+          playTone(880, 0.0, 0.15, 'sine');
+          playTone(880, 0.2, 0.15, 'sine');
+        }
+      } else if (triggerType === 'timer-end') {
+        if (soundTone === 'acoustic') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            playTone(freq, idx * 0.1, 0.8, 'sine');
+            playTone(freq * 1.5, idx * 0.1, 0.6, 'sine');
+          });
+          notes.forEach((freq, idx) => {
+            playTone(freq, 0.7 + idx * 0.08, 0.8, 'sine');
+            playTone(freq * 1.5, 0.7 + idx * 0.08, 0.6, 'sine');
+          });
+        } else if (soundTone === 'marimba') {
+          const notes = [329.63, 392.00, 523.25, 659.25];
+          notes.forEach((freq, idx) => {
+            playTone(freq, idx * 0.08, 0.3, 'triangle');
+            playTone(freq, 0.35 + idx * 0.08, 0.3, 'triangle');
+            playTone(freq, 0.7 + idx * 0.08, 0.5, 'triangle');
+          });
+        } else if (soundTone === 'digital') {
+          for (let i = 0; i < 4; i++) {
+            playTone(1320, i * 0.18, 0.12, 'square');
+            playTone(1760, i * 0.18 + 0.06, 0.12, 'sawtooth');
+          }
+        } else {
+          playTone(880, 0.0, 0.25, 'sine');
+          playTone(880, 0.3, 0.25, 'sine');
+          playTone(880, 0.6, 0.25, 'sine');
+        }
+      } else if (triggerType === 'test') {
+        if (soundTone === 'acoustic') {
+          playTone(523.25, 0.0, 0.7, 'sine');
+          playTone(523.25 * 1.5, 0.0, 0.5, 'sine');
+        } else if (soundTone === 'marimba') {
+          playTone(523.25, 0.0, 0.25, 'triangle');
+        } else if (soundTone === 'digital') {
+          playTone(1200, 0.0, 0.08, 'square');
+        } else {
+          playTone(880, 0.0, 0.18, 'sine');
+        }
+      }
+    } catch (e) {
+      console.warn('Audio feedback failed', e);
+    }
+  };
+
+  const playSatisfactionVibration = (triggerType: 'timer-end' | 'rotation-due' | 'test') => {
+    if (!hapticEnabled) return;
+    try {
+      if (!navigator.vibrate) return;
+      let pattern: number[] = [];
+
+      if (hapticPattern === 'pulse') {
+        if (triggerType === 'rotation-due') {
+          pattern = [100, 50, 100];
+        } else if (triggerType === 'timer-end') {
+          pattern = [200, 100, 200, 100, 200];
+        } else {
+          pattern = [100];
+        }
+      } else if (hapticPattern === 'double-tap') {
+        if (triggerType === 'rotation-due') {
+          pattern = [50, 40, 50];
+        } else if (triggerType === 'timer-end') {
+          pattern = [70, 50, 70, 100, 70, 50, 70];
+        } else {
+          pattern = [60, 40, 60];
+        }
+      } else if (hapticPattern === 'heartbeat') {
+        if (triggerType === 'rotation-due') {
+          pattern = [80, 100, 150];
+        } else if (triggerType === 'timer-end') {
+          pattern = [120, 120, 250, 120, 120, 250];
+        } else {
+          pattern = [90, 90, 120];
+        }
+      } else if (hapticPattern === 'intense') {
+        if (triggerType === 'rotation-due') {
+          pattern = [250, 80, 250];
+        } else if (triggerType === 'timer-end') {
+          pattern = [400, 80, 400, 80, 400];
+        } else {
+          pattern = [300];
+        }
+      }
+
+      if (pattern.length > 0) {
+        navigator.vibrate(pattern);
+      }
+    } catch (e) {}
+  };
 
   return (
     <div className="space-y-6">
@@ -133,6 +331,159 @@ export default function SettingsScreen({
 
         {/* Backups & Activity Audit logs */}
         <div className="space-y-6">
+          {/* Sound & Vibration Preferences */}
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
+            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5 border-b border-gray-100 pb-2">
+              <Volume2 className="w-4 h-4 text-[var(--blue)]" />
+              <span>Vibration & Chime Alerts</span>
+            </h3>
+            
+            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+              Configure your game-day audio and tactile alerts. Any user interaction unlocks Web Audio on your device.
+            </p>
+
+            <div className="space-y-4">
+              {/* Sound Settings */}
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                    {soundEnabled ? (
+                      <Volume2 className="w-4 h-4 text-emerald-600 animate-pulse" />
+                    ) : (
+                      <VolumeX className="w-4 h-4 text-gray-400" />
+                    )}
+                    <span>Audio Chime Alerts</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={soundEnabled}
+                    onChange={(e) => onChangeSoundEnabled(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                  />
+                </div>
+
+                {soundEnabled && (
+                  <div className="space-y-3 animate-in fade-in duration-150">
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">Chime Sound Style</label>
+                      <select
+                        value={soundTone}
+                        onChange={(e) => onChangeSoundTone(e.target.value)}
+                        className="w-full text-xs bg-white border border-gray-200 rounded-lg p-2 font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="acoustic">🔔 Acoustic Chime (Rich Harmonics)</option>
+                        <option value="marimba">🪵 Warm Marimba (Soft Wood Tap)</option>
+                        <option value="digital">⚡ Digital Alert (Tech Blip)</option>
+                        <option value="classic">🔊 Classic Beep (Standard Sine)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[11px] font-semibold text-gray-500">Volume</label>
+                        <span className="text-[10px] font-mono font-bold text-indigo-600">{Math.round(soundVolume * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={soundVolume}
+                        onChange={(e) => onChangeSoundVolume(parseFloat(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Haptic Settings */}
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-indigo-600" />
+                    <span>Haptic Vibration</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={hapticEnabled}
+                    onChange={(e) => onChangeHapticEnabled(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                  />
+                </div>
+
+                {hapticEnabled && (
+                  <div className="space-y-2 animate-in fade-in duration-150">
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">Vibration Pattern</label>
+                      <select
+                        value={hapticPattern}
+                        onChange={(e) => onChangeHapticPattern(e.target.value)}
+                        className="w-full text-xs bg-white border border-gray-200 rounded-lg p-2 font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="pulse">📳 Standard Pulse (Alerts)</option>
+                        <option value="double-tap">💓 Heartbeat Rhythm</option>
+                        <option value="intense">⚡ High Intensity (Timer Ends)</option>
+                      </select>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5">
+                      <p className="text-[10px] text-amber-800 leading-relaxed font-semibold">
+                        ⚠️ iPhone Vibration Tip:
+                      </p>
+                      <p className="text-[9px] text-amber-700 leading-relaxed mt-0.5 font-medium">
+                        Apple iOS restricts the <code className="font-mono text-[10px]">navigator.vibrate</code> API inside Safari/Chrome. Vibration is unavailable on iPhones, but high-quality sound alerts play beautifully!
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Test Console */}
+              <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/60 space-y-2.5">
+                <div className="flex items-center gap-1.5">
+                  <Bell className="w-4 h-4 text-indigo-600 animate-bounce" />
+                  <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Sideline Test Console</span>
+                </div>
+                <p className="text-[10px] text-gray-500 leading-relaxed font-semibold">
+                  Test your active configurations below. Note: if your iPhone is on silent, iOS completely blocks audio chimes.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSatisfactionChime('test');
+                      playSatisfactionVibration('test');
+                    }}
+                    className="py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition uppercase cursor-pointer text-center"
+                  >
+                    ⚡ Test Tap
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSatisfactionChime('rotation-due');
+                      playSatisfactionVibration('rotation-due');
+                    }}
+                    className="py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition uppercase cursor-pointer text-center"
+                  >
+                    🔁 Rotation Alert
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSatisfactionChime('timer-end');
+                      playSatisfactionVibration('timer-end');
+                    }}
+                    className="py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold transition uppercase cursor-pointer text-center"
+                  >
+                    🚨 Timer Alarm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Backup Restore Card */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
             <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
