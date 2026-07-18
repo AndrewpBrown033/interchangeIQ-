@@ -1,10 +1,10 @@
-name: Deploy to Firebase Hosting on Merge
+name: Firebase Deploy
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main ]
+  workflow_dispatch:   # This enables the "Run workflow" button
+
 
 jobs:
   build_and_deploy:
@@ -29,6 +29,6 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
-          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_INTERCHANGEIQ }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_BATTRICKIQ }}"
           channelId: live
           projectId: interchangeiq
