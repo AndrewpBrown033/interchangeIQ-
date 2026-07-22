@@ -1,6 +1,6 @@
 import React from 'react';
 import { Player, GameInfo } from '../types';
-import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning } from 'lucide-react';
+import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp } from 'lucide-react';
 
 interface SummaryScreenProps {
   players: Player[];
@@ -123,43 +123,75 @@ export default function SummaryScreen({
       </div>
 
       {/* Main Grid: Game Details & History */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Current Match */}
         <div
           onClick={() => onNavigate('lineup')}
-          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-indigo-200 cursor-pointer transition shadow-sm space-y-4 group"
+          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-indigo-200 cursor-pointer transition shadow-sm space-y-4 group flex flex-col justify-between"
         >
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-100 transition">
-              <Trophy className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-black text-[var(--navy)] group-hover:text-indigo-950 transition">Current Match Details</h3>
-          </div>
-          <div className="bg-[#FAFBFF] p-4 rounded-xl border border-gray-100">
-            {gameInfo.round || gameInfo.team ? (
-              <div className="space-y-1">
-                <span className="text-[10px] font-black tracking-widest text-[var(--blue)] uppercase">
-                  {gameInfo.round || 'Active Round'}
-                </span>
-                <p className="text-lg font-black text-[var(--ink)]">
-                  vs {gameInfo.team || 'Opponent'}
-                </p>
-                <p className="text-xs text-[var(--muted)] font-semibold">
-                  Date: {gameInfo.date}
-                </p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-100 transition">
+                <Trophy className="w-5 h-5" />
               </div>
-            ) : (
-              <p className="text-sm text-[var(--muted)] font-bold">No active game. Start one below!</p>
-            )}
+              <h3 className="text-base font-black text-[var(--navy)] group-hover:text-indigo-950 transition">Current Match Details</h3>
+            </div>
+            <div className="bg-[#FAFBFF] p-4 rounded-xl border border-gray-100">
+              {gameInfo.round || gameInfo.team ? (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black tracking-widest text-[var(--blue)] uppercase">
+                    {gameInfo.round || 'Active Round'}
+                  </span>
+                  <p className="text-lg font-black text-[var(--ink)]">
+                    vs {gameInfo.team || 'Opponent'}
+                  </p>
+                  <p className="text-xs text-[var(--muted)] font-semibold">
+                    Date: {gameInfo.date}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--muted)] font-bold">No active game. Start one below!</p>
+              )}
+            </div>
           </div>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onNavigate('lineup');
             }}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
           >
             Open Current Match
+          </button>
+        </div>
+
+        {/* Player Growth & Progression */}
+        <div
+          onClick={() => onNavigate('growth')}
+          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-emerald-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-100 transition">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-black text-[var(--navy)] group-hover:text-emerald-950 transition">Player Growth & Skill Testing</h3>
+            </div>
+            <p className="text-sm text-emerald-900 font-extrabold">
+              AFL Girls Year-on-Year Progression
+            </p>
+            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+              Record 2km time trials, aerobic fitness ratings, dominant kick distance, and non-preferred foot mastery.
+            </p>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate('growth');
+            }}
+            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+          >
+            View Player Growth & Assessments
           </button>
         </div>
 
@@ -187,7 +219,7 @@ export default function SummaryScreen({
               e.stopPropagation();
               onNavigate('history');
             }}
-            className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-[var(--ink)] font-bold text-xs rounded-xl transition cursor-pointer"
+            className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-[var(--ink)] font-bold text-xs rounded-xl transition cursor-pointer mt-2"
           >
             Open Match History
           </button>

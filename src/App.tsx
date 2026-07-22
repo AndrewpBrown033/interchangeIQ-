@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
-  Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile
+  Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment
 } from './types';
-import { DEFAULT_PLAYERS, DEFAULT_DRILLS } from './constants';
+import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS } from './constants';
 
 // Firebase Integrations
 import { auth, db, signInAnonymously, onAuthStateChanged, User } from './lib/firebase';
@@ -14,6 +14,7 @@ import SummaryScreen from './components/SummaryScreen';
 import GameDayScreen from './components/GameDayScreen';
 import RotationsScreen from './components/RotationsScreen';
 import TeamScreen from './components/TeamScreen';
+import PlayerGrowthScreen from './components/PlayerGrowthScreen';
 import HistoryScreen from './components/HistoryScreen';
 import ScoringScreen from './components/ScoringScreen';
 import TrainingScreen from './components/TrainingScreen';
@@ -205,6 +206,18 @@ export default function App() {
     return DEFAULT_DRILLS;
   });
 
+  // Player Growth & Progression Testing Records
+  const [growthRecords, setGrowthRecords] = useState<SkillAssessment[]>(() => {
+    try {
+      const saved = localStorage.getItem('iiq_growth_records');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn("Failed to parse growthRecords:", e);
+    }
+    return DEFAULT_GROWTH_RECORDS;
+  });
+
   const [trainingState, setTrainingState] = useState<TrainingState>(() => {
     try {
       const saved = localStorage.getItem('iiq_training_state');
@@ -335,6 +348,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('iiq_username', userName); }, [userName]);
   useEffect(() => { localStorage.setItem('iiq_audit_logs', JSON.stringify(auditLogs)); }, [auditLogs]);
   useEffect(() => { localStorage.setItem('iiq_drills', JSON.stringify(drills)); }, [drills]);
+  useEffect(() => { localStorage.setItem('iiq_growth_records', JSON.stringify(growthRecords)); }, [growthRecords]);
   useEffect(() => { localStorage.setItem('iiq_training_state', JSON.stringify(trainingState)); }, [trainingState]);
   useEffect(() => { localStorage.setItem('iiq_teams', JSON.stringify(teams)); }, [teams]);
   useEffect(() => { localStorage.setItem('iiq_users', JSON.stringify(users)); }, [users]);
@@ -355,64 +369,53 @@ export default function App() {
     const handleAuthenticatedUser = (user: User) => {
       if (!active) return;
       setCurrentUser(user);
-      const userRef = doc(db, 'users', user.uid);
-      getDoc(userRef).then((snap) => {
-        if (!active) return;
-        if (!snap.exists()) {
-          setDoc(userRef, {
-            uid: user.uid,
-            email: user.email || 'anonymous@interchangeiq.com',
-            name: userName || 'Coach Andrew',
-            role: 'Admin',
-            teamIds: [activeTeamId || 'team1']
-          }).catch(e => console.warn("Error setting user profile in Firestore:", e.message));
-        }
-      }).catch(e => console.warn("Error getting user profile from Firestore:", e.message));
+      
+      // ONLY write user profile records to Firestore for registered non-anonymous users with emails.
+      // Guest / anonymous sessions must NOT create dummy 'anonymous@interchangeiq.com' documents in Firestore.
+      if (user.email && !user.isAnonymous) {
+        const userRef = doc(db, 'users', user.uid);
+        getDoc(userRef).then((snap) => {
+          if (!active) return;
+          if (!snap.exists()) {
+            setDoc(userRef, {
+              uid: user.uid,
+              email: user.email,
+              name: userName || 'Coach Andrew',
+              role: 'Admin',
+              teamIds: [activeTeamId || 'team1']
+            }).catch(e => console.warn("Error setting user profile in Firestore:", e.message));
+          }
+        }).catch(e => console.warn("Error getting user profile from Firestore:", e.message));
+      }
     };
 
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user) {
         handleAuthenticatedUser(user);
+      } else {
+        // Only trigger anonymous sign-in if no active Firebase Auth session exists
+        signInAnonymously(auth)
+          .then((cred) => {
+            if (active) console.log('Firebase Anonymous Session Active:', cred.user.uid);
+          })
+          .catch((err) => {
+            console.warn('Firebase Auth fallback to local mode:', err.message);
+            const fallbackUid = localStorage.getItem('iiq_fallback_uid') || `local_${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('iiq_fallback_uid', fallbackUid);
+            
+            const fallbackUser = {
+              uid: fallbackUid,
+              email: '',
+              displayName: userName || 'Coach Andrew',
+              isAnonymous: true,
+            } as any;
+
+            if (active) {
+              setCurrentUser(fallbackUser);
+            }
+          });
       }
     });
-
-    signInAnonymously(auth)
-      .then((cred) => {
-        console.log('Firebase Anonymous Session Started:', cred.user.uid);
-      })
-      .catch((err) => {
-        // Log as warning rather than error to avoid triggering test failures / console error checkers
-        console.warn('Firebase Auth failed (falling back to offline-first/local session mode):', err.message);
-        
-        // Setup local fallback anonymous session
-        const fallbackUid = localStorage.getItem('iiq_fallback_uid') || `local_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('iiq_fallback_uid', fallbackUid);
-        
-        const fallbackUser = {
-          uid: fallbackUid,
-          email: 'anonymous@interchangeiq.com',
-          displayName: userName || 'Coach Andrew',
-        } as any;
-
-        if (active) {
-          setCurrentUser(fallbackUser);
-          
-          // Try to sync fallback profile to Firestore (permitted by rules)
-          const userRef = doc(db, 'users', fallbackUid);
-          getDoc(userRef).then((snap) => {
-            if (!active) return;
-            if (!snap.exists()) {
-              setDoc(userRef, {
-                uid: fallbackUid,
-                email: 'anonymous@interchangeiq.com',
-                name: userName || 'Coach Andrew',
-                role: 'Admin',
-                teamIds: [activeTeamId || 'team1']
-              }).catch(e => console.warn("Optional fallback profile sync skipped:", e.message));
-            }
-          }).catch(e => console.warn("Optional fallback user read skipped:", e.message));
-        }
-      });
 
     return () => {
       active = false;
@@ -575,6 +578,7 @@ export default function App() {
         if (data.history && Array.isArray(data.history)) setHistory(data.history);
         if (data.savedLineups && Array.isArray(data.savedLineups)) setSavedLineups(data.savedLineups);
         if (data.drills && Array.isArray(data.drills)) setDrills(parseDrillList(data.drills));
+        if (data.growthRecords && Array.isArray(data.growthRecords)) setGrowthRecords(data.growthRecords);
 
         setLastSyncedAt(data.updatedAt || Date.now());
         setCloudConnected(true);
@@ -600,6 +604,7 @@ export default function App() {
           history,
           savedLineups,
           drills: sanitizeDrillList(drills),
+          growthRecords,
           updatedAt: Date.now()
         };
         setDoc(docRef, initialData).catch(err => console.warn("Error creating team doc:", err.message));
@@ -630,6 +635,7 @@ export default function App() {
       history,
       savedLineups,
       drills: sanitizeDrillList(drills),
+      growthRecords,
       updatedAt: Date.now()
     };
 
@@ -646,7 +652,7 @@ export default function App() {
     }, 1500); // 1.5 second debounce to prevent rapid Firestore writes during rapid user actions or drag and drop
 
     return () => clearTimeout(timer);
-  }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, activeTeamId]);
+  }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, growthRecords, activeTeamId]);
 
   // Log audit helper
   const logAudit = (action: string) => {
@@ -893,6 +899,7 @@ export default function App() {
     { id: 'lineup', label: 'Game Day', icon: <Play className="w-5 h-5 text-[var(--green)]" /> },
     { id: 'rotations', label: 'Rotations', icon: <RefreshCw className="w-5 h-5 text-[var(--cyan)]" /> },
     { id: 'team', label: 'Team', icon: <Users className="w-5 h-5" /> },
+    { id: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-5 h-5 text-emerald-500" /> },
     { id: 'training', label: 'Training', icon: <BookOpen className="w-5 h-5 text-indigo-400" /> },
     { id: 'history', label: 'History', icon: <History className="w-5 h-5" /> },
     { id: 'scoring', label: 'Scoring', icon: <BarChart3 className="w-5 h-5" /> },
@@ -1121,7 +1128,7 @@ export default function App() {
             lastSyncedAt={lastSyncedAt}
             userName={userName}
             role="Admin"
-            email={currentUser?.email || 'anonymous@interchangeiq.com'}
+            email={currentUser?.email || `${(userName || 'coach').toLowerCase().replace(/\s+/g, '.')}@interchangeiq.com`}
             onNavigate={handleSelectTab}
             onStartNewGame={handleStartNewGame}
           />
@@ -1176,6 +1183,15 @@ export default function App() {
             onSelectPlayerId={setSelectedPlayerId}
             lineup={lineup}
             onUpdateLineup={setLineup}
+          />
+        )}
+        {activeTab === 'growth' && (
+          <PlayerGrowthScreen
+            players={players}
+            growthRecords={growthRecords}
+            onUpdateGrowthRecords={setGrowthRecords}
+            selectedPlayerId={selectedPlayerId}
+            onSelectPlayerId={setSelectedPlayerId}
           />
         )}
         {activeTab === 'training' && (

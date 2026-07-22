@@ -154,7 +154,7 @@ export default function AdminScreen({
     onUpdateUsers(updated);
   };
 
-  const activeCoaches = users.filter((u) => u.status !== 'Pending');
+  const activeCoaches = users.filter((u) => u.status !== 'Pending' && u.email !== 'anonymous@interchangeiq.com');
   const pendingInvites = users.filter((u) => u.status === 'Pending');
 
   return (

@@ -111,6 +111,31 @@ export interface TeamProfile {
   createdAt: number;
 }
 
+export interface SkillAssessment {
+  id: string;
+  playerId: string;
+  date: string; // e.g. "2026-03-01"
+  seasonLabel: string; // e.g. "2025 Start of Season", "2026 Pre-Season", "2026 Mid-Season"
+  // Fitness
+  timeTrial2km?: string; // e.g. "08:45"
+  yoyoLevel?: string; // e.g. "15.2"
+  sprint20m?: string; // e.g. "3.40s"
+  fitnessRating: number; // 1-10
+  // Kicking
+  preferredFoot: 'Right' | 'Left';
+  kickDistanceMeters: number; // e.g. 35
+  kickAccuracyRating: number; // 1-10
+  oppositeFootRating: number; // 1-10 (Crucial for AFL Girls year-on-year growth)
+  // Fundamental Skills
+  handballRating: number; // 1-10
+  markingRating: number; // 1-10
+  tacklingRating: number; // 1-10
+  gameSenseRating: number; // 1-10
+  // Goals & Notes
+  developmentGoals: string;
+  coachNotes: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
