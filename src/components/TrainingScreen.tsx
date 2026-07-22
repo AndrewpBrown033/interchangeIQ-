@@ -1008,6 +1008,33 @@ export default function TrainingScreen({
               </p>
             )}
 
+            {/* Quick Paste / Import Section */}
+            <div className="mb-4 p-3 bg-indigo-50/80 border border-indigo-100 rounded-2xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Quick Paste / Import Drill Text</span>
+                </span>
+                <span className="text-[10px] text-indigo-600 font-semibold">Paste text from Rookie Me Coach or drill notes</span>
+              </div>
+              <textarea
+                placeholder="Paste drill description, session text, or notes here to auto-fill form..."
+                rows={2}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!val.trim()) return;
+                  const lines = val.split('\n').filter((l) => l.trim());
+                  if (lines.length > 0 && !formTitle) setFormTitle(lines[0].replace(/^#+|\*+/g, '').trim());
+                  if (lines.length > 1 && !formOverview) setFormOverview(lines.slice(1, 3).join(' '));
+                  if (lines.length > 2) {
+                    const stepLines = lines.slice(2).map((l, i) => [`Step ${i + 1}`, l.trim()] as [string, string]);
+                    if (stepLines.length > 0) setFormSteps(stepLines);
+                  }
+                }}
+                className="w-full p-2 text-xs border border-indigo-200 bg-white rounded-xl text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"
+              />
+            </div>
+
             <div className="space-y-4">
               {/* Drill Title */}
               <div>

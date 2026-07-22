@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Score, Rotation, Plan, GameInfo } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
-import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell } from 'lucide-react';
+import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers } from 'lucide-react';
+import PlanModeView from './PlanModeView';
 
 const POSITION_DESCRIPTIONS: Record<string, string> = {
   'FP-L': 'Forward Pocket Left',
@@ -36,6 +37,7 @@ interface GameDayScreenProps {
   rotations: Rotation[];
   onUpdateRotations: (rotations: Rotation[]) => void;
   plans: Plan[];
+  onUpdatePlans?: (plans: Plan[]) => void;
   activePlanIds: string[];
   onTogglePlanRunning: (planId: string) => void;
   onCompleteGame: () => void;
@@ -64,6 +66,7 @@ export default function GameDayScreen({
   rotations,
   onUpdateRotations,
   plans,
+  onUpdatePlans = () => {},
   activePlanIds,
   onTogglePlanRunning,
   onCompleteGame,
@@ -85,6 +88,7 @@ export default function GameDayScreen({
   const clockIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // UI state overlays
+  const [showPlanMode, setShowPlanMode] = useState(false);
   const [scoreExpanded, setScoreExpanded] = useState(false);
   const [insightsCollapsed, setInsightsCollapsed] = useState(true);
   const [alertCollapsed, setAlertCollapsed] = useState(false);
@@ -755,6 +759,13 @@ export default function GameDayScreen({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setShowPlanMode(true)}
+            className="px-3.5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-600 text-black rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Layers className="w-4 h-4" />
+            <span>Visual Plan Mode</span>
+          </button>
           <button
             onClick={onCompleteGame}
             className="px-3.5 py-2 text-xs font-bold bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition shadow-xs"
@@ -1901,6 +1912,24 @@ export default function GameDayScreen({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Plan Mode View Modal */}
+      {showPlanMode && (
+        <PlanModeView
+          onClose={() => setShowPlanMode(false)}
+          players={players}
+          onUpdatePlayers={onUpdatePlayers}
+          lineup={lineup}
+          onUpdateLineup={onUpdateLineup}
+          rotations={rotations}
+          onUpdateRotations={onUpdateRotations}
+          plans={plans}
+          onUpdatePlans={onUpdatePlans}
+          currentQuarter={score.quarter}
+          activePlanIds={activePlanIds}
+          onTogglePlanRunning={onTogglePlanRunning}
+        />
       )}
     </div>
   );

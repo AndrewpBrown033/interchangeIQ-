@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Player, Rotation, Plan, LineupTemplate } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
 import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers } from 'lucide-react';
+import PlanModeView from './PlanModeView';
 
 interface RotationsScreenProps {
   players: Player[];
@@ -28,6 +29,7 @@ export default function RotationsScreen({
 }: RotationsScreenProps) {
   const [selectedPlanId, setSelectedPlanId] = useState<string>(plans[0]?.id || '');
   const [showRotationModal, setShowRotationModal] = useState(false);
+  const [showPlanMode, setShowPlanMode] = useState(false);
   const [editingRotation, setEditingRotation] = useState<Rotation | null>(null);
 
   // Rotation Form states
@@ -271,6 +273,13 @@ export default function RotationsScreen({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setShowPlanMode(true)}
+            className="px-3.5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-600 text-black rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <Layers className="w-4 h-4" />
+            <span>Visual Oval Plan Mode</span>
+          </button>
           <button
             onClick={handleCreatePlan}
             className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-sm"
@@ -615,6 +624,23 @@ export default function RotationsScreen({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Visual Oval Plan Mode View Modal */}
+      {showPlanMode && (
+        <PlanModeView
+          onClose={() => setShowPlanMode(false)}
+          players={players}
+          onUpdatePlayers={() => {}}
+          lineup={lineup}
+          onUpdateLineup={onUpdateLineup}
+          rotations={rotations}
+          onUpdateRotations={onUpdateRotations}
+          plans={plans}
+          onUpdatePlans={onUpdatePlans}
+          activePlanIds={activePlanIds}
+          onTogglePlanRunning={onTogglePlanRunning}
+        />
       )}
     </div>
   );

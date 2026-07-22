@@ -1148,6 +1148,7 @@ export default function App() {
             rotations={rotations}
             onUpdateRotations={setRotations}
             plans={plans}
+            onUpdatePlans={setPlans}
             activePlanIds={activePlanIds}
             onTogglePlanRunning={handleTogglePlanRunning}
             onCompleteGame={handleCompleteGame}
