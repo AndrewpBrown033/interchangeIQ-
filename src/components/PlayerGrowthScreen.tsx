@@ -3,8 +3,9 @@ import { Player, SkillAssessment } from '../types';
 import {
   TrendingUp, Award, Zap, Target, Plus, Calendar, Activity,
   ChevronRight, ArrowUpRight, Sparkles, CheckCircle2, Search, Filter,
-  FileSpreadsheet, Edit3, Trash2, Flame
+  FileSpreadsheet, Edit3, Trash2, Flame, BookOpen
 } from 'lucide-react';
+import SkillRubricModal from './SkillRubricModal';
 
 interface PlayerGrowthScreenProps {
   players: Player[];
@@ -24,7 +25,22 @@ export default function PlayerGrowthScreen({
   const [selectedZone, setSelectedZone] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showRubricModal, setShowRubricModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<SkillAssessment | null>(null);
+
+  // Score selection callback from Rubric Modal
+  const handleRubricScoreSelect = (
+    category: 'kick' | 'oppFoot' | 'handball' | 'marking' | 'tackling' | 'gameSense' | 'fitness',
+    score: number
+  ) => {
+    if (category === 'kick') setFormKickAccuracy(score);
+    else if (category === 'oppFoot') setFormOppositeFoot(score);
+    else if (category === 'handball') setFormHandball(score);
+    else if (category === 'marking') setFormMarking(score);
+    else if (category === 'tackling') setFormTackling(score);
+    else if (category === 'gameSense') setFormGameSense(score);
+    else if (category === 'fitness') setFormFitnessRating(score);
+  };
 
   // Active Player Selection
   const activePlayerId = selectedPlayerId || players[0]?.id || '';
@@ -221,6 +237,14 @@ export default function PlayerGrowthScreen({
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => setShowRubricModal(true)}
+              className="px-3.5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="View Standardized AFL Skill Scoring Rubrics"
+            >
+              <BookOpen className="w-4 h-4 text-slate-950" />
+              <span>📖 Skill Rubrics</span>
+            </button>
             <button
               onClick={() => handleOpenAddModal(activePlayerId, 'fitness')}
               className="px-3.5 py-2.5 bg-indigo-500/30 hover:bg-indigo-500/40 border border-indigo-400/30 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
@@ -600,12 +624,22 @@ export default function PlayerGrowthScreen({
                 <TrendingUp className="w-5 h-5 text-emerald-600" />
                 <span>{editingRecord ? 'Edit Growth Record' : 'Record Skill & Fitness Benchmark'}</span>
               </h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-sm font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowRubricModal(true)}
+                  className="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-black transition flex items-center gap-1 cursor-pointer border border-amber-300"
+                  title="View 1-10 Rubric Criteria"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Rubric Guide</span>
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-sm font-bold p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Task-Focused Selector Bar */}
@@ -1000,6 +1034,14 @@ export default function PlayerGrowthScreen({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Skill Scoring Rubric Modal */}
+      {showRubricModal && (
+        <SkillRubricModal
+          onClose={() => setShowRubricModal(false)}
+          onSelectScore={handleRubricScoreSelect}
+        />
       )}
     </div>
   );

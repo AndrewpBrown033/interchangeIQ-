@@ -30,15 +30,47 @@ app.get("/api/health", (_req, res) => {
 // Jarvis AI Assistant endpoint
 app.post("/api/jarvis", async (req, res) => {
   try {
-    const { message, history, squad, drills, focusArea, targetPlayers, duration } = req.body;
+    const { message, history, squad, drills, focusArea, targetPlayers, duration, growthRecords } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: "Message is required." });
     }
 
-    // Build context summary for Jarvis
+    // Build growth assessment lookup per player
+    const growthLookup: Record<string, any[]> = {};
+    if (Array.isArray(growthRecords)) {
+      growthRecords.forEach((r: any) => {
+        if (!growthLookup[r.playerId]) growthLookup[r.playerId] = [];
+        growthLookup[r.playerId].push(r);
+      });
+    }
+
+    // Build rich squad summary including position heatmap slot times & skill assessments
     const squadSummary = Array.isArray(squad) && squad.length > 0
-      ? squad.map((p: any) => `- #${p.number} ${p.name} (${p.positions?.join(', ') || 'N/A'}) [Status: ${p.status || 'available'} ${p.note ? `Note: ${p.note}` : ''}]`).join("\n")
+      ? squad.map((p: any) => {
+          const activeMins = Math.round((p.active || 0) / 60);
+          const benchMins = Math.round((p.bench || 0) / 60);
+          
+          // Slot times heatmap breakdown
+          let slotHeatmapStr = "No recorded slot time data";
+          if (p.slotTimes && Object.keys(p.slotTimes).length > 0) {
+            slotHeatmapStr = Object.entries(p.slotTimes)
+              .map(([slot, secs]: [string, any]) => `${slot}: ${Math.round(Number(secs) / 60)} mins`)
+              .join(", ");
+          }
+
+          // Skill growth records
+          const pGrowth = growthLookup[p.id] || [];
+          const latestGrowth = pGrowth[pGrowth.length - 1];
+          let skillsStr = "No growth record saved yet";
+          if (latestGrowth) {
+            skillsStr = `Pref Foot: ${latestGrowth.preferredFoot || 'Right'} | Kick Acc: ${latestGrowth.kickAccuracyRating}/10 | Kick Dist: ${latestGrowth.kickDistanceMeters}m | Opposite Foot: ${latestGrowth.oppositeFootRating}/10 | Handball: ${latestGrowth.handballRating}/10 | Marking: ${latestGrowth.markingRating}/10 | Tackling: ${latestGrowth.tacklingRating}/10 | Game Sense: ${latestGrowth.gameSenseRating}/10 | 2km TT: ${latestGrowth.timeTrial2km || 'N/A'} | Yoyo: ${latestGrowth.yoyoLevel || 'N/A'} | Goals: "${latestGrowth.developmentGoals || 'None'}"`;
+          }
+
+          return `• #${p.number} ${p.name} (Nick: "${p.nick || ''}") | Pos: [${p.positions?.join(', ') || 'N/A'}] | Zone: ${p.primaryZone || 'N/A'} | Status: ${p.status || 'available'}
+  - Heatmap/Ground Time: On Field: ${activeMins} mins | Bench: ${benchMins} mins | Position Breakdown: { ${slotHeatmapStr} }
+  - Skill Profile & Assessments: ${skillsStr}`;
+        }).join("\n\n")
       : "No player list provided.";
 
     const drillsSummary = Array.isArray(drills) && drills.length > 0
@@ -46,30 +78,32 @@ app.post("/api/jarvis", async (req, res) => {
       : "No drills provided in library.";
 
     const systemInstruction = `You are Jarvis, an elite AFL (Australian Rules Football) Senior Coaching & Skill Development Assistant built into InterchangeIQ.
-Your role is to assist coaches with AFL training recommendations, player development, tactical session planning, and skill drills.
+Your role is to assist coaches in open conversation on EVERYTHING regarding:
+1. Individual Players & Squad Performance (Skill levels, kick accuracy, opposite foot ratings, 2km time trial times, game sense, tackling, marking, handballing).
+2. Position Heatmaps & Ground Time Distribution (Time recorded in specific field slots like Full Forward, Centre, Wing, Half Back, Ruck, Bench, etc., on-field vs bench percentages, rotation optimization).
+3. AFL Training Plans & Drill Recommendations (Aligning session objectives with the team's drill library).
+4. Match Strategy, Kick-In Traps, Stoppages & Official AFL Junior/Youth Curriculums.
 
 OFFICIAL AFL COACHING CURRICULUM FRAMEWORKS:
-You are equipped with knowledge from official AFL Coaching Curriculums:
 1. AFL Junior Coaching Curriculum - Level 6 (11-12 Years) Guidebook:
-   - URL: https://play.afl/sites/default/files/2023-10/Junior%20Coaching%20Curriculum%20-%20Level%206%20%2811-12%20Years%29%20Guidebook.pdf
    - Key Principles: Age-appropriate skill progression, small-sided games (SSGs), high touch frequency, game-sense constraints, dual-foot kicking development, dynamic footy prep warm-ups, positive feedback, and fun/engagement.
 2. AFL Youth Coaching Curriculum (13-17 Years):
-   - URL: https://play.afl/learning-resource/youth-coaching-curriculum#article-0
    - Key Principles: Technical refinement under match pressure, team structure & tactical principles (corridor movement, defensive transition), physical conditioning, position flexibility, player decision-making, and self-reflection.
 
 IMPORTANT INSTRUCTIONS:
-1. Always maintain a professional, encouraging, articulate, and knowledgeable AFL coach persona ("Jarvis").
-2. ALWAYS align recommendations to the drills available in the team's system library listed below wherever possible! (Note: The library includes both standard and newly created custom drills added by the coach).
-3. When referencing a drill from the library, clearly mention its EXACT title (e.g., [Drill: Title]) so the user can locate it in their system library.
-4. Integrate principles from the official AFL Junior & Youth Coaching Curriculums when suggesting session structures or answering questions, and feel free to cite or share these official AFL resource URLs when helpful.
-5. When asked for a training plan, construct a structured, timed schedule (e.g. Footy Prep Warm-up, Skill Blocks, Match Simulation, Cool Down) using existing drills in the library where possible, noting drill duration in minutes.
-6. Take into account any specified Focus Area (${focusArea || 'General'}), Target Players (${targetPlayers || 'All Squad'}), and Duration (${duration || '45 mins'}).
-7. If the user asks about specific players or positional needs, tailor the drill suggestions directly to those players and positions.
+1. Maintain a friendly, highly articulate, expert AFL Senior Coach persona ("Jarvis").
+2. Answer questions in an open, direct, analytical, and conversational manner.
+3. When answering questions about a player or group of players:
+   - Provide explicit stats from their Positional Heatmap / Ground Time breakdown (e.g., active mins on field vs bench mins, time spent at specific field slots).
+   - Reference their exact Skill Assessment scores (e.g. Kick Accuracy, Opposite Foot Rating, 2km Time Trial, Handballing, Marking, Tackling, Coach Notes).
+4. Always suggest actionable coaching takeaways or drills from the team's system drill library whenever appropriate.
+5. When referencing a drill from the library, clearly mention its EXACT title (e.g., [Drill: Title]) so the system can match and link it.
+6. Format your responses with clean Markdown headers, bullet points, and bold text for maximum readability.
 
-CURRENT TEAM SQUAD:
+CURRENT SQUAD (Heatmap, Time Recorded in Positions & Skill Profiles):
 ${squadSummary}
 
-CURRENT DRILL LIBRARY IN SYSTEM (Includes newly added drills):
+CURRENT DRILL LIBRARY IN SYSTEM:
 ${drillsSummary}`;
 
     // Format chat contents for Gemini API

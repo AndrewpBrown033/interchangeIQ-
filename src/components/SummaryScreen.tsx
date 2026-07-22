@@ -1,6 +1,6 @@
 import React from 'react';
 import { Player, GameInfo } from '../types';
-import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, Bot, Sparkles, ArrowRight } from 'lucide-react';
+import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp } from 'lucide-react';
 
 interface SummaryScreenProps {
   players: Player[];
@@ -63,42 +63,6 @@ export default function SummaryScreen({
           className="bg-[var(--green)] text-white px-4 py-2.5 rounded-xl font-bold text-xs hover:opacity-95 transition shadow-sm"
         >
           New Game Line Up
-        </button>
-      </div>
-
-      {/* Jarvis AI Coaching Assistant Banner */}
-      <div
-        onClick={() => onNavigate('jarvis')}
-        className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-6 rounded-2xl border border-indigo-800/40 shadow-md hover:shadow-xl transition-all cursor-pointer group flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden"
-      >
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 group-hover:scale-105 transition-transform shrink-0">
-            <Bot className="w-7 h-7 text-indigo-300" />
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-black text-white tracking-tight flex items-center gap-1.5">
-                <span>Jarvis AI Assistant</span>
-                <Sparkles className="w-4 h-4 text-amber-400" />
-              </h3>
-              <span className="px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-200 font-bold text-[10px] uppercase">
-                AFL Senior Coach
-              </span>
-            </div>
-            <p className="text-xs text-indigo-200/90 font-medium">
-              Get instant training recommendations, dual foot skill plans, and match drill suggestions aligned to your squad.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onNavigate('jarvis');
-          }}
-          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 shrink-0 cursor-pointer shadow-sm group-hover:translate-x-0.5"
-        >
-          <span>Talk to Jarvis AI</span>
-          <ArrowRight className="w-4 h-4" />
         </button>
       </div>
 

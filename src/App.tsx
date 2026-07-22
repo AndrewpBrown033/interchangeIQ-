@@ -897,9 +897,9 @@ export default function App() {
   // Nav configuration
   const navItems = [
     { id: 'summary', label: 'Summary', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'jarvis', label: 'Jarvis AI', icon: <Bot className="w-5 h-5 text-indigo-500" /> },
     { id: 'lineup', label: 'Game Day', icon: <Play className="w-5 h-5 text-[var(--green)]" /> },
     { id: 'rotations', label: 'Rotations', icon: <RefreshCw className="w-5 h-5 text-[var(--cyan)]" /> },
+    { id: 'jarvis', label: 'JARVIS AI', icon: <Bot className="w-5 h-5 text-purple-600" /> },
     { id: 'team', label: 'Team', icon: <Users className="w-5 h-5" /> },
     { id: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-5 h-5 text-emerald-500" /> },
     { id: 'training', label: 'Training', icon: <BookOpen className="w-5 h-5 text-indigo-400" /> },
@@ -1182,6 +1182,7 @@ export default function App() {
           <JarvisScreen
             players={players}
             drills={drills}
+            growthRecords={growthRecords}
             trainingState={trainingState}
             onUpdateTrainingState={setTrainingState}
             onNavigateTab={handleSelectTab}
@@ -1238,6 +1239,7 @@ export default function App() {
             activeTeamId={activeTeamId}
             onSelectTeam={setActiveTeamId}
             currentUserRole="Admin"
+            onNavigateTab={handleSelectTab}
           />
         )}
         {activeTab === 'settings' && (

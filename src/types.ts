@@ -147,3 +147,16 @@ export interface UserProfile {
   invitedAt?: number;
   inviteCode?: string;
 }
+
+export interface TacticalPrompt {
+  id: string;
+  title: string;
+  category: 'Ball Movement' | 'Defensive Structure' | 'Stoppages & Ruck' | 'Skill Benchmark' | 'Match Strategy' | 'Fitness & Conditioning' | 'Player Analysis' | 'Position Heatmap';
+  promptText: string;
+  focusArea?: string;
+  targetUnit?: string;
+  duration?: string;
+  isSystemDefault?: boolean;
+  createdBy?: string;
+  createdAt: number;
+}
