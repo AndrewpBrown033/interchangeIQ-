@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TeamProfile, UserProfile, TacticalPrompt } from '../types';
+import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory } from '../types';
 import {
   Plus,
   Trash,
@@ -27,7 +27,11 @@ import {
   Clock,
   Layers,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Trophy,
+  Activity,
+  Award,
+  FileText
 } from 'lucide-react';
 
 interface AdminScreenProps {
@@ -39,6 +43,10 @@ interface AdminScreenProps {
   onSelectTeam: (teamId: string) => void;
   currentUserRole: string;
   onNavigateTab?: (tab: string) => void;
+  players?: Player[];
+  savedLineups?: LineupTemplate[];
+  history?: GameHistory[];
+  lineup?: Record<string, string>;
 }
 
 export const DEFAULT_TACTICAL_PROMPTS: TacticalPrompt[] = [
@@ -161,8 +169,38 @@ export default function AdminScreen({
   onSelectTeam,
   currentUserRole,
   onNavigateTab,
+  players = [],
+  savedLineups = [],
+  history = [],
+  lineup = {},
 }: AdminScreenProps) {
   const [adminSection, setAdminSection] = useState<'access' | 'prompts'>('access');
+
+  // Squad summary metrics calculations
+  const squadCount = players.length;
+  const availableCount = players.filter((p) => p.status === 'available').length;
+  const injuredCount = players.filter((p) => p.status === 'injured').length;
+  const awayCount = players.filter((p) => p.status === 'away').length;
+
+  const totalGames = history.length;
+  const winsCount = history.filter((g) => {
+    const hTotal = (g.score?.home?.goals || 0) * 6 + (g.score?.home?.behinds || 0);
+    const aTotal = (g.score?.away?.goals || 0) * 6 + (g.score?.away?.behinds || 0);
+    return hTotal > aTotal;
+  }).length;
+  const lossesCount = history.filter((g) => {
+    const hTotal = (g.score?.home?.goals || 0) * 6 + (g.score?.home?.behinds || 0);
+    const aTotal = (g.score?.away?.goals || 0) * 6 + (g.score?.away?.behinds || 0);
+    return hTotal < aTotal;
+  }).length;
+  const drawsCount = Math.max(0, totalGames - winsCount - lossesCount);
+
+  const activeOnFieldCount = Object.values(lineup).filter(Boolean).length;
+  const activeOnBenchCount = players.filter(
+    (p) => p.status === 'available' && !Object.values(lineup).includes(p.id)
+  ).length;
+
+  const lineupsCount = savedLineups.length;
 
   // Tactical Prompts State
   const [prompts, setPrompts] = useState<TacticalPrompt[]>(() => {
@@ -517,24 +555,136 @@ export default function AdminScreen({
                 Manage your registered sports clubs. Active coaches can be assigned directly to individual team datasets.
               </p>
 
-              <div className="space-y-2">
+              {/* Squad Summary Counts Box */}
+              <div className="bg-[#f8fafc] border border-slate-200 p-4 rounded-xl space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-emerald-600" />
+                    <span className="font-extrabold text-xs text-[var(--navy)] uppercase tracking-wider">
+                      Squad Summary & Metrics
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    Live Counts
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Squad Count */}
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                      <span>Squad Count</span>
+                      <Users className="w-3.5 h-3.5 text-blue-600" />
+                    </div>
+                    <div className="text-xl font-black text-[var(--navy)]">
+                      {squadCount} <span className="text-xs font-semibold text-slate-500">Players</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 text-[9px] font-extrabold">
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {availableCount} Avail
+                      </span>
+                      {injuredCount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                          {injuredCount} Injured
+                        </span>
+                      )}
+                      {awayCount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          {awayCount} Away
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Games */}
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                      <span>Games Played</span>
+                      <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                    </div>
+                    <div className="text-xl font-black text-[var(--navy)]">
+                      {totalGames} <span className="text-xs font-semibold text-slate-500">Matches</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 text-[9px] font-extrabold">
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {winsCount} Wins
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                        {lossesCount} Losses
+                      </span>
+                      {drawsCount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                          {drawsCount} Draws
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Players Field / Bench Status */}
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                      <span>Field vs Bench</span>
+                      <Shield className="w-3.5 h-3.5 text-indigo-600" />
+                    </div>
+                    <div className="text-xl font-black text-[var(--navy)]">
+                      {activeOnFieldCount} <span className="text-xs font-semibold text-slate-500">Field</span> / {activeOnBenchCount} <span className="text-xs font-semibold text-slate-500">Bench</span>
+                    </div>
+                    <div className="text-[9px] font-extrabold text-slate-600">
+                      Starter slots: <span className="text-indigo-600">{activeOnFieldCount}/18</span> set
+                    </div>
+                  </div>
+
+                  {/* Lineups */}
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                      <span>Lineups Saved</span>
+                      <Layers className="w-3.5 h-3.5 text-cyan-600" />
+                    </div>
+                    <div className="text-xl font-black text-[var(--navy)]">
+                      {lineupsCount} <span className="text-xs font-semibold text-slate-500">Presets</span>
+                    </div>
+                    <button
+                      onClick={() => onNavigateTab?.('team')}
+                      className="text-[9px] font-bold text-cyan-700 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Manage Lineups →</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
                 {teams.map((t, index) => {
                   const isActive = activeTeamId === t.id;
                   return (
                     <div
                       key={`team-profile-${t.id || 'new'}-${index}`}
-                      className={`p-4 border rounded-xl flex items-center justify-between gap-4 transition ${
+                      className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
                         isActive ? 'border-[var(--green)] bg-green-50/50' : 'border-gray-100 bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div>
+                      <div className="space-y-1">
                         <b className="text-sm font-extrabold text-[var(--ink)] block">{t.name}</b>
-                        <span className="text-[10px] font-bold text-gray-500">
-                          ID: {t.id} {isActive ? '• Active selection' : ''}
-                        </span>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                          <span>ID: {t.id}</span>
+                          {isActive && <span className="text-emerald-600 font-extrabold">• Active Selection</span>}
+                        </div>
+                        {isActive && (
+                          <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] font-bold text-slate-600">
+                            <span className="px-2 py-0.5 rounded bg-white border border-slate-200">
+                              Squad: <strong className="text-slate-900">{squadCount}</strong>
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-white border border-slate-200">
+                              Games: <strong className="text-slate-900">{totalGames}</strong>
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-white border border-slate-200">
+                              Lineups: <strong className="text-slate-900">{lineupsCount}</strong>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 shrink-0">
                         <button
                           onClick={() => onSelectTeam(t.id)}
                           className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition cursor-pointer ${

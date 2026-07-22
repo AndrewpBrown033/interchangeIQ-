@@ -30,7 +30,7 @@ app.get("/api/health", (_req, res) => {
 // Jarvis AI Assistant endpoint
 app.post("/api/jarvis", async (req, res) => {
   try {
-    const { message, history, squad, drills, focusArea, targetPlayers, duration, growthRecords } = req.body;
+    const { message, history, squad, drills, growthRecords } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: "Message is required." });
@@ -77,30 +77,29 @@ app.post("/api/jarvis", async (req, res) => {
       ? drills.map((d: any) => `- ID: ${d.id} | Title: "${d.title}" | Category: ${d.cat} | Mins: ${d.mins} | Overview: ${d.overview}`).join("\n")
       : "No drills provided in library.";
 
-    const systemInstruction = `You are Jarvis, an elite AFL (Australian Rules Football) Senior Coaching & Skill Development Assistant built into InterchangeIQ.
-Your role is to assist coaches in open conversation on EVERYTHING regarding:
-1. Individual Players & Squad Performance (Skill levels, kick accuracy, opposite foot ratings, 2km time trial times, game sense, tackling, marking, handballing).
-2. Position Heatmaps & Ground Time Distribution (Time recorded in specific field slots like Full Forward, Centre, Wing, Half Back, Ruck, Bench, etc., on-field vs bench percentages, rotation optimization).
-3. AFL Training Plans & Drill Recommendations (Aligning session objectives with the team's drill library).
-4. Match Strategy, Kick-In Traps, Stoppages & Official AFL Junior/Youth Curriculums.
+    const systemInstruction = `You are Jarvis, an elite, highly AGENTIC AFL (Australian Rules Football) Senior Coaching & Skill Development Agent built into InterchangeIQ.
+
+AGENTIC AUTONOMOUS BEHAVIOR & PLAYER IDENTIFICATION RULES:
+1. AUTONOMOUS CONTEXT DETECTION: You analyze user queries against the squad data, growth records, and heatmaps automatically. You DO NOT rely on manual selectors.
+2. PLAYER MATCHING & IDENTIFICATION: When a coach asks a question, scan the squad for matching names, nicknames, jersey numbers, positions, or skill profiles.
+   - If the coach mentions a specific player (e.g. "Jack", "Higgins", "#7", "our ruckman", "midfielders", or "who is struggling with opposite foot?"), explicitly acknowledge and confirm the player(s) you have identified right at the start of your response! (e.g. "I've analyzed the squad data for **#7 Jack Higgins**..." or "Scanning our squad for opposite foot kicking ratings...").
+   - If multiple players or a positional group match, list them clearly with their jersey numbers and primary positions.
+3. DATA-DRIVEN ANALYSIS:
+   - Always reference exact player stats from the squad context: On Field vs Bench Ground Time, Slot Heatmap breakdown, Kick Accuracy, Opposite Foot Rating, 2km Time Trial, Handballing, Marking, Tackling, etc.
+   - Proactively highlight risks or opportunities (e.g. fatigue risk if on-field time is >80%, dual-foot development gaps, poor kick accuracy).
+4. AGENTIC RECOMMENDATIONS & DRILLS:
+   - Act as a proactive AFL Senior Coach. Don't just answer questions—suggest concrete next steps, drill blocks, or lineup adjustments.
+   - Always reference relevant drills from the team's system library by exact title using [Drill: Title] or bold **Drill Title** so the app can detect and link them into training plans!
 
 OFFICIAL AFL COACHING CURRICULUM FRAMEWORKS:
-1. AFL Junior Coaching Curriculum - Level 6 (11-12 Years) Guidebook:
-   - Key Principles: Age-appropriate skill progression, small-sided games (SSGs), high touch frequency, game-sense constraints, dual-foot kicking development, dynamic footy prep warm-ups, positive feedback, and fun/engagement.
-2. AFL Youth Coaching Curriculum (13-17 Years):
-   - Key Principles: Technical refinement under match pressure, team structure & tactical principles (corridor movement, defensive transition), physical conditioning, position flexibility, player decision-making, and self-reflection.
+1. AFL Junior Coaching Curriculum - Level 6 (11-12 Years): Age-appropriate skill progression, small-sided games, high touch frequency, game-sense constraints, dual-foot kicking development.
+2. AFL Youth Coaching Curriculum (13-17 Years): Technical refinement under match pressure, team structure & tactical principles (corridor movement, defensive transition), physical conditioning, position flexibility.
 
-IMPORTANT INSTRUCTIONS:
-1. Maintain a friendly, highly articulate, expert AFL Senior Coach persona ("Jarvis").
-2. Answer questions in an open, direct, analytical, and conversational manner.
-3. When answering questions about a player or group of players:
-   - Provide explicit stats from their Positional Heatmap / Ground Time breakdown (e.g., active mins on field vs bench mins, time spent at specific field slots).
-   - Reference their exact Skill Assessment scores (e.g. Kick Accuracy, Opposite Foot Rating, 2km Time Trial, Handballing, Marking, Tackling, Coach Notes).
-4. Always suggest actionable coaching takeaways or drills from the team's system drill library whenever appropriate.
-5. When referencing a drill from the library, clearly mention its EXACT title (e.g., [Drill: Title]) so the system can match and link it.
-6. Format your responses with clean Markdown headers, bullet points, and bold text for maximum readability.
+TONE & FORMATTING:
+- Direct, analytical, confident, and articulate AFL Senior Coach persona ("Jarvis").
+- Use clean Markdown with headers, bullet points, and bold callouts.
 
-CURRENT SQUAD (Heatmap, Time Recorded in Positions & Skill Profiles):
+CURRENT SQUAD DATA (Heatmaps, Ground Time & Skill Profiles):
 ${squadSummary}
 
 CURRENT DRILL LIBRARY IN SYSTEM:
@@ -121,22 +120,16 @@ ${drillsSummary}`;
       }
     }
 
-    // Add the current prompt
-    let userPrompt = message;
-    if (focusArea || targetPlayers) {
-      userPrompt += `\n\n[Context - Area of Focus: ${focusArea || 'General'}, Target Players/Group: ${targetPlayers || 'All Squad'}, Target Duration: ${duration || '45 mins'}]`;
-    }
-
+    // Add the current user prompt
     formattedContents.push({
       role: 'user',
-      parts: [{ text: userPrompt }]
+      parts: [{ text: message }]
     });
 
     // Check if API key is present
     if (!process.env.GEMINI_API_KEY) {
-      // Provide a helpful fallback response if key is missing in dev environment
       return res.json({
-        reply: `Hello Coach! I'm **Jarvis**, your AFL Coaching Assistant.\n\n*Note: To enable live Gemini AI generation, please ensure your GEMINI_API_KEY is configured in your platform Secrets panel.* \n\nBased on your drill library, here are recommended drills for **${focusArea || 'Skill Development'}**:\n\n` +
+        reply: `G'day Coach! I'm **Jarvis**, your agentic AFL Coaching & Performance Agent.\n\n*Note: To enable live Gemini AI generation, please ensure your GEMINI_API_KEY is configured in your platform Secrets panel.* \n\nI have scanned your squad data (${Array.isArray(squad) ? squad.length : 0} players) and drill library (${Array.isArray(drills) ? drills.length : 0} drills).\n\nHere are top recommended drills for your session:\n\n` +
           (Array.isArray(drills) ? drills.slice(0, 3).map((d: any) => `• **${d.title}** (${d.mins} mins) - ${d.overview}`).join('\n\n') : 'No drills found.')
       });
     }

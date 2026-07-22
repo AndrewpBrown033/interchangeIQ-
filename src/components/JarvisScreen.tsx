@@ -9,22 +9,13 @@ import {
   Plus,
   CheckCircle2,
   BookOpen,
-  Users,
-  Target,
-  Clock,
-  Zap,
   ArrowRight,
   MessageSquare,
   Trash2,
-  User,
-  Activity,
-  Award,
   History,
   Edit3,
   Check,
-  Flame,
-  Search,
-  ExternalLink
+  Search
 } from 'lucide-react';
 
 interface Message {
@@ -33,9 +24,6 @@ interface Message {
   content: string;
   timestamp: Date;
   matchedDrillIds?: string[];
-  focusArea?: string;
-  targetGroup?: string;
-  selectedPlayerName?: string;
 }
 
 interface ConversationThread {
@@ -44,8 +32,6 @@ interface ConversationThread {
   createdAt: number;
   updatedAt: number;
   messages: Message[];
-  selectedPlayerId?: string;
-  selectedFocus?: string;
 }
 
 interface JarvisScreenProps {
@@ -60,18 +46,9 @@ interface JarvisScreenProps {
 const DEFAULT_WELCOME_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
-  content: `G'day Coach! I'm **Jarvis**, your AFL Senior Coaching & Skill Development Assistant.\n\nAsk me **anything in open conversation** regarding:\n\n• 👤 **Individual Player Performance & Skill Levels** (Kick Accuracy, Opposite Foot Rating, 2km Time Trial, Handball, Marking, Tackling)\n• 🗺️ **Position Heatmaps & Ground Time** (Time recorded in specific field slots like Full Back, Midfield, Wing, Bench, and rotation efficiency)\n• ⚡ **AFL Drill Recommendations & Session Plans** (Aligned directly to your **library drills**)\n• 🏆 **Match Strategy & AFL Junior/Youth Curriculum Standards**\n\nUse the **Quick Asks** below or select a player to begin!`,
+  content: `G'day Coach! I'm **Jarvis**, your autonomous AFL Coaching & Performance Intelligence Agent.\n\nI automatically analyze your squad data, ground time heatmaps, and skill assessment records in real-time.\n\nAsk me **anything in open conversation** — for example:\n• *"How is Jack Higgins performing on kick accuracy and opposite foot?"*\n• *"Show me our midfield rotation ground times and who needs more bench rest"*\n• *"Who has the highest 2km time trial and fitness score?"*\n• *"Design a 45-minute corridor ball movement session with 3 drills from our library"*\n\nI will automatically identify the relevant players and suggest actionable coaching strategies!`,
   timestamp: new Date(),
 };
-
-const QUICK_ASKS = [
-  { label: 'Opposite Foot Audit', prompt: 'Identify our players with the lowest opposite foot kicking ratings and suggest targeted drills to develop dual-foot mastery.' },
-  { label: 'Position Heatmap Breakdown', prompt: 'Show ground time heatmap breakdown for Midfielders vs Defenders across the squad and highlight any rotation imbalances.' },
-  { label: '2km Time Trial Ranking', prompt: 'Who has the highest 2km time trial and fitness score in our player growth records?' },
-  { label: 'Corridor Ball Movement', prompt: 'Build a 45-minute AFL session targeting fast transition through the corridor with low-trajectory kicking and rapid handballs.' },
-  { label: 'Stoppages & Clearances', prompt: 'Recommend a high-intensity stoppage clearance session for Midfielders and Rucks to maximize ground-ball gets.' },
-  { label: 'Defensive Zone Wall', prompt: 'Develop a tactical blueprint and 3-drill block to teach our back six how to setup the defensive zone wall against quick opposition kick-ins.' },
-];
 
 export default function JarvisScreen({
   players,
@@ -87,11 +64,10 @@ export default function JarvisScreen({
   // Load saved conversation threads
   const [threads, setThreads] = useState<ConversationThread[]>(() => {
     try {
-      const saved = localStorage.getItem('iiq_jarvis_history_v2');
+      const saved = localStorage.getItem('iiq_jarvis_history_v3');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Convert string timestamps back to Date objects in messages
           return parsed.map((t: any) => ({
             ...t,
             messages: Array.isArray(t.messages)
@@ -102,7 +78,6 @@ export default function JarvisScreen({
       }
     } catch (_e) {}
 
-    // Initial default thread
     return [
       {
         id: `thread-${Date.now()}`,
@@ -118,18 +93,13 @@ export default function JarvisScreen({
     return threads[0]?.id || `thread-${Date.now()}`;
   });
 
-  // Current active thread messages
   const activeThread = threads.find((t) => t.id === activeThreadId) || threads[0];
   const messages = activeThread ? activeThread.messages : [DEFAULT_WELCOME_MESSAGE];
 
-  // Input & Filters State
   const [input, setInput] = useState('');
-  const [selectedFocus, setSelectedFocus] = useState<string>('All-Round AFL Skills');
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string>('all');
   const [loading, setLoading] = useState(false);
   const [addedPlanNotice, setAddedPlanNotice] = useState<string | null>(null);
 
-  // Thread editing
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitleText, setEditingTitleText] = useState('');
   const [historySearch, setHistorySearch] = useState('');
@@ -142,14 +112,12 @@ export default function JarvisScreen({
     }
   }, [messages, loading, activeTab]);
 
-  // Persist threads to localStorage on change
   useEffect(() => {
     try {
-      localStorage.setItem('iiq_jarvis_history_v2', JSON.stringify(threads));
+      localStorage.setItem('iiq_jarvis_history_v3', JSON.stringify(threads));
     } catch (_e) {}
   }, [threads]);
 
-  // Check for pending prompt passed from Admin screen
   useEffect(() => {
     try {
       const pending = localStorage.getItem('iiq_pending_jarvis_prompt');
@@ -161,13 +129,6 @@ export default function JarvisScreen({
     } catch (_e) {}
   }, []);
 
-  // Focused player instance
-  const focusedPlayer = players.find((p) => p.id === selectedPlayerId);
-  const focusedPlayerGrowth = focusedPlayer
-    ? growthRecords.filter((r) => r.playerId === focusedPlayer.id).slice(-1)[0]
-    : null;
-
-  // Helper to update active thread's messages
   const updateActiveThreadMessages = (newMessages: Message[], customTitle?: string) => {
     setThreads((prevThreads) =>
       prevThreads.map((t) => {
@@ -178,7 +139,7 @@ export default function JarvisScreen({
           } else if (t.title === 'Initial Coaching Session' || t.title === 'New Conversation') {
             const firstUserMsg = newMessages.find((m) => m.role === 'user');
             if (firstUserMsg) {
-              updatedTitle = firstUserMsg.content.slice(0, 32) + (firstUserMsg.content.length > 32 ? '...' : '');
+              updatedTitle = firstUserMsg.content.slice(0, 36) + (firstUserMsg.content.length > 36 ? '...' : '');
             }
           }
           return {
@@ -193,7 +154,6 @@ export default function JarvisScreen({
     );
   };
 
-  // Start new conversation thread
   const handleCreateNewThread = () => {
     const newThread: ConversationThread = {
       id: `thread-${Date.now()}`,
@@ -204,7 +164,7 @@ export default function JarvisScreen({
         {
           id: `msg-${Date.now()}`,
           role: 'assistant',
-          content: `New thread started! Ask me any question on squad skill assessments, ground time heatmaps, or training sessions.`,
+          content: `New thread started! Ask me any question regarding your players, position heatmaps, ground time, or drill sessions.`,
           timestamp: new Date(),
         },
       ],
@@ -214,11 +174,9 @@ export default function JarvisScreen({
     setActiveTab('thread');
   };
 
-  // Delete thread
   const handleDeleteThread = (threadId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (threads.length <= 1) {
-      // Just reset the single thread
       const resetThread: ConversationThread = {
         id: `thread-${Date.now()}`,
         title: 'Initial Coaching Session',
@@ -237,7 +195,6 @@ export default function JarvisScreen({
     }
   };
 
-  // Save thread title edit
   const handleSaveTitleEdit = (threadId: string) => {
     if (!editingTitleText.trim()) {
       setEditingThreadId(null);
@@ -249,7 +206,6 @@ export default function JarvisScreen({
     setEditingThreadId(null);
   };
 
-  // Extract matching drill IDs from Jarvis's response text
   const detectMatchedDrills = (text: string): string[] => {
     const matches: string[] = [];
     const lowerText = text.toLowerCase();
@@ -268,18 +224,11 @@ export default function JarvisScreen({
     const query = (textToSend || input).trim();
     if (!query || loading) return;
 
-    let enrichedQuery = query;
-    if (focusedPlayer) {
-      enrichedQuery = `[Query regarding Player: ${focusedPlayer.name} (#${focusedPlayer.number})]\n${query}`;
-    }
-
     const userMessage: Message = {
       id: `msg-${Date.now()}-u`,
       role: 'user',
       content: query,
       timestamp: new Date(),
-      focusArea: selectedFocus,
-      selectedPlayerName: focusedPlayer ? focusedPlayer.name : undefined,
     };
 
     const newMessages = [...messages, userMessage];
@@ -293,9 +242,7 @@ export default function JarvisScreen({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: enrichedQuery,
-          focusArea: selectedFocus,
-          targetPlayers: focusedPlayer ? focusedPlayer.name : 'Whole Squad',
+          message: query,
           squad: players,
           drills: drills,
           growthRecords: growthRecords,
@@ -323,7 +270,6 @@ export default function JarvisScreen({
         content: reply,
         timestamp: new Date(),
         matchedDrillIds: matchedIds,
-        selectedPlayerName: focusedPlayer ? focusedPlayer.name : undefined,
       };
 
       updateActiveThreadMessages([...newMessages, assistantMessage]);
@@ -340,13 +286,12 @@ export default function JarvisScreen({
     }
   };
 
-  // Convert matched drills in Jarvis message to a new Training Plan
   const handleCreatePlanFromJarvis = (msg: Message) => {
     const matchedIds = msg.matchedDrillIds && msg.matchedDrillIds.length > 0
       ? msg.matchedDrillIds
       : drills.slice(0, 3).map(d => d.id);
 
-    const planName = `Jarvis Plan: ${msg.selectedPlayerName ? `${msg.selectedPlayerName} - ` : ''}${msg.focusArea || selectedFocus}`;
+    const planName = `Jarvis Plan (${new Date().toLocaleDateString()})`;
     const newPlan = {
       id: `plan-${Date.now()}`,
       name: planName,
@@ -365,7 +310,6 @@ export default function JarvisScreen({
     setTimeout(() => setAddedPlanNotice(null), 4000);
   };
 
-  // Add a specific single drill to active or new plan
   const handleAddDrillToActivePlan = (drillId: string) => {
     const drill = drills.find((d) => d.id === drillId);
     if (!drill) return;
@@ -417,7 +361,7 @@ export default function JarvisScreen({
 
   return (
     <div className="space-y-6">
-      {/* Header Banner & Navigation Tabs */}
+      {/* Header Banner */}
       <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white rounded-3xl p-6 border border-indigo-800/40 shadow-xl relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -430,20 +374,19 @@ export default function JarvisScreen({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">Jarvis AI Coaching Assistant</h1>
+                <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">Jarvis Agentic AI Assistant</h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Live Assistant Mode
+                  Agentic Mode
                 </span>
               </div>
               <p className="text-xs text-indigo-200/80 font-medium mt-1 max-w-2xl leading-relaxed">
-                Clear, direct coaching conversation thread. Ask about specific player skill scores, ground time heatmaps, or session drill recommendations.
+                Autonomous coaching intelligence. Ask anything about your players, heatmaps, skill ratings, or drill recommendations — Jarvis will automatically deduce player context from squad data.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto shrink-0">
-            {/* View Switcher: Coaching Thread vs Conversation History */}
             <div className="flex bg-white/10 backdrop-blur-md p-1 rounded-2xl border border-white/15">
               <button
                 onClick={() => setActiveTab('thread')}
@@ -465,7 +408,7 @@ export default function JarvisScreen({
                 }`}
               >
                 <History className="w-4 h-4" />
-                <span>Conversation History</span>
+                <span>History</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 font-black">
                   {threads.length}
                 </span>
@@ -503,92 +446,10 @@ export default function JarvisScreen({
         </div>
       )}
 
-      {/* TAB 1: MAIN COACHING THREAD */}
+      {/* MAIN COACHING THREAD */}
       {activeTab === 'thread' && (
         <div className="space-y-4">
-          {/* Target Player Bar (Minimal & Clean) */}
-          <div className="bg-white p-3.5 rounded-2xl border border-[var(--line)] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-xl">
-                <User className="w-4 h-4" />
-              </span>
-              <div>
-                <span className="text-[10px] font-black uppercase text-[var(--muted)] block">Target Player Focus</span>
-                <select
-                  value={selectedPlayerId}
-                  onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  className="bg-transparent text-xs font-black text-[var(--navy)] focus:outline-none cursor-pointer"
-                >
-                  <option value="all">⚡ Entire Squad (General Coaching Query)</option>
-                  {players.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      #{p.number} {p.name} ({p.positions?.join(', ') || 'Utility'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {focusedPlayer && (
-              <div className="flex items-center gap-3 bg-indigo-50/70 border border-indigo-100 px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-950">
-                <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">
-                  #{focusedPlayer.number}
-                </div>
-                <span>{focusedPlayer.name}</span>
-                <span className="text-gray-400">•</span>
-                <span className="text-emerald-700">On Field: {Math.round((focusedPlayer.active || 0) / 60)}m</span>
-                {focusedPlayerGrowth && (
-                  <>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-indigo-700">Opp Foot: {focusedPlayerGrowth.oppositeFootRating}/10</span>
-                  </>
-                )}
-                <button
-                  onClick={() => setSelectedPlayerId('all')}
-                  className="text-gray-400 hover:text-gray-700 font-black ml-1"
-                  title="Clear Player Selection"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={() => onNavigateTab('admin')}
-              className="text-[11px] font-extrabold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1 self-end sm:self-auto"
-            >
-              <span>Manage Prompts & System Settings in Admin</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Quick Asks Strip */}
-          <div className="bg-white p-3 rounded-2xl border border-[var(--line)] shadow-2xs space-y-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Quick Asks</span>
-              </span>
-              <span className="text-[10px] font-semibold text-[var(--muted)]">Tap any suggestion to run immediately</span>
-            </div>
-
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {QUICK_ASKS.map((qa, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSendMessage(qa.prompt)}
-                  disabled={loading}
-                  className="px-3 py-1.5 bg-gray-50 hover:bg-indigo-600 hover:text-white border border-gray-200 hover:border-indigo-600 text-gray-800 text-[11px] font-extrabold rounded-xl transition cursor-pointer shrink-0 shadow-2xs flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3 h-3 text-amber-500" />
-                  <span>{qa.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Main Conversation Window */}
-          <div className="bg-white rounded-3xl border border-[var(--line)] shadow-sm overflow-hidden flex flex-col h-[520px]">
+          <div className="bg-white rounded-3xl border border-[var(--line)] shadow-sm overflow-hidden flex flex-col h-[580px]">
             {/* Thread Top Bar */}
             <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
               <div className="flex items-center gap-2">
@@ -648,7 +509,7 @@ export default function JarvisScreen({
                         </span>
                       </div>
 
-                      {/* Matched Drills Action Box for Assistant Messages */}
+                      {/* Matched Drills Action Box */}
                       {isAssistant && msg.matchedDrillIds && msg.matchedDrillIds.length > 0 && (
                         <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3.5 space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -719,7 +580,7 @@ export default function JarvisScreen({
                 <div className="flex gap-3 items-center text-indigo-600 bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-100 w-fit">
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span className="text-xs font-bold">
-                    Jarvis is analyzing player metrics & drills...
+                    Jarvis is scanning squad records, heatmaps & drills...
                   </span>
                 </div>
               )}
@@ -740,11 +601,7 @@ export default function JarvisScreen({
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={
-                    focusedPlayer
-                      ? `Ask Jarvis about ${focusedPlayer.name}'s heatmap, skills, or drills...`
-                      : "Ask Jarvis questions on players, position heatmaps, skill levels, or drills..."
-                  }
+                  placeholder="Ask Jarvis about players, heatmaps, opposite foot ratings, or session plans..."
                   className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-[var(--ink)] focus:outline-none focus:border-indigo-500 focus:bg-white transition"
                   disabled={loading}
                 />
@@ -762,7 +619,7 @@ export default function JarvisScreen({
         </div>
       )}
 
-      {/* TAB 2: CONVERSATION HISTORY */}
+      {/* CONVERSATION HISTORY TAB */}
       {activeTab === 'history' && (
         <div className="bg-white rounded-3xl border border-[var(--line)] shadow-sm p-6 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
@@ -876,7 +733,6 @@ export default function JarvisScreen({
 
                   <div className="flex items-center justify-between text-[11px] font-bold text-gray-500 pt-2 border-t border-gray-100">
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
                       {new Date(t.updatedAt).toLocaleDateString()} • {t.messages.length} messages
                     </span>
 

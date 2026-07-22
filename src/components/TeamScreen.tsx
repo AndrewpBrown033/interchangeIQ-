@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
-import { POSITION_GROUPS, POSITIONS } from '../constants';
-import { Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, Check, X, Flame, Sparkles, Clock, Activity } from 'lucide-react';
+import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS } from '../constants';
+import { Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, Check, X, Flame, Sparkles, Clock, Activity, RotateCcw } from 'lucide-react';
 
 interface TeamScreenProps {
   players: Player[];
@@ -229,20 +229,37 @@ export default function TeamScreen({
     }
   };
 
+  const handleRestoreDefaultSquad = () => {
+    if (players.length > 0) {
+      if (!window.confirm("Restore default AFL squad (22 players)? This will reset your current player list to default data.")) {
+        return;
+      }
+    }
+    onUpdatePlayers(DEFAULT_PLAYERS);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top action header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
         <div>
-          <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Team Squad</h2>
+          <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Team Squad ({players.length})</h2>
           <p className="text-xs text-[var(--muted)] font-semibold mt-1">
             Manage player profiles, positional zones, and status
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
+            onClick={handleRestoreDefaultSquad}
+            className="px-3.5 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Reload default squad of 22 players"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-gray-600" />
+            <span>Restore Default Squad</span>
+          </button>
+          <button
             onClick={handleOpenAddPlayer}
-            className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Player</span>
@@ -320,6 +337,19 @@ export default function TeamScreen({
                 </div>
               );
             })}
+
+            {filtered.length === 0 && (
+              <div className="p-8 text-center space-y-3 bg-gray-50/50">
+                <p className="text-xs font-extrabold text-gray-500">No players found in active squad roster.</p>
+                <button
+                  onClick={handleRestoreDefaultSquad}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 mx-auto cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restore Default Squad (22 Players)</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

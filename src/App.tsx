@@ -570,7 +570,15 @@ export default function App() {
         // Mark that we are applying remote updates to prevent uploading them right back
         setIsSyncingFromServer(true);
 
-        if (data.players && Array.isArray(data.players)) setPlayers(data.players);
+        if (data.players && Array.isArray(data.players)) {
+          if (data.players.length > 0) {
+            setPlayers(data.players);
+          } else {
+            setPlayers((prev) => (prev && prev.length > 0 ? prev : DEFAULT_PLAYERS));
+          }
+        } else {
+          setPlayers((prev) => (prev && prev.length > 0 ? prev : DEFAULT_PLAYERS));
+        }
         if (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) setLineup(data.lineup);
         if (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) setScore(data.score);
         if (data.gameInfo && typeof data.gameInfo === 'object' && !Array.isArray(data.gameInfo)) setGameInfo(data.gameInfo);
@@ -1240,6 +1248,10 @@ export default function App() {
             onSelectTeam={setActiveTeamId}
             currentUserRole="Admin"
             onNavigateTab={handleSelectTab}
+            players={players}
+            savedLineups={savedLineups}
+            history={history}
+            lineup={lineup}
           />
         )}
         {activeTab === 'settings' && (
