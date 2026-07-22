@@ -11,6 +11,7 @@ import { doc, setDoc, getDoc, onSnapshot, collection, deleteDoc } from 'firebase
 
 // Screens imports
 import SummaryScreen from './components/SummaryScreen';
+import JarvisScreen from './components/JarvisScreen';
 import GameDayScreen from './components/GameDayScreen';
 import RotationsScreen from './components/RotationsScreen';
 import TeamScreen from './components/TeamScreen';
@@ -25,7 +26,7 @@ import LoginScreen from './components/LoginScreen';
 // Lucide Icons
 import {
   LayoutDashboard, Play, RefreshCw, Users, History, BarChart3,
-  BookOpen, Shield, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert
+  BookOpen, Shield, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot
 } from 'lucide-react';
 
 // Helper functions to serialize/deserialize Drill steps to avoid nested arrays in Firestore
@@ -896,6 +897,7 @@ export default function App() {
   // Nav configuration
   const navItems = [
     { id: 'summary', label: 'Summary', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'jarvis', label: 'Jarvis AI', icon: <Bot className="w-5 h-5 text-indigo-500" /> },
     { id: 'lineup', label: 'Game Day', icon: <Play className="w-5 h-5 text-[var(--green)]" /> },
     { id: 'rotations', label: 'Rotations', icon: <RefreshCw className="w-5 h-5 text-[var(--cyan)]" /> },
     { id: 'team', label: 'Team', icon: <Users className="w-5 h-5" /> },
@@ -1175,6 +1177,15 @@ export default function App() {
             onUpdateLineup={setLineup}
           />
         )}
+        {activeTab === 'jarvis' && (
+          <JarvisScreen
+            players={players}
+            drills={drills}
+            trainingState={trainingState}
+            onUpdateTrainingState={setTrainingState}
+            onNavigateTab={handleSelectTab}
+          />
+        )}
         {activeTab === 'team' && (
           <TeamScreen
             players={players}
@@ -1200,6 +1211,7 @@ export default function App() {
             onUpdateDrills={setDrills}
             trainingState={trainingState}
             onUpdateTrainingState={setTrainingState}
+            onNavigateToJarvis={() => handleSelectTab('jarvis')}
           />
         )}
         {activeTab === 'history' && (

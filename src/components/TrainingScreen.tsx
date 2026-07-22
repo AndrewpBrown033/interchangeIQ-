@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Drill, TrainingState } from '../types';
-import { Play, Pause, Library, FolderHeart, Plus, Trash, ArrowLeft, ArrowRight, Eye, Edit3, Check, X, FileEdit } from 'lucide-react';
+import { Play, Pause, Library, FolderHeart, Plus, Trash, ArrowLeft, ArrowRight, Eye, Edit3, Check, X, FileEdit, Bot, Sparkles } from 'lucide-react';
 
 interface TrainingScreenProps {
   drills: Drill[];
   onUpdateDrills: (updated: Drill[]) => void;
   trainingState: TrainingState;
   onUpdateTrainingState: (state: TrainingState) => void;
+  onNavigateToJarvis?: () => void;
 }
 
 export default function TrainingScreen({
@@ -14,6 +15,7 @@ export default function TrainingScreen({
   onUpdateDrills,
   trainingState,
   onUpdateTrainingState,
+  onNavigateToJarvis,
 }: TrainingScreenProps) {
   const [showAddEditModal, setShowAddEditModal] = useState(false);
   const [editingDrill, setEditingDrill] = useState<Drill | null>(null);
@@ -539,6 +541,16 @@ export default function TrainingScreen({
             >
               {trainingState.motionPaused ? <Play className="w-3.5 h-3.5 text-[var(--green)]" /> : <Pause className="w-3.5 h-3.5 text-[var(--amber)]" />}
               <span>{trainingState.motionPaused ? 'Play routes' : 'Pause routes'}</span>
+            </button>
+          )}
+
+          {onNavigateToJarvis && (
+            <button
+              onClick={onNavigateToJarvis}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-xs cursor-pointer"
+            >
+              <Bot className="w-4 h-4 text-indigo-200" />
+              <span>Ask Jarvis AI</span>
             </button>
           )}
 
