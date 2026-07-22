@@ -268,18 +268,41 @@ export default function JarvisScreen({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0 bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-            <div className="text-right">
-              <span className="text-[10px] uppercase tracking-wider text-indigo-200/70 font-black block">Connected Library</span>
-              <span className="text-sm font-black text-white">{drills.length} AFL Drills • {players.length} Players</span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 self-start md:self-auto shrink-0">
+            <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/15">
+              <a
+                href="https://play.afl/sites/default/files/2023-10/Junior%20Coaching%20Curriculum%20-%20Level%206%20%2811-12%20Years%29%20Guidebook.pdf"
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1.5 bg-indigo-500/30 hover:bg-indigo-500/50 text-indigo-100 hover:text-white rounded-xl text-[11px] font-extrabold transition flex items-center gap-1 border border-indigo-400/30"
+                title="AFL Junior Coaching Curriculum - Level 6 Guidebook"
+              >
+                <span>📄 Junior (11-12Y) Guide</span>
+              </a>
+              <a
+                href="https://play.afl/learning-resource/youth-coaching-curriculum#article-0"
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1.5 bg-blue-500/30 hover:bg-blue-500/50 text-blue-100 hover:text-white rounded-xl text-[11px] font-extrabold transition flex items-center gap-1 border border-blue-400/30"
+                title="AFL Youth Coaching Curriculum"
+              >
+                <span>📘 Youth Curriculum</span>
+              </a>
             </div>
-            <button
-              onClick={() => onNavigateTab('training')}
-              className="p-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>Drills</span>
-            </button>
+
+            <div className="flex items-center gap-2.5 bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+              <div className="text-right">
+                <span className="text-[10px] uppercase tracking-wider text-indigo-200/70 font-black block">Connected Library</span>
+                <span className="text-sm font-black text-white">{drills.length} AFL Drills • {players.length} Players</span>
+              </div>
+              <button
+                onClick={() => onNavigateTab('training')}
+                className="p-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Drills</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -447,6 +470,40 @@ export default function JarvisScreen({
             </div>
             <p className="text-xs text-[var(--muted)] font-semibold line-clamp-2">
               Combine high-intensity aerobic repetition with drill skill blocks.
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              handlePresetPrompt(
+                `What are the core skill progression principles and small-sided game guidelines from the official AFL Junior Coaching Curriculum Level 6 (11-12 Years) Guidebook?`
+              )
+            }
+            className="p-3.5 bg-amber-50/60 hover:bg-amber-50 border border-amber-200 hover:border-amber-300 rounded-2xl text-left transition shadow-xs group cursor-pointer space-y-1.5"
+          >
+            <div className="flex items-center gap-2 text-amber-700 font-black text-xs group-hover:text-amber-900">
+              <BookOpen className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>AFL Junior Curriculum (11-12Y)</span>
+            </div>
+            <p className="text-xs text-amber-800/80 font-semibold line-clamp-2">
+              Level 6 guidebook guidelines: small-sided games, footy prep & touch frequency.
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              handlePresetPrompt(
+                `How does the official AFL Youth Coaching Curriculum (13-17 Years) recommend structuring tactical ball movement, corridor play, and game speed pressure?`
+              )
+            }
+            className="p-3.5 bg-blue-50/60 hover:bg-blue-50 border border-blue-200 hover:border-blue-300 rounded-2xl text-left transition shadow-xs group cursor-pointer space-y-1.5"
+          >
+            <div className="flex items-center gap-2 text-blue-700 font-black text-xs group-hover:text-blue-900">
+              <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>AFL Youth Curriculum (13-17Y)</span>
+            </div>
+            <p className="text-xs text-blue-800/80 font-semibold line-clamp-2">
+              Youth curriculum framework: tactical decision making, team defense & match speed.
             </p>
           </button>
         </div>
