@@ -9,7 +9,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Initialize Gemini API client on the server side
 const ai = new GoogleGenAI({
@@ -115,6 +116,18 @@ ${drillsSummary}`;
       details: err.message || "An error occurred while communicating with Gemini."
     });
   }
+});
+
+// Global API Error Handler to always return JSON for server errors
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+  console.error("API Error caught:", err);
+  res.status(err.status || 500).json({
+    error: err.message || "Server Error",
+    details: err.toString()
+  });
 });
 
 async function startServer() {

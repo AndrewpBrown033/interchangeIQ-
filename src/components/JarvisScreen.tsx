@@ -131,7 +131,14 @@ export default function JarvisScreen({
         }),
       });
 
-      const data = await res.json();
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch (_e) {
+        throw new Error(`Server returned invalid response (Status ${res.status}).`);
+      }
+
       const reply = data.reply || data.error || 'Sorry Coach, I could not generate a response right now.';
 
       const matchedIds = detectMatchedDrills(reply);
