@@ -1259,6 +1259,9 @@ export default function App() {
             onChangeHapticEnabled={setHapticEnabled}
             hapticPattern={hapticPattern}
             onChangeHapticPattern={setHapticPattern}
+            players={players}
+            onUpdatePlayers={setPlayers}
+            onUpdateLineup={setLineup}
           />
         )}
       </main>

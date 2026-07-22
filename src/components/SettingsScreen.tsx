@@ -1,6 +1,6 @@
-import React from 'react';
-import { AuditLogEntry } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert, Volume2, VolumeX, Smartphone, Bell } from 'lucide-react';
+import React, { useState } from 'react';
+import { Player, AuditLogEntry } from '../types';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet } from 'lucide-react';
 
 interface SettingsScreenProps {
   currentTheme: string;
@@ -23,6 +23,9 @@ interface SettingsScreenProps {
   onChangeHapticEnabled: (enabled: boolean) => void;
   hapticPattern: string;
   onChangeHapticPattern: (pattern: string) => void;
+  players?: Player[];
+  onUpdatePlayers?: (players: Player[]) => void;
+  onUpdateLineup?: (lineup: Record<string, string>) => void;
 }
 
 export default function SettingsScreen({
@@ -46,7 +49,156 @@ export default function SettingsScreen({
   onChangeHapticEnabled,
   hapticPattern,
   onChangeHapticPattern,
+  players = [],
+  onUpdatePlayers,
+  onUpdateLineup,
 }: SettingsScreenProps) {
+  // CSV Import state
+  const [csvStatus, setCsvStatus] = useState<{ type: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const [csvMode, setCsvMode] = useState<'replace' | 'append'>('replace');
+
+  // CSV parsing logic for Excel imports
+  const splitCSVRow = (row: string) => {
+    const out = [];
+    let cur = '';
+    let q = false;
+    for (let i = 0; i < row.length; i++) {
+      const c = row[i];
+      const n = row[i + 1];
+      if (c === '"' && q && n === '"') {
+        cur += '"';
+        i++;
+        continue;
+      }
+      if (c === '"') {
+        q = !q;
+        continue;
+      }
+      if (c === ',' && !q) {
+        out.push(cur.trim());
+        cur = '';
+        continue;
+      }
+      cur += c;
+    }
+    out.push(cur.trim());
+    return out;
+  };
+
+  const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = String(event.target?.result || '');
+        const rows = text
+          .replace(/^\uFEFF/, '')
+          .split(/\r?\n/)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map(splitCSVRow);
+
+        if (!rows.length) {
+          setCsvStatus({ type: 'err', text: 'No rows found in the CSV.' });
+          return;
+        }
+
+        const validHeaders = ['name', 'player', 'playername', 'number', 'no', '#', 'positions', 'position', 'status', 'nick', 'nickname', 'note', 'reason'];
+        const normaliseHeader = (h: string) => String(h || '').toLowerCase().replace(/[^a-z0-9#]/g, '');
+
+        const hasHeader = rows[0].some((c) => validHeaders.includes(normaliseHeader(c)));
+        const startIdx = hasHeader ? 1 : 0;
+        const headerMap: Record<string, number> = {};
+
+        if (hasHeader) {
+          rows[0].forEach((h, i) => {
+            headerMap[normaliseHeader(h)] = i;
+          });
+        }
+
+        const val = (cols: string[], names: string[], defaultIdx: number) => {
+          for (const n of names) {
+            const k = normaliseHeader(n);
+            if (headerMap[k] !== undefined) return cols[headerMap[k]] || '';
+          }
+          return cols[defaultIdx] || '';
+        };
+
+        const imported: Player[] = [];
+        const errors: string[] = [];
+
+        for (let r = startIdx; r < rows.length; r++) {
+          const cols = rows[r];
+          const rowNo = r + 1;
+          const name = val(cols, ['name', 'player', 'player name'], 0).trim();
+          const number = val(cols, ['number', 'no', '#'], 1).trim();
+          const posRaw = val(cols, ['positions', 'position'], 2).trim();
+          const statusRaw = (val(cols, ['status'], 3).trim() || 'available').toLowerCase() as any;
+          const nick = val(cols, ['nick', 'nickname'], 4).trim();
+          const note = val(cols, ['note', 'reason'], 5).trim();
+
+          if (!name) {
+            errors.push(`Row ${rowNo}: missing player name`);
+            continue;
+          }
+          if (!number) {
+            errors.push(`Row ${rowNo}: missing jumper number for ${name}`);
+            continue;
+          }
+
+          const positions = posRaw
+            .split(/[;|]/)
+            .map((x) => x.trim().toUpperCase())
+            .filter(Boolean);
+
+          const status = ['available', 'away', 'injured'].includes(statusRaw) ? statusRaw : 'available';
+
+          imported.push({
+            id: `p-${Date.now()}-${Math.random()}`,
+            name,
+            number,
+            positions: positions.length ? positions : ['MID'],
+            primaryZone: positions[0] || 'MID',
+            status,
+            nick,
+            note,
+            active: 0,
+            bench: 0,
+          });
+        }
+
+        if (!imported.length) {
+          setCsvStatus({ type: 'err', text: 'No players imported. Check your file format.' });
+          return;
+        }
+
+        if (onUpdatePlayers) {
+          if (csvMode === 'replace') {
+            onUpdatePlayers(imported);
+            if (onUpdateLineup) onUpdateLineup({});
+          } else {
+            // Append unique only
+            const existingNames = new Set(players.map((p) => p.name.toLowerCase()));
+            const uniqueNew = imported.filter((p) => !existingNames.has(p.name.toLowerCase()));
+            onUpdatePlayers([...players, ...uniqueNew]);
+          }
+        }
+
+        setCsvStatus({
+          type: errors.length ? 'warn' : 'ok',
+          text: `Successfully loaded ${imported.length} players! ${
+            errors.length ? `(Skipped ${errors.length} erroneous rows)` : ''
+          }`,
+        });
+      } catch (err: any) {
+        setCsvStatus({ type: 'err', text: `Import failed: ${err.message}` });
+      }
+    };
+
+    reader.readAsText(file);
+  };
   const THEMES = [
     { id: 'classic', name: 'Classic Navy', colors: ['#0B1238', '#1F36C7', '#00C8E6'] },
     { id: 'forest', name: 'Forest Green', colors: ['#0B2818', '#127A42', '#5FE3A0'] },
@@ -482,6 +634,49 @@ export default function SettingsScreen({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Bulk Load Roster from Excel / CSV */}
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
+            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
+              <FileSpreadsheet className="w-4 h-4 text-[var(--blue)]" />
+              <span>Bulk Load Roster from Excel / CSV</span>
+            </h3>
+            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+              Upload a standard comma-separated file (.csv) containing columns for <b>Name</b>, <b>Number</b>, <b>Positions</b>, <b>Nickname</b>, and <b>Note</b>.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={csvMode}
+                onChange={(e) => setCsvMode(e.target.value as any)}
+                className="px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-[var(--ink)] focus:outline-none"
+              >
+                <option value="replace">Replace full squad with this file</option>
+                <option value="append">Append unique players to current squad</option>
+              </select>
+
+              <label className="px-4 py-2 bg-[#EEF2FF] hover:bg-blue-50 text-[var(--blue)] font-bold text-xs rounded-xl transition border border-blue-100 cursor-pointer text-center flex items-center gap-1.5">
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Upload CSV File</span>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCSVImport}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {csvStatus && (
+              <div className={`p-3 text-xs font-bold rounded-xl border ${
+                csvStatus.type === 'ok' ? 'bg-green-50 border-green-200 text-[#0E7A48]' :
+                csvStatus.type === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                {csvStatus.text}
+              </div>
+            )}
           </div>
 
           {/* Backup Restore Card */}
