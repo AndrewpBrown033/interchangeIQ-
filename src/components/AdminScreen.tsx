@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory } from '../types';
+import { DEFAULT_PLAYERS } from '../constants';
 import {
   Plus,
   Trash,
@@ -44,6 +45,7 @@ interface AdminScreenProps {
   currentUserRole: string;
   onNavigateTab?: (tab: string) => void;
   players?: Player[];
+  onUpdatePlayers?: (players: Player[]) => void;
   savedLineups?: LineupTemplate[];
   history?: GameHistory[];
   lineup?: Record<string, string>;
@@ -170,6 +172,7 @@ export default function AdminScreen({
   currentUserRole,
   onNavigateTab,
   players = [],
+  onUpdatePlayers,
   savedLineups = [],
   history = [],
   lineup = {},
@@ -594,6 +597,18 @@ export default function AdminScreen({
                         </span>
                       )}
                     </div>
+                    {onUpdatePlayers && (
+                      <button
+                        onClick={() => {
+                          if (squadCount > 0 && !window.confirm("Reload default 22-player AFL squad? This will replace current team roster.")) return;
+                          onUpdatePlayers(DEFAULT_PLAYERS);
+                        }}
+                        className="text-[9px] font-bold text-blue-600 hover:underline flex items-center gap-1 pt-0.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-2.5 h-2.5" />
+                        <span>{squadCount === 0 ? 'Load Default 22 Squad' : 'Reset Default Squad'}</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Games */}

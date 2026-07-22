@@ -570,14 +570,10 @@ export default function App() {
         // Mark that we are applying remote updates to prevent uploading them right back
         setIsSyncingFromServer(true);
 
-        if (data.players && Array.isArray(data.players)) {
-          if (data.players.length > 0) {
-            setPlayers(data.players);
-          } else {
-            setPlayers((prev) => (prev && prev.length > 0 ? prev : DEFAULT_PLAYERS));
-          }
+        if (data.players && Array.isArray(data.players) && data.players.length > 0) {
+          setPlayers(data.players);
         } else {
-          setPlayers((prev) => (prev && prev.length > 0 ? prev : DEFAULT_PLAYERS));
+          setPlayers(DEFAULT_PLAYERS);
         }
         if (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) setLineup(data.lineup);
         if (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) setScore(data.score);
@@ -1249,6 +1245,7 @@ export default function App() {
             currentUserRole="Admin"
             onNavigateTab={handleSelectTab}
             players={players}
+            onUpdatePlayers={setPlayers}
             savedLineups={savedLineups}
             history={history}
             lineup={lineup}
