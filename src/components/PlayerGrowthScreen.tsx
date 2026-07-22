@@ -57,6 +57,9 @@ export default function PlayerGrowthScreen({
   const [formGoals, setFormGoals] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
+  // Task-focused modal entry state ('fitness' | 'kicking' | 'skills' | 'goals' | 'all')
+  const [entryTaskMode, setEntryTaskMode] = useState<'fitness' | 'kicking' | 'skills' | 'goals' | 'all'>('fitness');
+
   // Filtered Players
   const filteredPlayers = players.filter((p) => {
     const matchesZone = selectedZone === 'All' || p.primaryZone === selectedZone;
@@ -83,10 +86,14 @@ export default function PlayerGrowthScreen({
     fitnessRatingDelta = latestRecord.fitnessRating - earliestRecord.fitnessRating;
   }
 
-  // Open Add Assessment Modal
-  const handleOpenAddModal = (playerId?: string) => {
+  // Open Add Assessment Modal with task mode focus
+  const handleOpenAddModal = (
+    playerId?: string,
+    initialTaskMode: 'fitness' | 'kicking' | 'skills' | 'goals' | 'all' = 'fitness'
+  ) => {
     const targetId = playerId || activePlayerId;
     setEditingRecord(null);
+    setEntryTaskMode(initialTaskMode);
     setFormPlayerId(targetId);
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormSeasonLabel('2026 Pre-Season');
@@ -129,6 +136,7 @@ export default function PlayerGrowthScreen({
 
   const handleOpenEditModal = (record: SkillAssessment) => {
     setEditingRecord(record);
+    setEntryTaskMode('all');
     setFormPlayerId(record.playerId);
     setFormDate(record.date);
     setFormSeasonLabel(record.seasonLabel);
@@ -212,13 +220,29 @@ export default function PlayerGrowthScreen({
             </p>
           </div>
 
-          <button
-            onClick={() => handleOpenAddModal(activePlayerId)}
-            className="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Record Growth Assessment</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => handleOpenAddModal(activePlayerId, 'fitness')}
+              className="px-3.5 py-2.5 bg-indigo-500/30 hover:bg-indigo-500/40 border border-indigo-400/30 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+              title="Log 2km Time Trial & Fitness Test"
+            >
+              <span>🏃 Log 2km Fitness</span>
+            </button>
+            <button
+              onClick={() => handleOpenAddModal(activePlayerId, 'kicking')}
+              className="px-3.5 py-2.5 bg-amber-500/30 hover:bg-amber-500/40 border border-amber-400/30 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+              title="Log Kicking & Opposite Foot"
+            >
+              <span>🦵 Log Kicking</span>
+            </button>
+            <button
+              onClick={() => handleOpenAddModal(activePlayerId, 'all')}
+              className="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Full Benchmark</span>
+            </button>
+          </div>
         </div>
 
         {/* Squad Metrics Row */}
@@ -578,9 +602,67 @@ export default function PlayerGrowthScreen({
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-sm font-bold p-1"
+                className="text-gray-400 hover:text-gray-600 text-sm font-bold p-1 cursor-pointer"
               >
                 ✕
+              </button>
+            </div>
+
+            {/* Task-Focused Selector Bar */}
+            <div className="bg-gray-100/80 p-1.5 rounded-2xl flex flex-wrap items-center gap-1">
+              <span className="text-[10px] font-black uppercase text-gray-500 px-2 flex items-center gap-1">
+                <Target className="w-3.5 h-3.5 text-indigo-600" />
+                Task Focus:
+              </span>
+              <button
+                onClick={() => setEntryTaskMode('fitness')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                  entryTaskMode === 'fitness'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <span>🏃 2km & Fitness</span>
+              </button>
+              <button
+                onClick={() => setEntryTaskMode('kicking')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                  entryTaskMode === 'kicking'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <span>🦵 Kicking & Opposite Foot</span>
+              </button>
+              <button
+                onClick={() => setEntryTaskMode('skills')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                  entryTaskMode === 'skills'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <span>⚙️ Skill Fundamentals</span>
+              </button>
+              <button
+                onClick={() => setEntryTaskMode('goals')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                  entryTaskMode === 'goals'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <span>📋 Goals & Notes</span>
+              </button>
+              <button
+                onClick={() => setEntryTaskMode('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                  entryTaskMode === 'all'
+                    ? 'bg-gray-900 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <span>🔍 All Activities</span>
               </button>
             </div>
 
@@ -637,210 +719,268 @@ export default function PlayerGrowthScreen({
               </div>
 
               {/* FITNESS SECTION */}
-              <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 space-y-3">
-                <b className="text-xs font-black text-indigo-900 uppercase tracking-wider block">
-                  🏃 Aerobic & Fitness Metrics
-                </b>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
-                      2km Time Trial (mm:ss)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 08:30"
-                      value={formTimeTrial}
-                      onChange={(e) => setFormTimeTrial(e.target.value)}
-                      className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none"
-                    />
+              {(entryTaskMode === 'fitness' || entryTaskMode === 'all') && (
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  entryTaskMode === 'fitness'
+                    ? 'bg-indigo-50 border-indigo-300 shadow-xs ring-2 ring-indigo-500/20'
+                    : 'bg-indigo-50/40 border-indigo-100'
+                } space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <b className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🏃 Aerobic & Fitness Metrics</span>
+                      {entryTaskMode === 'fitness' && (
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[9px] font-extrabold uppercase">
+                          Active Focus Task
+                        </span>
+                      )}
+                    </b>
                   </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
+                        2km Time Trial (mm:ss)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 08:30"
+                        value={formTimeTrial}
+                        onChange={(e) => setFormTimeTrial(e.target.value)}
+                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
-                      Yo-Yo Level
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 15.4"
-                      value={formYoyo}
-                      onChange={(e) => setFormYoyo(e.target.value)}
-                      className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none"
-                    />
-                  </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
+                        Yo-Yo Level
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 15.4"
+                        value={formYoyo}
+                        onChange={(e) => setFormYoyo(e.target.value)}
+                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
-                      20m Sprint (s)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 3.42s"
-                      value={formSprint}
-                      onChange={(e) => setFormSprint(e.target.value)}
-                      className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none"
-                    />
-                  </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
+                        20m Sprint (s)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 3.42s"
+                        value={formSprint}
+                        onChange={(e) => setFormSprint(e.target.value)}
+                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
-                      Aerobic Rating ({formFitnessRating}/10)
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={formFitnessRating}
-                      onChange={(e) => setFormFitnessRating(parseInt(e.target.value))}
-                      className="w-full h-1 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 mt-2"
-                    />
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
+                        Aerobic Rating ({formFitnessRating}/10)
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={formFitnessRating}
+                        onChange={(e) => setFormFitnessRating(parseInt(e.target.value))}
+                        className="w-full h-1 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 mt-2"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* KICKING & DUAL FOOT SECTION */}
-              <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 space-y-3">
-                <b className="text-xs font-black text-emerald-900 uppercase tracking-wider block">
-                  🦵 Kicking & Opposite Foot Mastery (AFL Girls Focus)
-                </b>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block mb-1 text-[10px] font-extrabold text-emerald-800">
-                      Preferred Foot
-                    </label>
-                    <select
-                      value={formPreferredFoot}
-                      onChange={(e) => setFormPreferredFoot(e.target.value as any)}
-                      className="w-full p-2 bg-white border border-emerald-200 rounded-xl font-bold text-gray-800 focus:outline-none"
-                    >
-                      <option value="Right">Right Foot</option>
-                      <option value="Left">Left Foot</option>
-                    </select>
+              {(entryTaskMode === 'kicking' || entryTaskMode === 'all') && (
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  entryTaskMode === 'kicking'
+                    ? 'bg-emerald-50 border-emerald-300 shadow-xs ring-2 ring-emerald-500/20'
+                    : 'bg-emerald-50/40 border-emerald-100'
+                } space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <b className="text-xs font-black text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🦵 Kicking & Opposite Foot Mastery (AFL Girls Focus)</span>
+                      {entryTaskMode === 'kicking' && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[9px] font-extrabold uppercase">
+                          Active Focus Task
+                        </span>
+                      )}
+                    </b>
                   </div>
 
-                  <div>
-                    <label className="block mb-1 text-[10px] font-extrabold text-emerald-800">
-                      Kick Distance (Meters)
-                    </label>
-                    <input
-                      type="number"
-                      min="10"
-                      max="60"
-                      value={formKickDistance}
-                      onChange={(e) => setFormKickDistance(parseInt(e.target.value) || 30)}
-                      className="w-full p-2 bg-white border border-emerald-200 rounded-xl font-bold text-gray-800 focus:outline-none"
-                    />
-                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-emerald-800">
+                        Preferred Foot
+                      </label>
+                      <select
+                        value={formPreferredFoot}
+                        onChange={(e) => setFormPreferredFoot(e.target.value as any)}
+                        className="w-full p-2 bg-white border border-emerald-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Right">Right Foot</option>
+                        <option value="Left">Left Foot</option>
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block mb-1 text-[10px] font-extrabold text-emerald-800">
-                      Kick Accuracy ({formKickAccuracy}/10)
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={formKickAccuracy}
-                      onChange={(e) => setFormKickAccuracy(parseInt(e.target.value))}
-                      className="w-full h-1 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-600 mt-2"
-                    />
-                  </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-emerald-800">
+                        Kick Distance (Meters)
+                      </label>
+                      <input
+                        type="number"
+                        min="10"
+                        max="60"
+                        value={formKickDistance}
+                        onChange={(e) => setFormKickDistance(parseInt(e.target.value) || 30)}
+                        className="w-full p-2 bg-white border border-emerald-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
 
-                  <div className="bg-amber-100/60 p-2 rounded-xl border border-amber-200">
-                    <label className="block mb-1 text-[10px] font-black text-amber-900">
-                      Opposite Foot Proficiency ({formOppositeFoot}/10)
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={formOppositeFoot}
-                      onChange={(e) => setFormOppositeFoot(parseInt(e.target.value))}
-                      className="w-full h-1.5 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600 mt-1"
-                    />
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-emerald-800">
+                        Kick Accuracy ({formKickAccuracy}/10)
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={formKickAccuracy}
+                        onChange={(e) => setFormKickAccuracy(parseInt(e.target.value))}
+                        className="w-full h-1 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-600 mt-2"
+                      />
+                    </div>
+
+                    <div className="bg-amber-100/60 p-2 rounded-xl border border-amber-200">
+                      <label className="block mb-1 text-[10px] font-black text-amber-900">
+                        Opposite Foot Proficiency ({formOppositeFoot}/10)
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={formOppositeFoot}
+                        onChange={(e) => setFormOppositeFoot(parseInt(e.target.value))}
+                        className="w-full h-1.5 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600 mt-1"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* FUNDAMENTAL SKILLS (1-10) */}
-              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
-                <b className="text-xs font-black text-gray-800 uppercase tracking-wider block">
-                  ⚙️ Fundamentals & Game Sense
-                </b>
+              {(entryTaskMode === 'skills' || entryTaskMode === 'all') && (
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  entryTaskMode === 'skills'
+                    ? 'bg-blue-50 border-blue-300 shadow-xs ring-2 ring-blue-500/20'
+                    : 'bg-gray-50 border-gray-200'
+                } space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <b className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>⚙️ Fundamentals & Game Sense</span>
+                      {entryTaskMode === 'skills' && (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[9px] font-extrabold uppercase">
+                          Active Focus Task
+                        </span>
+                      )}
+                    </b>
+                  </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                      Handballing ({formHandball}/10)
-                    </label>
-                    <input
-                      type="range" min="1" max="10" value={formHandball}
-                      onChange={(e) => setFormHandball(parseInt(e.target.value))}
-                      className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                      Marking ({formMarking}/10)
-                    </label>
-                    <input
-                      type="range" min="1" max="10" value={formMarking}
-                      onChange={(e) => setFormMarking(parseInt(e.target.value))}
-                      className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                      Tackling ({formTackling}/10)
-                    </label>
-                    <input
-                      type="range" min="1" max="10" value={formTackling}
-                      onChange={(e) => setFormTackling(parseInt(e.target.value))}
-                      className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                      Game Sense ({formGameSense}/10)
-                    </label>
-                    <input
-                      type="range" min="1" max="10" value={formGameSense}
-                      onChange={(e) => setFormGameSense(parseInt(e.target.value))}
-                      className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600"
-                    />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                        Handballing ({formHandball}/10)
+                      </label>
+                      <input
+                        type="range" min="1" max="10" value={formHandball}
+                        onChange={(e) => setFormHandball(parseInt(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                        Marking ({formMarking}/10)
+                      </label>
+                      <input
+                        type="range" min="1" max="10" value={formMarking}
+                        onChange={(e) => setFormMarking(parseInt(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                        Tackling ({formTackling}/10)
+                      </label>
+                      <input
+                        type="range" min="1" max="10" value={formTackling}
+                        onChange={(e) => setFormTackling(parseInt(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                        Game Sense ({formGameSense}/10)
+                      </label>
+                      <input
+                        type="range" min="1" max="10" value={formGameSense}
+                        onChange={(e) => setFormGameSense(parseInt(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600 cursor-pointer"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* GOALS & NOTES */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-400">
-                    Player Development Goal
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={formGoals}
-                    onChange={(e) => setFormGoals(e.target.value)}
-                    placeholder="e.g. Build confidence on non-preferred foot kicking under pressure..."
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
-                  />
-                </div>
+              {(entryTaskMode === 'goals' || entryTaskMode === 'all') && (
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  entryTaskMode === 'goals'
+                    ? 'bg-purple-50 border-purple-300 shadow-xs ring-2 ring-purple-500/20'
+                    : 'bg-gray-50 border-gray-200'
+                } space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <b className="text-xs font-black text-purple-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>📋 Goals & Coach Notes</span>
+                      {entryTaskMode === 'goals' && (
+                        <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[9px] font-extrabold uppercase">
+                          Active Focus Task
+                        </span>
+                      )}
+                    </b>
+                  </div>
 
-                <div>
-                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-400">
-                    Coach Evaluation Notes
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={formNotes}
-                    onChange={(e) => setFormNotes(e.target.value)}
-                    placeholder="e.g. Tremendous improvement in aerobic 2km time trial and kicking power..."
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block mb-1 text-[10px] font-black uppercase text-gray-500">
+                        Player Development Goal
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={formGoals}
+                        onChange={(e) => setFormGoals(e.target.value)}
+                        placeholder="e.g. Build confidence on non-preferred foot kicking under pressure..."
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 text-[10px] font-black uppercase text-gray-500">
+                        Coach Evaluation Notes
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={formNotes}
+                        onChange={(e) => setFormNotes(e.target.value)}
+                        placeholder="e.g. Tremendous improvement in aerobic 2km time trial and kicking power..."
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
