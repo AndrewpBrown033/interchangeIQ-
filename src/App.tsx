@@ -590,11 +590,27 @@ export default function App() {
     setUsers(newUsers);
   };
 
+  // Helper to generate a fresh, team-isolated 22-player default squad with team-prefixed unique IDs
+  const createFreshSquadForTeam = (teamId: string): Player[] => {
+    const cleanId = teamId.replace(/[^a-zA-Z0-9]/g, '');
+    return DEFAULT_PLAYERS.map((p, index) => ({
+      ...p,
+      id: `p_${cleanId}_${index + 1}_${Math.random().toString(36).substring(2, 6)}`,
+      active: 0,
+      bench: 0,
+      slotTimes: {},
+    }));
+  };
+
   // Real-time Firestore document subscriber (Downstream sync)
   useEffect(() => {
     if (!activeTeamId) return;
 
     setCloudConnected(false);
+    // Block upstream sync while changing active team
+    isSyncingFromServerRef.current = true;
+    setIsSyncingFromServer(true);
+
     const docRef = doc(db, 'teams', activeTeamId);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
@@ -608,15 +624,17 @@ export default function App() {
         if (data.players && Array.isArray(data.players) && data.players.length > 0) {
           setPlayers(data.players);
         } else {
-          setPlayers(DEFAULT_PLAYERS);
+          setPlayers(createFreshSquadForTeam(activeTeamId));
         }
         if (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) setLineup(data.lineup);
+        else setLineup({});
+
         if (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) setScore(data.score);
         if (data.gameInfo && typeof data.gameInfo === 'object' && !Array.isArray(data.gameInfo)) setGameInfo(data.gameInfo);
-        if (data.rotations && Array.isArray(data.rotations)) setRotations(data.rotations);
+        if (data.rotations && Array.isArray(data.rotations)) setRotations(data.rotations); else setRotations([]);
         if (data.plans && Array.isArray(data.plans)) setPlans(data.plans);
-        if (data.history && Array.isArray(data.history)) setHistory(data.history);
-        if (data.savedLineups && Array.isArray(data.savedLineups)) setSavedLineups(data.savedLineups);
+        if (data.history && Array.isArray(data.history)) setHistory(data.history); else setHistory([]);
+        if (data.savedLineups && Array.isArray(data.savedLineups)) setSavedLineups(data.savedLineups); else setSavedLineups([]);
         if (data.drills && Array.isArray(data.drills)) setDrills(parseDrillList(data.drills));
         if (data.growthRecords && Array.isArray(data.growthRecords)) setGrowthRecords(data.growthRecords);
 
@@ -627,32 +645,53 @@ export default function App() {
         setTimeout(() => {
           isSyncingFromServerRef.current = false;
           setIsSyncingFromServer(false);
-        }, 500);
+        }, 400);
       } else {
-        // Document does not exist in Firestore yet (new team). We should push our current local state!
+        // Document does not exist in Firestore yet (new team). We create a fresh isolated squad!
         setCloudConnected(true);
         setLastSyncedAt(Date.now());
         const currentTeams = Array.isArray(teams) ? teams : [];
+        const freshPlayers = createFreshSquadForTeam(activeTeamId);
         const initialData = JSON.parse(JSON.stringify({
           id: activeTeamId,
           name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
-          players: players && players.length > 0 ? players : DEFAULT_PLAYERS,
-          lineup,
-          score,
+          players: freshPlayers,
+          lineup: {},
+          score: {
+            quarter: 1,
+            home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+            away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+          },
           gameInfo,
-          rotations,
-          plans,
-          history,
-          savedLineups,
+          rotations: [],
+          plans: [{ id: 'plan1', name: 'Q1 Rotation' }],
+          history: [],
+          savedLineups: [],
           drills: sanitizeDrillList(drills),
           growthRecords,
           updatedAt: Date.now()
         }));
+
+        setPlayers(freshPlayers);
+        setLineup({});
+        setSavedLineups([]);
+        setHistory([]);
+        setRotations([]);
+
         setDoc(docRef, initialData).catch(err => console.warn("Error creating team doc:", err.message));
+
+        setTimeout(() => {
+          isSyncingFromServerRef.current = false;
+          setIsSyncingFromServer(false);
+        }, 400);
       }
     }, (error) => {
       console.warn("Firestore onSnapshot notice:", error.message);
       setCloudConnected(false);
+      setTimeout(() => {
+        isSyncingFromServerRef.current = false;
+        setIsSyncingFromServer(false);
+      }, 400);
     });
 
     return () => unsubscribe();
@@ -667,7 +706,7 @@ export default function App() {
     const data = JSON.parse(JSON.stringify({
       id: activeTeamId,
       name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
-      players: players && players.length > 0 ? players : DEFAULT_PLAYERS,
+      players: players && players.length > 0 ? players : createFreshSquadForTeam(activeTeamId),
       lineup,
       score,
       gameInfo,

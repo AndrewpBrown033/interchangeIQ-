@@ -668,15 +668,28 @@ export default function TeamScreen({
 
                 {/* Heatmap visualization and Stats side-by-side or stacked */}
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
-                  {/* Mini-Field Heatmap Container */}
-                  <div className="xl:col-span-3 bg-gray-50 border border-gray-100 p-4 rounded-2xl flex flex-col items-center justify-center">
-                    <div className="relative w-full max-w-[420px] aspect-[1.3] mx-auto rounded-[35%] overflow-hidden border-4 border-white shadow-md bg-[radial-gradient(ellipse_at_center,#2EB46E_0%,#1B8C4F_55%,#0B5C36_100%)] p-2 select-none">
-                      {/* AFL Field lines */}
-                      <div className="absolute inset-3 border border-white/20 rounded-[35%] pointer-events-none"></div>
-                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border border-white/20 rounded-full pointer-events-none"></div>
-                      <div className="absolute left-[27%] top-[35%] w-[46%] h-[30%] border border-white/20 pointer-events-none"></div>
+                  {/* Mini-Field Heatmap Container - Replicating Game Day AFL Oval */}
+                  <div className="xl:col-span-3 bg-gray-50 border border-gray-100 p-4 rounded-2xl flex flex-col items-center justify-center overflow-x-auto">
+                    <div className="w-full max-w-[560px] field relative select-none mx-auto shadow-md shrink-0" style={{ height: '540px' }}>
+                      <div className="centre-square"></div>
 
-                      {/* Map slots */}
+                      {/* AFL Goal Posts & Markings - Top End */}
+                      <div className="goal-line-top"></div>
+                      <div className="goal-square-top"></div>
+                      <div className="goal-post behind top-left-behind"></div>
+                      <div className="goal-post main top-left-main"></div>
+                      <div className="goal-post main top-right-main"></div>
+                      <div className="goal-post behind top-right-behind"></div>
+
+                      {/* AFL Goal Posts & Markings - Bottom End */}
+                      <div className="goal-line-bottom"></div>
+                      <div className="goal-square-bottom"></div>
+                      <div className="goal-post behind bottom-left-behind"></div>
+                      <div className="goal-post main bottom-left-main"></div>
+                      <div className="goal-post main bottom-right-main"></div>
+                      <div className="goal-post behind bottom-right-behind"></div>
+
+                      {/* Map slots & Heatmap Overlay */}
                       {POSITIONS.map(([slotName, label, x, y]) => {
                         const playerSlotTimes = activePlayer.slotTimes || {};
                         const secondsSpent = playerSlotTimes[slotName] || 0;
@@ -689,32 +702,32 @@ export default function TeamScreen({
                           <div
                             key={slotName}
                             style={{ left: `${x}%`, top: `${y}%` }}
-                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none"
+                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10"
                           >
                             {/* Heat Glow Ring */}
                             {hasHeat && (
                               <div
-                                className="absolute rounded-full blur-[8px] sm:blur-[12px] opacity-80 animate-pulse transition-all duration-500"
+                                className="absolute rounded-full blur-[8px] sm:blur-[12px] opacity-85 animate-pulse transition-all duration-500"
                                 style={{
-                                  width: `${20 + heatRatio * 32}px`,
-                                  height: `${20 + heatRatio * 32}px`,
-                                  backgroundColor: `rgba(${230 + heatRatio * 25}, ${110 - heatRatio * 70}, 30, ${0.4 + heatRatio * 0.5})`,
-                                  boxShadow: `0 0 ${12 + heatRatio * 16}px rgba(${240 + heatRatio * 15}, 100, 0, ${0.3 + heatRatio * 0.4})`
+                                  width: `${28 + heatRatio * 40}px`,
+                                  height: `${28 + heatRatio * 40}px`,
+                                  backgroundColor: `rgba(${235 + heatRatio * 20}, ${110 - heatRatio * 75}, 25, ${0.45 + heatRatio * 0.45})`,
+                                  boxShadow: `0 0 ${14 + heatRatio * 18}px rgba(${245 + heatRatio * 10}, 110, 0, ${0.35 + heatRatio * 0.45})`
                                 }}
                               />
                             )}
 
                             {/* Label box */}
                             {hasHeat ? (
-                              <div className="relative z-10 flex flex-col items-center bg-black/60 backdrop-blur-xs px-1.5 py-0.5 rounded border border-white/20 shadow-xs">
-                                <span className="text-[7px] sm:text-[9px] font-black text-white leading-none tracking-tight">{slotName}</span>
-                                <span className="text-[6px] sm:text-[8px] font-black text-amber-300 leading-none mt-0.5">
+                              <div className="relative z-10 flex flex-col items-center bg-black/75 backdrop-blur-xs px-2 py-0.5 rounded-md border border-white/30 shadow-md">
+                                <span className="text-[8px] sm:text-[10px] font-black text-white leading-none tracking-tight">{slotName}</span>
+                                <span className="text-[7px] sm:text-[9px] font-black text-amber-300 leading-none mt-0.5">
                                   {Math.round(secondsSpent / 60)}m
                                 </span>
                               </div>
                             ) : (
-                              <div className="relative z-10 flex flex-col items-center bg-white/5 border border-white/10 px-1 py-0.5 rounded-sm">
-                                <span className="text-[6px] sm:text-[8px] font-bold text-white/30 leading-none">{slotName}</span>
+                              <div className="relative z-10 flex flex-col items-center bg-black/30 border border-white/20 px-1.5 py-0.5 rounded-sm backdrop-blur-2xs">
+                                <span className="text-[7px] sm:text-[8px] font-bold text-white/50 leading-none">{slotName}</span>
                               </div>
                             )}
                           </div>
