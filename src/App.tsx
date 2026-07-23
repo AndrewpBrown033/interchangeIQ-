@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
   Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment
@@ -325,6 +325,40 @@ export default function App() {
   const [cloudConnected, setCloudConnected] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [isSyncingFromServer, setIsSyncingFromServer] = useState(false);
+  const isSyncingFromServerRef = useRef(false);
+
+  // Manual Force Sync function
+  const handleForceSync = async (): Promise<boolean> => {
+    if (!activeTeamId) return false;
+    try {
+      const docRef = doc(db, 'teams', activeTeamId);
+      const currentTeams = Array.isArray(teams) ? teams : [];
+      const teamName = currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team';
+      const cleanData = JSON.parse(JSON.stringify({
+        id: activeTeamId,
+        name: teamName,
+        players: players && players.length > 0 ? players : DEFAULT_PLAYERS,
+        lineup,
+        score,
+        gameInfo,
+        rotations,
+        plans,
+        history,
+        savedLineups,
+        drills: sanitizeDrillList(drills),
+        growthRecords,
+        updatedAt: Date.now()
+      }));
+      await setDoc(docRef, cleanData);
+      setLastSyncedAt(Date.now());
+      setCloudConnected(true);
+      return true;
+    } catch (err: any) {
+      console.warn("Manual force sync error:", err);
+      setCloudConnected(false);
+      return false;
+    }
+  };
 
   // Invite acceptance states
   const [pendingInviteToAccept, setPendingInviteToAccept] = useState<UserProfile | null>(null);
@@ -567,7 +601,8 @@ export default function App() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         
-        // Mark that we are applying remote updates to prevent uploading them right back
+        // Mark that we are applying remote updates using ref and state
+        isSyncingFromServerRef.current = true;
         setIsSyncingFromServer(true);
 
         if (data.players && Array.isArray(data.players) && data.players.length > 0) {
@@ -590,17 +625,18 @@ export default function App() {
 
         // Reset the server-sync flag after states have processed
         setTimeout(() => {
+          isSyncingFromServerRef.current = false;
           setIsSyncingFromServer(false);
-        }, 100);
+        }, 500);
       } else {
         // Document does not exist in Firestore yet (new team). We should push our current local state!
         setCloudConnected(true);
         setLastSyncedAt(Date.now());
         const currentTeams = Array.isArray(teams) ? teams : [];
-        const initialData = {
+        const initialData = JSON.parse(JSON.stringify({
           id: activeTeamId,
           name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
-          players,
+          players: players && players.length > 0 ? players : DEFAULT_PLAYERS,
           lineup,
           score,
           gameInfo,
@@ -611,7 +647,7 @@ export default function App() {
           drills: sanitizeDrillList(drills),
           growthRecords,
           updatedAt: Date.now()
-        };
+        }));
         setDoc(docRef, initialData).catch(err => console.warn("Error creating team doc:", err.message));
       }
     }, (error) => {
@@ -624,14 +660,14 @@ export default function App() {
 
   // Firestore document publisher with debounce (Upstream sync)
   useEffect(() => {
-    if (!activeTeamId || isSyncingFromServer) return;
+    if (!activeTeamId || isSyncingFromServer || isSyncingFromServerRef.current) return;
 
     const docRef = doc(db, 'teams', activeTeamId);
     const currentTeams = Array.isArray(teams) ? teams : [];
-    const data = {
+    const data = JSON.parse(JSON.stringify({
       id: activeTeamId,
       name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
-      players,
+      players: players && players.length > 0 ? players : DEFAULT_PLAYERS,
       lineup,
       score,
       gameInfo,
@@ -642,7 +678,7 @@ export default function App() {
       drills: sanitizeDrillList(drills),
       growthRecords,
       updatedAt: Date.now()
-    };
+    }));
 
     const timer = setTimeout(() => {
       setDoc(docRef, data)
@@ -654,7 +690,7 @@ export default function App() {
           console.warn('Firestore write deferred:', err.message);
           setCloudConnected(false);
         });
-    }, 1500); // 1.5 second debounce to prevent rapid Firestore writes during rapid user actions or drag and drop
+    }, 1000); // 1.0 second debounce
 
     return () => clearTimeout(timer);
   }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, growthRecords, activeTeamId]);
@@ -904,7 +940,7 @@ export default function App() {
     { id: 'lineup', label: 'Game Day', icon: <Play className="w-5 h-5 text-[var(--green)]" /> },
     { id: 'rotations', label: 'Rotations', icon: <RefreshCw className="w-5 h-5 text-[var(--cyan)]" /> },
     { id: 'jarvis', label: 'JARVIS AI', icon: <Bot className="w-5 h-5 text-purple-600" /> },
-    { id: 'team', label: 'Team', icon: <Users className="w-5 h-5" /> },
+    { id: 'team', label: 'Team View', icon: <Users className="w-5 h-5 text-blue-600" /> },
     { id: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-5 h-5 text-emerald-500" /> },
     { id: 'training', label: 'Training', icon: <BookOpen className="w-5 h-5 text-indigo-400" /> },
     { id: 'history', label: 'History', icon: <History className="w-5 h-5" /> },
@@ -1137,6 +1173,7 @@ export default function App() {
             email={currentUser?.email || `${(userName || 'coach').toLowerCase().replace(/\s+/g, '.')}@interchangeiq.com`}
             onNavigate={handleSelectTab}
             onStartNewGame={handleStartNewGame}
+            onForceSync={handleForceSync}
           />
         )}
         {activeTab === 'lineup' && (
@@ -1200,6 +1237,10 @@ export default function App() {
             onSelectPlayerId={setSelectedPlayerId}
             lineup={lineup}
             onUpdateLineup={setLineup}
+            savedLineups={savedLineups}
+            history={history}
+            teamName={teams.find(t => t.id === activeTeamId)?.name}
+            onNavigateTab={handleSelectTab}
           />
         )}
         {activeTab === 'growth' && (

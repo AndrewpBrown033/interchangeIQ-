@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Player } from '../types';
+import { Player, LineupTemplate, GameHistory } from '../types';
 import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS } from '../constants';
-import { Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, Check, X, Flame, Sparkles, Clock, Activity, RotateCcw } from 'lucide-react';
+import { 
+  Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, 
+  Check, X, Flame, Sparkles, Clock, Activity, RotateCcw, Landmark, 
+  Users, Trophy, Shield, Layers, Play, ArrowRight 
+} from 'lucide-react';
 
 interface TeamScreenProps {
   players: Player[];
@@ -10,6 +14,10 @@ interface TeamScreenProps {
   onSelectPlayerId: (id: string | null) => void;
   lineup: Record<string, string>;
   onUpdateLineup: (lineup: Record<string, string>) => void;
+  savedLineups?: LineupTemplate[];
+  history?: GameHistory[];
+  teamName?: string;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export default function TeamScreen({
@@ -19,6 +27,10 @@ export default function TeamScreen({
   onSelectPlayerId,
   lineup,
   onUpdateLineup,
+  savedLineups = [],
+  history = [],
+  teamName,
+  onNavigateTab,
 }: TeamScreenProps) {
   const [filterZone, setFilterZone] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'number' | 'name'>('number');
@@ -238,8 +250,152 @@ export default function TeamScreen({
     onUpdatePlayers(DEFAULT_PLAYERS);
   };
 
+  // Metrics calculation
+  const squadCount = players.length;
+  const availableCount = players.filter((p) => p.status === 'available').length;
+  const injuredCount = players.filter((p) => p.status === 'injured').length;
+  const awayCount = players.filter((p) => p.status === 'away').length;
+
+  const totalGames = history.length;
+  const winsCount = history.filter((g) => {
+    const hTotal = (g.score?.home?.goals || 0) * 6 + (g.score?.home?.behinds || 0);
+    const aTotal = (g.score?.away?.goals || 0) * 6 + (g.score?.away?.behinds || 0);
+    return hTotal > aTotal;
+  }).length;
+  const lossesCount = history.filter((g) => {
+    const hTotal = (g.score?.home?.goals || 0) * 6 + (g.score?.home?.behinds || 0);
+    const aTotal = (g.score?.away?.goals || 0) * 6 + (g.score?.away?.behinds || 0);
+    return hTotal < aTotal;
+  }).length;
+  const drawsCount = Math.max(0, totalGames - winsCount - lossesCount);
+
+  const activeOnFieldCount = Object.values(lineup).filter(Boolean).length;
+  const activeOnBenchCount = players.filter(
+    (p) => p.status === 'available' && !Object.values(lineup).includes(p.id)
+  ).length;
+
+  const lineupsCount = savedLineups.length;
+
   return (
     <div className="space-y-6">
+      {/* Squad Summary & Metrics Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black text-white tracking-tight">{teamName || 'Active Team View'}</h2>
+                <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full uppercase tracking-wider">
+                  Live Dataset View
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-semibold">Squad Summary & Performance Metrics</p>
+            </div>
+          </div>
+          {onNavigateTab && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onNavigateTab('lineup')}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <Play className="w-3.5 h-3.5 text-white" />
+                <span>Game Day →</span>
+              </button>
+              <button
+                onClick={() => onNavigateTab('admin')}
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Admin Panel
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 4 Stat Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Squad Count */}
+          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+              <span>Total Roster</span>
+              <Users className="w-4 h-4 text-blue-400" />
+            </div>
+            <div className="text-2xl font-black text-white">
+              {squadCount} <span className="text-xs text-slate-400 font-semibold">Players</span>
+            </div>
+            <div className="flex flex-wrap gap-1 pt-1 text-[9px] font-extrabold">
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {availableCount} Avail
+              </span>
+              {injuredCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                  {injuredCount} Inj
+                </span>
+              )}
+              {awayCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {awayCount} Away
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Games Record */}
+          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+              <span>Match Record</span>
+              <Trophy className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="text-2xl font-black text-white">
+              {totalGames} <span className="text-xs text-slate-400 font-semibold">Games</span>
+            </div>
+            <div className="flex flex-wrap gap-1 pt-1 text-[9px] font-extrabold">
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {winsCount} Wins
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                {lossesCount} Loss
+              </span>
+              {drawsCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                  {drawsCount} Draw
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Starter Slots / Field */}
+          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+              <span>Field / Bench</span>
+              <Shield className="w-4 h-4 text-indigo-400" />
+            </div>
+            <div className="text-2xl font-black text-white">
+              {activeOnFieldCount} <span className="text-xs text-slate-400 font-semibold">Field</span> / {activeOnBenchCount} <span className="text-xs text-slate-400 font-semibold">Bench</span>
+            </div>
+            <div className="text-[10px] font-bold text-indigo-300 pt-1">
+              {activeOnFieldCount}/18 Starter Slots Set
+            </div>
+          </div>
+
+          {/* Lineups Saved */}
+          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+              <span>Lineup Presets</span>
+              <Layers className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div className="text-2xl font-black text-white">
+              {lineupsCount} <span className="text-xs text-slate-400 font-semibold">Presets</span>
+            </div>
+            <div className="text-[10px] font-bold text-cyan-300 pt-1">
+              Ready for Game Day
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Top action header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
         <div>

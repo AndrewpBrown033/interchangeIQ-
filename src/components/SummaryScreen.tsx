@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Player, GameInfo } from '../types';
-import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp } from 'lucide-react';
+import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface SummaryScreenProps {
   players: Player[];
@@ -14,6 +14,7 @@ interface SummaryScreenProps {
   email: string;
   onNavigate: (tabId: string) => void;
   onStartNewGame: () => void;
+  onForceSync?: () => Promise<boolean>;
 }
 
 export default function SummaryScreen({
@@ -28,7 +29,10 @@ export default function SummaryScreen({
   email,
   onNavigate,
   onStartNewGame,
+  onForceSync,
 }: SummaryScreenProps) {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const availablePlayers = players.filter((p) => p.status === 'available');
   const injuredPlayers = players.filter((p) => p.status === 'injured');
   const awayPlayers = players.filter((p) => p.status === 'away');
@@ -236,16 +240,46 @@ export default function SummaryScreen({
           <p className="text-xs font-semibold text-[var(--muted)]">
             Last synced: <span className="font-bold text-[var(--ink)]">{formatSyncTime(lastSyncedAt)}</span>
           </p>
+          {syncNotice && (
+            <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{syncNotice}</span>
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase ${
             cloudConnected ? 'bg-[#E6F6EE] text-[#0E7A48]' : 'bg-[#FFF4DB] text-[#8A5A00]'
           }`}>
             {cloudConnected ? 'Live Connection Active' : 'Offline Mode'}
           </span>
+
+          {onForceSync && (
+            <button
+              disabled={isSyncing}
+              onClick={async () => {
+                setIsSyncing(true);
+                setSyncNotice(null);
+                const success = await onForceSync();
+                setIsSyncing(false);
+                if (success) {
+                  setSyncNotice("Synced squad & team data to Cloud!");
+                  setTimeout(() => setSyncNotice(null), 4000);
+                } else {
+                  setSyncNotice("Sync failed. Check connection.");
+                  setTimeout(() => setSyncNotice(null), 4000);
+                }
+              }}
+              className="px-3.5 py-1.5 bg-[var(--navy)] hover:bg-[var(--navy)]/90 text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+            </button>
+          )}
+
           <button
             onClick={() => onNavigate('settings')}
-            className="p-2 bg-gray-50 border border-[var(--line)] hover:bg-gray-100 rounded-xl transition text-gray-500"
+            className="p-2 bg-gray-50 border border-[var(--line)] hover:bg-gray-100 rounded-xl transition text-gray-500 cursor-pointer"
             title="Open settings"
           >
             <Settings className="w-4 h-4" />

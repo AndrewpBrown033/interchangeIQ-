@@ -701,14 +701,18 @@ export default function AdminScreen({
 
                       <div className="flex gap-2 shrink-0">
                         <button
-                          onClick={() => onSelectTeam(t.id)}
-                          className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
+                          onClick={() => {
+                            onSelectTeam(t.id);
+                            onNavigateTab?.('team');
+                          }}
+                          className={`px-3.5 py-1.5 text-[11px] font-extrabold rounded-lg border transition cursor-pointer flex items-center gap-1 ${
                             isActive
-                              ? 'bg-green-600 text-white border-green-700'
-                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
+                              : 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-2xs'
                           }`}
+                          title="Select team and open Squad Summary & Metrics tab"
                         >
-                          {isActive ? 'Opened' : 'Open'}
+                          <span>{isActive ? 'View Team View →' : 'Open →'}</span>
                         </button>
                         <button
                           onClick={() => handleRenameTeam(t.id)}
