@@ -414,24 +414,39 @@ export default function RotationsScreen({
                             : 'border-[var(--line)] bg-white hover:shadow-xs'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-[var(--blue)] text-white font-black text-xs rounded-xl flex flex-col items-center justify-center shrink-0">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                          <div className="w-10 h-10 bg-[var(--navy)] text-white font-black text-xs rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm border border-slate-700">
                             <span>Q{r.quarter}</span>
-                            <span className="text-[10px] text-blue-100">{r.minute}m</span>
+                            <span className="text-[10px] text-amber-400">{r.minute}m</span>
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <b className="text-sm font-extrabold text-gray-900">
-                                {r.out} ➔ {r.inn}
-                              </b>
+
+                          <div className="space-y-1.5">
+                            {/* Dual OFF / ON High-Contrast Interchange Badges */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* OFF Badge */}
+                              <span className="px-2.5 py-1 rounded-lg bg-red-950/80 border border-red-600/80 text-red-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
+                                <span className="bg-red-600 text-white w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↓</span>
+                                <span>OFF: {r.out}</span>
+                              </span>
+
+                              {/* Interchange Arrow */}
+                              <span className="text-slate-400 font-black text-xs">⇄</span>
+
+                              {/* ON Badge */}
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/80 text-emerald-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
+                                <span className="bg-emerald-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↑</span>
+                                <span>ON: {r.inn}</span>
+                              </span>
+
                               <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${
                                 r.type === 'onfield' ? 'bg-cyan-50 text-cyan-700' : 'bg-blue-50 text-blue-700'
                               }`}>
                                 {r.type === 'onfield' ? 'On Field Swap' : 'Interchange'}
                               </span>
                             </div>
+
                             {r.note && (
-                              <p className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                              <p className="text-[10px] text-gray-500 font-semibold">
                                 Note: {r.note}
                               </p>
                             )}

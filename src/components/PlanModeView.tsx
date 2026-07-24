@@ -12,7 +12,8 @@ import {
   Sparkles,
   CheckCircle2,
   XCircle,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 
 interface PlanModeViewProps {
@@ -369,34 +370,53 @@ export default function PlanModeView({
                   }}
                   className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer transition-all ${
                     isSelected
-                      ? 'scale-110 ring-2 ring-amber-400 rounded-xl shadow-2xl z-40'
-                      : 'hover:scale-105'
+                      ? 'scale-110 ring-4 ring-red-500 shadow-[0_0_25px_rgba(239,68,68,0.9)] rounded-xl z-40'
+                      : selectedSource
+                        ? 'hover:scale-105 hover:ring-4 hover:ring-emerald-400 hover:shadow-[0_0_20px_rgba(52,211,153,0.8)]'
+                        : 'hover:scale-105'
                   }`}
                   style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                 >
-                  <div className="bg-[#121a2c]/90 backdrop-blur-md border border-slate-700/80 hover:border-slate-500 rounded-xl p-1.5 shadow-xl flex flex-col min-w-[82px] max-w-[100px]">
-                    {/* Top slot header badge */}
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className="bg-slate-800/90 text-indigo-300 font-black text-[8px] px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                        {pos.label}
-                      </span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                  <div className={`bg-white border rounded-xl p-1.5 shadow-xl flex items-center gap-1.5 min-w-[96px] max-w-[115px] relative overflow-hidden transition-all ${
+                    isSelected
+                      ? 'border-2 border-slate-900 ring-2 ring-red-500'
+                      : 'border-slate-200 hover:border-slate-400'
+                  }`}>
+                    {/* RookieMe Selection Badges */}
+                    {isSelected && (
+                      <div className="absolute top-0.5 right-0.5 bg-red-600 text-white font-black text-[7px] px-1 py-0.5 rounded shadow-xs flex items-center gap-0.5 animate-pulse z-20">
+                        <span>OFF</span>
+                        <span>↓</span>
+                      </div>
+                    )}
+
+                    {/* Jumper Number Box */}
+                    <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md font-black text-white text-[10px] flex items-center justify-center shrink-0 shadow-xs ${
+                      isSelected ? 'bg-red-600' :
+                      Number(p?.number || 0) % 4 === 0 ? 'bg-[#ea580c]' :
+                      Number(p?.number || 0) % 3 === 0 ? 'bg-[#1d4ed8]' :
+                      Number(p?.number || 0) % 2 === 0 ? 'bg-[#15803d]' : 'bg-[#7e22ce]'
+                    }`}>
+                      {p?.number || '0'}
                     </div>
 
-                    {/* Number and Name */}
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-md bg-blue-600 text-white font-black text-[9px] flex items-center justify-center shrink-0">
-                        {p?.number || '0'}
-                      </div>
-                      <div className="font-extrabold text-[10px] text-slate-100 truncate">
+                    {/* Player Info & Stats */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between text-left">
+                      <div className="font-extrabold text-[9px] text-slate-900 truncate leading-tight" title={p?.name || 'Vacant'}>
                         {p ? (p.nick || p.name) : 'Vacant'}
                       </div>
-                    </div>
 
-                    {/* Time & Energy */}
-                    <div className="flex items-center justify-between text-[8px] text-slate-400 font-bold mt-1 pt-1 border-t border-slate-800">
-                      <span>{formatTime(p?.active || 220)}</span>
-                      <span className="text-emerald-400">{energyPct}%</span>
+                      <div className="flex items-center justify-between gap-0.5 leading-none text-[7px] font-black text-slate-600 mt-1">
+                        <span className="px-1 py-0.5 rounded bg-slate-100 text-slate-700 uppercase tracking-tighter">
+                          {pos.label}
+                        </span>
+                        <span>{formatTime(p?.active || 220)}</span>
+                        <span className="text-slate-800 font-black">{energyPct}%</span>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          energyPct < 40 ? 'bg-red-500 animate-pulse' :
+                          energyPct < 75 ? 'bg-amber-400' : 'bg-emerald-500'
+                        }`} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -407,29 +427,32 @@ export default function PlanModeView({
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
               <defs>
                 {/* Refined Small Crisp Arrow Markers */}
-                <marker id="clean-arrow-amber" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-                  <path d="M 0 1 L 7 4 L 0 7 z" fill="#fbbf24" />
+                <marker id="clean-arrow-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
                 </marker>
-                <marker id="clean-arrow-emerald" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-                  <path d="M 0 1 L 7 4 L 0 7 z" fill="#34d399" />
+                <marker id="clean-arrow-amber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24" />
                 </marker>
-                <marker id="clean-arrow-cyan" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-                  <path d="M 0 1 L 7 4 L 0 7 z" fill="#38bdf8" />
+                <marker id="clean-arrow-emerald" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399" />
+                </marker>
+                <marker id="clean-arrow-cyan" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
                 </marker>
               </defs>
 
-              {/* Render queued rotation arrows as sleek thin dashed lines */}
+              {/* Render queued rotation arrows as bold high-contrast dashed lines */}
               {qRotations.map((rot, idx) => {
                 const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
                 const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
                 // Default positions if on bench
-                const outPos = FIELD_POSITIONS.find((p) => p.slot === outSlot) || { x: 12, y: 50 };
+                const outPos = FIELD_POSITIONS.find((p) => p.slot === outSlot) || { x: 10, y: 50 };
                 const inPos = FIELD_POSITIONS.find((p) => p.slot === inSlot) || { x: 50, y: 50 };
 
-                const colors = ['#fbbf24', '#38bdf8', '#34d399', '#a855f7'];
+                const colors = ['#0f172a', '#fbbf24', '#38bdf8', '#34d399'];
                 const strokeColor = colors[idx % colors.length];
-                const markerId = idx % 2 === 0 ? 'clean-arrow-amber' : 'clean-arrow-cyan';
+                const markerId = idx === 0 ? 'clean-arrow-dark' : idx % 2 === 0 ? 'clean-arrow-amber' : 'clean-arrow-cyan';
 
                 return (
                   <g key={rot.id}>
@@ -439,10 +462,10 @@ export default function PlanModeView({
                       x2={inPos.x}
                       y2={inPos.y}
                       stroke={strokeColor}
-                      strokeWidth="1.2"
-                      strokeDasharray="2.5 2.5"
+                      strokeWidth="2.2"
+                      strokeDasharray="5,4"
                       markerEnd={`url(#${markerId})`}
-                      opacity="0.9"
+                      opacity="0.95"
                     />
                   </g>
                 );
@@ -453,81 +476,93 @@ export default function PlanModeView({
         </div>
 
         {/* RIGHT COLUMN: QUEUE & NEW PLAN PANEL */}
-        <div className="col-span-3 sm:col-span-3 lg:col-span-3 border-l border-slate-800/80 bg-[#0f172a]/80 flex flex-col overflow-hidden">
+        <div className="col-span-3 sm:col-span-3 lg:col-span-3 border-l border-slate-800/80 bg-white text-slate-900 flex flex-col overflow-hidden">
           
           {/* Header */}
-          <div className="p-3.5 border-b border-slate-800 flex items-center justify-between bg-[#0b1220] shrink-0">
+          <div className="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
             <div className="flex items-center gap-2">
-              <span className="font-black text-xs uppercase tracking-wider text-slate-200">QUEUE</span>
-              <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black text-[10px]">
+              <span className="font-extrabold text-xs uppercase tracking-wider text-orange-600">Queue</span>
+              <span className="w-5 h-5 rounded-full bg-red-500 text-white font-black text-[10px] flex items-center justify-center">
                 {qRotations.length}
               </span>
             </div>
 
-            <button
-              onClick={() => {
-                const min = prompt('Enter minute mark for rotation (e.g. 7):', `${selectedMinute}`);
-                if (min) setSelectedMinute(parseInt(min, 10) || 7);
-              }}
-              className="text-[10px] font-bold px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300 transition cursor-pointer"
-            >
-              Time: {selectedMinute} MINS
-            </button>
+            <span className="text-[11px] font-black uppercase text-slate-800 tracking-wider">
+              NEW PLAN
+            </span>
           </div>
 
           {/* Queued Rotations Grouped List */}
-          <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
             {qRotations.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-black tracking-widest text-amber-400 uppercase">
-                  <span>AT {selectedMinute} MINS • Q{selectedQuarter}</span>
-                  <button
-                    onClick={handleClearQueue}
-                    className="text-slate-500 hover:text-red-400 transition cursor-pointer"
-                    title="Clear Queue"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+                  <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 font-black text-xs flex items-center justify-center border border-amber-300">
+                    {qRotations.length * 2}
+                  </div>
+                  <div className="font-black text-sm text-slate-900">
+                    Substitution
+                  </div>
                 </div>
 
-                {qRotations.map((rot) => {
-                  const pOut = players.find((p) => p.id === rot.outId);
-                  const pIn = players.find((p) => p.id === rot.inId);
+                <div className="space-y-3">
+                  {qRotations.map((rot) => {
+                    const pOut = players.find((p) => p.id === rot.outId);
+                    const pIn = players.find((p) => p.id === rot.inId);
 
-                  return (
-                    <div key={rot.id} className="space-y-1.5 p-2 bg-[#141d2f] border border-slate-800 rounded-xl">
-                      {/* OFF Pill */}
-                      <div className="p-2 rounded-lg bg-red-950/40 border border-red-800/40 text-red-300 text-xs font-bold flex items-center justify-between">
-                        <div className="flex items-center gap-2 truncate">
-                          <ArrowLeft className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                          <span className="truncate">OFF: #{pOut?.number} {pOut?.name}</span>
+                    const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId) || 'LW';
+                    const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId) || 'Bench';
+
+                    return (
+                      <div key={rot.id} className="space-y-2 text-xs font-bold text-slate-800 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                        {/* OFF Item */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ArrowLeft className="w-4 h-4 text-red-500 shrink-0 stroke-[3]" />
+                            <div className="truncate">
+                              <div className="font-black text-slate-900 truncate">
+                                {pOut?.number}. {pOut?.name}
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-semibold">
+                                {outSlot} to Bench
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveRotation(rot.id)}
+                            className="text-slate-400 hover:text-red-500 p-1 transition cursor-pointer"
+                            title="Remove"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* ON Item */}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ArrowRight className="w-4 h-4 text-emerald-500 shrink-0 stroke-[3]" />
+                            <div className="truncate">
+                              <div className="font-black text-slate-900 truncate">
+                                {pIn?.number}. {pIn?.name}
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-semibold">
+                                Bench to {inSlot}
+                              </div>
+                            </div>
+                          </div>
+                          <RefreshCw className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                         </div>
                       </div>
-
-                      {/* ON Pill */}
-                      <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-800/40 text-emerald-300 text-xs font-bold flex items-center justify-between">
-                        <div className="flex items-center gap-2 truncate">
-                          <ArrowRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span className="truncate">ON: #{pIn?.number} {pIn?.name}</span>
-                        </div>
-
-                        <button
-                          onClick={() => handleRemoveRotation(rot.id)}
-                          className="text-slate-500 hover:text-red-400 transition"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
 
             {qRotations.length === 0 && (
-              <div className="p-8 text-center border-2 border-dashed border-slate-800 rounded-2xl bg-[#0b1220]/50 space-y-2">
-                <Repeat className="w-6 h-6 text-slate-600 mx-auto" />
-                <p className="text-xs font-bold text-slate-400">No rotations queued for Q{selectedQuarter}</p>
+              <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 space-y-2">
+                <Repeat className="w-6 h-6 text-slate-400 mx-auto" />
+                <p className="text-xs font-bold text-slate-600">No rotations queued for Q{selectedQuarter}</p>
                 <p className="text-[10px] text-slate-500">
                   Tap a bench player and a field player to queue an interchange rotation.
                 </p>
@@ -536,28 +571,22 @@ export default function PlanModeView({
           </div>
 
           {/* Action Footer */}
-          <div className="p-3.5 border-t border-slate-800/80 bg-[#080c14] space-y-2.5 shrink-0">
+          <div className="p-3 border-t border-slate-200 bg-slate-50 grid grid-cols-2 gap-2 shrink-0">
+            <button
+              onClick={handleClearQueue}
+              disabled={qRotations.length === 0}
+              className="py-2.5 px-3 font-black text-[11px] rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 transition cursor-pointer uppercase tracking-wider disabled:opacity-50"
+            >
+              CLEAR
+            </button>
             <button
               onClick={handleApplyPlanToGame}
               disabled={qRotations.length === 0}
-              className={`w-full py-3 px-4 font-black text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider ${
-                qRotations.length > 0
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-950/50'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-              }`}
+              className="py-2.5 px-3 font-black text-[11px] rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition cursor-pointer uppercase tracking-wider disabled:opacity-50"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>APPLY PLAN TO GAME LINEUP</span>
-            </button>
-
-            <button
-              onClick={handleClearQueue}
-              className="w-full py-1.5 text-slate-400 hover:text-white font-extrabold text-[11px] tracking-wider transition uppercase cursor-pointer"
-            >
-              CLEAR QUEUE
+              ADD TO QUEUE
             </button>
           </div>
-
         </div>
 
       </div>

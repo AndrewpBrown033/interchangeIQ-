@@ -1339,6 +1339,50 @@ export default function GameDayScreen({
                 <div className="goal-post main bottom-right-main" id="afl-goal-post-bottom-3"></div>
                 <div className="goal-post behind bottom-right-behind" id="afl-goal-post-bottom-4"></div>
 
+                {/* Dynamic SVG Connecting Lines & Arrowhead Markers for Interchange / Swaps */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-15" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <defs>
+                    <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
+                    </marker>
+                    <marker id="afl-arrow-red" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626" />
+                    </marker>
+                    <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
+                    </marker>
+                  </defs>
+
+                  {/* Draw dashed lines connecting pending selected player to target swap positions */}
+                  {pendingActionPlayerId && (() => {
+                    const srcSlot = Object.keys(lineup).find((k) => lineup[k] === pendingActionPlayerId);
+                    const srcPosConfig = srcSlot ? POSITIONS.find(([sn]) => sn === srcSlot) : null;
+                    const x1 = srcPosConfig ? srcPosConfig[2] : 5;
+                    const y1 = srcPosConfig ? srcPosConfig[3] : 50;
+
+                    return POSITIONS.map(([slotName, label, x2, y2]) => {
+                      const targetPid = lineup[slotName];
+                      if (targetPid === pendingActionPlayerId) return null;
+
+                      return (
+                        <g key={`pending-line-${slotName}`}>
+                          <line
+                            x1={`${x1}%`}
+                            y1={`${y1}%`}
+                            x2={`${x2}%`}
+                            y2={`${y2}%`}
+                            stroke="#0f172a"
+                            strokeWidth="1.8"
+                            strokeDasharray="4,4"
+                            markerEnd="url(#afl-arrow-dark)"
+                            opacity="0.6"
+                          />
+                        </g>
+                      );
+                    });
+                  })()}
+                </svg>
+
                 {POSITIONS.map(([slotName, label, x, y]) => {
                   const pid = lineup[slotName];
                   const p = pid ? players.find((x) => x.id === pid) : null;
@@ -1355,14 +1399,32 @@ export default function GameDayScreen({
                       }}
                       className={`slot flex items-center justify-center transition-all ${
                         ['R', 'ROV', 'RR', 'C', 'CHF', 'CHB', 'FF', 'FB'].includes(slotName) ? 'key' : ''
-                      } ${isSelected ? 'selected' : ''}`}
+                      } ${
+                        isSelected
+                          ? 'ring-4 ring-red-500 shadow-[0_0_24px_rgba(239,68,68,0.9)] rounded-xl scale-105 z-30'
+                          : pendingActionPlayerId
+                            ? 'hover:ring-4 hover:ring-emerald-400 hover:shadow-[0_0_20px_rgba(52,211,153,0.8)] cursor-pointer'
+                            : ''
+                      }`}
                       style={{ left: `${x}%`, top: `${y}%` }}
                     >
                       {p ? (
-                        <div className="relative overflow-hidden w-full h-full rounded-lg bg-white p-1 shadow-xs border border-gray-100 flex flex-col justify-between">
+                        <div className={`relative overflow-hidden w-full h-full rounded-xl bg-white p-1 shadow-md border flex items-center gap-1.5 transition-all select-none ${
+                          isSelected
+                            ? 'border-2 border-slate-900 ring-2 ring-red-500'
+                            : 'border-slate-200/90 hover:border-slate-400'
+                        }`}>
+                          {/* RookieMe Interchange Active Badges */}
+                          {isSelected && (
+                            <div className="absolute top-0.5 right-0.5 z-20 bg-red-600 text-white font-black text-[7px] px-1 py-0.5 rounded shadow-sm flex items-center gap-0.5 animate-pulse">
+                              <span>OFF</span>
+                              <span>↓</span>
+                            </div>
+                          )}
+
                           {/* Swipe-to-bench background indicator */}
                           {swipingPlayerId === p.id && Math.abs(swipeOffset) > 10 && (
-                            <div className="absolute inset-0 bg-red-600 text-white flex items-center justify-center gap-1 animate-pulse z-10">
+                            <div className="absolute inset-0 bg-red-600 text-white flex items-center justify-center gap-1 animate-pulse z-10 rounded-xl">
                               <RotateCcw className="w-3.5 h-3.5" />
                               <span className="text-[8px] font-black uppercase tracking-wider">Bench Player</span>
                             </div>
@@ -1378,41 +1440,33 @@ export default function GameDayScreen({
                               transform: swipingPlayerId === p.id ? `translateX(${swipeOffset}px)` : 'none',
                               transition: swipingPlayerId === p.id ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                             }}
-                            className="w-full h-full absolute inset-0 flex flex-col justify-between bg-white p-1 rounded-lg text-black font-extrabold select-none"
+                            className="w-full h-full flex items-center gap-1.5 bg-white rounded-lg text-black select-none"
                           >
-                            {/* Position Label Row */}
-                            <div className="flex items-center justify-between border-b border-gray-150 pb-0.5 mb-0.5 w-full shrink-0">
-                              <span className={`text-[7px] sm:text-[8px] font-black px-1 rounded-xs uppercase tracking-tighter ${
-                                POSITION_GROUPS.FWD.includes(slotName) ? 'bg-red-50 text-red-600' :
-                                POSITION_GROUPS.MID.includes(slotName) ? 'bg-blue-50 text-blue-600' :
-                                POSITION_GROUPS.DEF.includes(slotName) ? 'bg-emerald-50 text-emerald-600' : 'bg-purple-50 text-purple-600'
-                              }`}>
-                                {label}
-                              </span>
-                              <span className="hidden sm:inline text-[7px] text-gray-400 font-extrabold truncate max-w-[85px] text-right" title={POSITION_DESCRIPTIONS[slotName]}>
-                                {POSITION_DESCRIPTIONS[slotName]?.replace('Pocket Left', 'Pkt L').replace('Pocket Right', 'Pkt R').replace('Half Forward Left', 'HF L').replace('Half Forward Right', 'HF R').replace('Half Back Left', 'HB L').replace('Half Back Right', 'HB R').replace('Centre Half Forward', 'Ctr Half Fwd').replace('Centre Half Back', 'Ctr Half Bk')}
-                              </span>
+                            {/* Square Jumper Number Badge */}
+                            <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md font-black text-white text-[9px] sm:text-[11px] flex items-center justify-center shrink-0 shadow-xs ${
+                              POSITION_GROUPS.FWD.includes(slotName) ? 'bg-[#ea580c]' :
+                              POSITION_GROUPS.MID.includes(slotName) ? 'bg-[#1d4ed8]' :
+                              POSITION_GROUPS.DEF.includes(slotName) ? 'bg-[#15803d]' : 'bg-[#7e22ce]'
+                            }`}>
+                              {p.number}
                             </div>
 
-                            {/* Player info */}
-                            <div className="flex items-center gap-1 w-full min-w-0">
-                              <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[8px] sm:text-[10px] text-white font-black shrink-0 ${
-                                POSITION_GROUPS.FWD.includes(slotName) ? 'bg-[#E5484D]' :
-                                POSITION_GROUPS.MID.includes(slotName) ? 'bg-[#4C6FFF]' :
-                                POSITION_GROUPS.DEF.includes(slotName) ? 'bg-[#16a765]' : 'bg-[#8B5CF6]'
-                              }`}>
-                                {p.number}
+                            {/* Player Name & Bottom Stats Row */}
+                            <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5 text-left">
+                              <div className="font-extrabold text-[8px] sm:text-[9.5px] text-slate-900 truncate leading-none" title={p.name}>
+                                {p.nick || (p.name.split(' ').length > 1 ? `${p.name.split(' ')[0][0]}. ${p.name.split(' ').slice(1).join(' ')}` : p.name)}
                               </div>
-                              <div className="truncate text-[8px] sm:text-[9px] leading-none flex-1 text-left w-full min-w-0">
-                                {/* On desktop: show full name or nickname */}
-                                <div className="hidden sm:block font-extrabold truncate text-gray-900" title={p.nick ? `${p.nick} (${p.name})` : p.name}>
-                                  {p.nick || p.name}
-                                </div>
-                                {/* On mobile: show first name or short name */}
-                                <div className="block sm:hidden font-extrabold truncate text-gray-900 text-[8px]" title={p.nick ? `${p.nick} (${p.name})` : p.name}>
-                                  {p.nick || p.name.split(' ')[0]}
-                                </div>
-                                <div className="text-[6px] sm:text-[7px] text-gray-500 font-bold leading-none mt-0.5">{fmt(p.active)}</div>
+
+                              <div className="flex items-center justify-between gap-0.5 leading-none text-[6.5px] sm:text-[7.5px] font-black text-slate-600">
+                                <span className="px-1 py-0.5 rounded bg-slate-100 text-slate-700 uppercase font-black tracking-tighter">
+                                  {label}
+                                </span>
+                                <span>{fmt(p.active)}</span>
+                                <span className="text-slate-800">{Math.min(100, Math.round((p.active / 1800) * 100))}%</span>
+                                <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${
+                                  (p.active / 1800) > 0.85 ? 'bg-red-500 animate-pulse' :
+                                  (p.active / 1800) > 0.5 ? 'bg-amber-400' : 'bg-emerald-500'
+                                }`} />
                               </div>
                             </div>
                           </div>
@@ -1628,26 +1682,93 @@ export default function GameDayScreen({
         </div>
       )}
 
-      {/* Floating Action Hint / Instructions */}
-      {pendingActionPlayerId && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[var(--navy)] text-white px-5 py-2.5 rounded-full flex items-center gap-3 shadow-lg z-50 animate-bounce">
-          <AlertCircle className="w-4 h-4 text-[var(--cyan)]" />
-          <span className="text-xs font-black">
-            {pendingActionMode === 'swap'
-              ? `Select another player to swap with #${players.find((x) => x.id === pendingActionPlayerId)?.number}`
-              : `Tap an empty field position to place #${players.find((x) => x.id === pendingActionPlayerId)?.number}`}
-          </span>
-          <button
-            onClick={() => {
-              setPendingActionPlayerId(null);
-              setPendingActionMode(null);
-            }}
-            className="px-2 py-0.5 bg-white/10 hover:bg-white/20 text-white rounded-md text-[10px] font-black uppercase"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+      {/* RookieMe-Style Game Management Interchange Visual Overlay */}
+      {pendingActionPlayerId && (() => {
+        const srcPlayer = players.find((x) => x.id === pendingActionPlayerId);
+        const srcSlot = Object.keys(lineup).find((k) => lineup[k] === pendingActionPlayerId);
+        const posConfig = srcSlot ? POSITIONS.find(([sn]) => sn === srcSlot) : null;
+        const srcPosLabel = posConfig ? posConfig[1] : (srcSlot || 'BENCH');
+
+        return (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#091325] border-2 border-slate-700 text-white p-3.5 sm:p-4 rounded-2xl shadow-2xl z-50 max-w-xl w-[94vw] sm:w-full backdrop-blur-md space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* Header bar */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span className="font-black text-xs uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
+                  Interchange in Progress
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setPendingActionPlayerId(null);
+                  setPendingActionMode(null);
+                }}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-black uppercase transition cursor-pointer border border-slate-700"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* OFF & ON Interchange Visual Pair */}
+            <div className="grid grid-cols-1 sm:grid-cols-11 gap-2 items-center">
+              {/* OFF Player (Red / Crimson Card) */}
+              <div className="sm:col-span-5 bg-gradient-to-r from-red-950/90 via-red-900/80 to-red-950/90 border-2 border-red-500/80 p-2.5 rounded-xl flex items-center justify-between gap-2 shadow-lg">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-red-600 border-2 border-white text-white font-black text-sm flex items-center justify-center shrink-0 shadow-md">
+                    #{srcPlayer?.number}
+                  </div>
+                  <div className="truncate">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-red-300 block">
+                      {srcPosLabel} • COMING OFF
+                    </span>
+                    <b className="text-xs font-black text-white truncate block">
+                      {srcPlayer?.nick || srcPlayer?.name}
+                    </b>
+                  </div>
+                </div>
+                <div className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5 shrink-0 shadow-xs">
+                  <span>OFF</span>
+                  <span>↓</span>
+                </div>
+              </div>
+
+              {/* Central Swap Flow Direction Indicator */}
+              <div className="sm:col-span-1 flex items-center justify-center py-1 sm:py-0">
+                <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-amber-400 text-amber-400 font-black flex items-center justify-center shadow-lg text-xs animate-pulse">
+                  ⇄
+                </div>
+              </div>
+
+              {/* ON Player Target Card (Green / Mint Preview) */}
+              <div className="sm:col-span-5 bg-gradient-to-r from-emerald-950/90 via-emerald-900/80 to-emerald-950/90 border-2 border-emerald-500/80 p-2.5 rounded-xl flex items-center justify-between gap-2 shadow-lg">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500 border-2 border-white text-white font-black text-sm flex items-center justify-center shrink-0 shadow-md animate-pulse">
+                    ?
+                  </div>
+                  <div className="truncate">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-300 block">
+                      GOING ON • TARGET
+                    </span>
+                    <b className="text-xs font-black text-emerald-100 truncate block">
+                      Tap Player or Slot...
+                    </b>
+                  </div>
+                </div>
+                <div className="bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5 shrink-0 shadow-xs">
+                  <span>ON</span>
+                  <span>↑</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-400 font-semibold text-center italic">
+              Tap any player on field or bench to execute the interchange swap.
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Live Game Day Insights Summary */}
       <div className={`card collapsible-card bg-white rounded-2xl border border-[var(--line)] shadow-sm ${gameDayInsightsCollapsed ? 'max-h-[56px] overflow-hidden' : ''}`}>

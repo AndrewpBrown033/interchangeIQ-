@@ -425,12 +425,12 @@ export default function TeamScreen({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Players List */}
-        <div className="bg-white rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden flex flex-col h-fit">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
             <h3 className="font-black text-sm text-[var(--navy)]">Roster list</h3>
             <button
               onClick={() => setSortBy(sortBy === 'number' ? 'name' : 'number')}
-              className="px-2 py-1 text-[10px] font-black text-gray-500 bg-gray-50 border border-gray-100 rounded-md hover:bg-gray-100"
+              className="px-2 py-1 text-[10px] font-black text-gray-500 bg-gray-50 border border-gray-100 rounded-md hover:bg-gray-100 cursor-pointer"
             >
               Sort: {sortBy === 'number' ? 'Jumper #' : 'Name'}
             </button>
@@ -442,7 +442,7 @@ export default function TeamScreen({
               <button
                 key={zone}
                 onClick={() => setFilterZone(zone)}
-                className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition ${
+                className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition cursor-pointer ${
                   filterZone === zone
                     ? 'bg-[var(--blue)] text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-800'
@@ -453,7 +453,7 @@ export default function TeamScreen({
             ))}
           </div>
 
-          <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-100">
+          <div className="max-h-[720px] overflow-y-auto divide-y divide-gray-100">
             {filtered.map((p) => {
               const isActive = activeId === p.id;
               const fldPos = Object.keys(lineup).find((k) => lineup[k] === p.id);
