@@ -670,8 +670,11 @@ export default function TeamScreen({
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
                   {/* Mini-Field Heatmap Container - Replicating Game Day AFL Oval */}
                   <div className="xl:col-span-3 bg-gray-50 border border-gray-100 p-4 rounded-2xl flex flex-col items-center justify-center overflow-x-auto">
-                    <div className="w-full max-w-[560px] field relative select-none mx-auto shadow-md shrink-0" style={{ height: '540px' }}>
+                    <div className="w-full max-w-[490px] field relative select-none mx-auto shadow-md shrink-0" style={{ height: '680px' }}>
                       <div className="centre-square"></div>
+                      <div className="centre-circle-inner"></div>
+                      <div className="fifty-arc-top"></div>
+                      <div className="fifty-arc-bottom"></div>
 
                       {/* AFL Goal Posts & Markings - Top End */}
                       <div className="goal-line-top"></div>

@@ -5,23 +5,36 @@ import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, Chev
 import PlanModeView from './PlanModeView';
 
 const POSITION_DESCRIPTIONS: Record<string, string> = {
-  'FP-L': 'Forward Pocket Left',
+  'RBP': 'Right Back Pocket',
+  'FB': 'Full Back',
+  'LBP': 'Left Back Pocket',
+  'RHB': 'Right Half Back',
+  'CHB': 'Centre Half Back',
+  'LHB': 'Left Half Back',
+  'M3': 'Midfield 3',
+  'M2': 'Midfield 2',
+  'RW': 'Right Wing',
+  'LW': 'Left Wing',
+  'M1': 'Midfield 1',
+  'R': 'Ruck',
+  'RHF': 'Right Half Forward',
+  'CHF': 'Centre Half Forward',
+  'LHF': 'Left Half Forward',
+  'RFP': 'Right Forward Pocket',
   'FF': 'Full Forward',
+  'LFP': 'Left Forward Pocket',
+  'FP-L': 'Forward Pocket Left',
   'FP-R': 'Forward Pocket Right',
   'HF-L': 'Half Forward Left',
-  'CHF': 'Centre Half Forward',
   'HF-R': 'Half Forward Right',
   'W-L': 'Wing Left',
-  'C': 'Centre',
   'W-R': 'Wing Right',
-  'R': 'Ruck',
+  'C': 'Centre',
   'ROV': 'Rover',
   'RR': 'Ruck Rover',
   'HB-L': 'Half Back Left',
-  'CHB': 'Centre Half Back',
   'HB-R': 'Half Back Right',
   'BP-L': 'Back Pocket Left',
-  'FB': 'Full Back',
   'BP-R': 'Back Pocket Right',
 };
 
@@ -1319,9 +1332,12 @@ export default function GameDayScreen({
             </div>
           ) : (
             /* Oval Field */
-            <div className="overflow-x-auto pb-4">
-              <div className="field relative select-none">
+            <div className="overflow-x-auto pb-4 flex justify-center">
+              <div className="field relative select-none w-full max-w-[490px]">
                 <div className="centre-square"></div>
+                <div className="centre-circle-inner"></div>
+                <div className="fifty-arc-top"></div>
+                <div className="fifty-arc-bottom"></div>
 
                 {/* AFL Goal Posts & Markings - Top End */}
                 <div className="goal-line-top" id="afl-goal-line-top"></div>
@@ -1412,7 +1428,7 @@ export default function GameDayScreen({
                         <div className={`relative overflow-hidden w-full h-full rounded-xl bg-white p-1 shadow-md border flex items-center gap-1.5 transition-all select-none ${
                           isSelected
                             ? 'border-2 border-slate-900 ring-2 ring-red-500'
-                            : 'border-slate-200/90 hover:border-slate-400'
+                            : 'border-slate-300 hover:border-slate-400'
                         }`}>
                           {/* RookieMe Interchange Active Badges */}
                           {isSelected && (
@@ -1474,8 +1490,8 @@ export default function GameDayScreen({
                       ) : (
                         <div className="flex flex-col items-center justify-center w-full h-full text-center p-0.5 sm:p-1">
                           <span className="text-amber-300 font-black text-[9px] sm:text-[11px] leading-none mb-0.5 tracking-wider uppercase">{label}</span>
-                          <span className="hidden sm:block text-[7px] text-white/70 font-extrabold truncate max-w-full leading-tight mb-1" title={POSITION_DESCRIPTIONS[slotName]}>
-                            {POSITION_DESCRIPTIONS[slotName]?.replace('Pocket Left', 'Pkt L').replace('Pocket Right', 'Pkt R').replace('Half Forward Left', 'HF L').replace('Half Forward Right', 'HF R').replace('Half Back Left', 'HB L').replace('Half Back Right', 'HB R').replace('Centre Half Forward', 'Ctr Half Fwd').replace('Centre Half Back', 'Ctr Half Bk')}
+                          <span className="hidden sm:block text-[7px] text-white/70 font-extrabold truncate max-w-full leading-tight mb-1" title={POSITION_DESCRIPTIONS[slotName] || slotName}>
+                            {POSITION_DESCRIPTIONS[slotName] || slotName}
                           </span>
                           <span className="text-[6px] sm:text-[7px] font-black uppercase text-white/50 border border-dashed border-white/20 bg-white/5 px-1 py-0.5 rounded-sm sm:rounded-md hover:bg-white/15 transition-all">
                             + Assign

@@ -114,8 +114,9 @@ body {
 
 /* Custom Field and Slot Styles */
 .field {
-  height: 640px;
-  max-width: 920px;
+  height: 620px;
+  max-width: 580px;
+  width: 100%;
   margin: 0 auto;
   position: relative;
   border-radius: 50%;
@@ -128,10 +129,11 @@ body {
 .field::before {
   content: '';
   position: absolute;
-  inset: 42px;
-  border: 2px solid rgba(255,255,255,0.4);
+  inset: 14px 20px;
+  border: 2px solid rgba(255,255,255,0.65);
   border-radius: 50%;
   pointer-events: none;
+  z-index: 1;
 }
 
 .field::after {
@@ -139,22 +141,62 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 150px;
-  height: 150px;
+  width: 100px;
+  height: 100px;
   transform: translate(-50%, -50%);
-  border: 3px solid rgba(255,255,255,0.4);
+  border: 2px solid rgba(255,255,255,0.45);
   border-radius: 50%;
   z-index: 1;
   pointer-events: none;
 }
 
+.field .centre-circle-inner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,255,255,0.45);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .field .centre-square {
   position: absolute;
-  left: 27%;
-  top: 35%;
-  width: 46%;
-  height: 33%;
-  border: 3px solid rgba(255,255,255,0.4);
+  left: 50%;
+  top: 50%;
+  width: 210px;
+  height: 210px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,255,255,0.4);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.field .fifty-arc-top {
+  position: absolute;
+  top: -110px;
+  left: 50%;
+  width: 290px;
+  height: 290px;
+  transform: translateX(-50%);
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.field .fifty-arc-bottom {
+  position: absolute;
+  bottom: -110px;
+  left: 50%;
+  width: 290px;
+  height: 290px;
+  transform: translateX(-50%);
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
   pointer-events: none;
   z-index: 1;
 }
@@ -192,13 +234,13 @@ body {
 }
 
 .slot.key {
-  transform: translate(-50%, -50%) scale(1.03);
+  transform: translate(-50%, -50%);
   z-index: 7;
 }
 
 @media (max-width: 640px) {
   .slot.key {
-    transform: translate(-50%, -50%) scale(1.02);
+    transform: translate(-50%, -50%);
   }
 }
 
