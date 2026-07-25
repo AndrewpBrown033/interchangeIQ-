@@ -49,6 +49,7 @@ interface AdminScreenProps {
   savedLineups?: LineupTemplate[];
   history?: GameHistory[];
   lineup?: Record<string, string>;
+  onForceSyncTeams?: () => Promise<{ success: boolean; teamCount: number; message: string }>;
 }
 
 export const DEFAULT_TACTICAL_PROMPTS: TacticalPrompt[] = [
@@ -176,8 +177,11 @@ export default function AdminScreen({
   savedLineups = [],
   history = [],
   lineup = {},
+  onForceSyncTeams,
 }: AdminScreenProps) {
   const [adminSection, setAdminSection] = useState<'access' | 'prompts'>('access');
+  const [isSyncingTeams, setIsSyncingTeams] = useState(false);
+  const [teamSyncMsg, setTeamSyncMsg] = useState<string | null>(null);
 
   // Squad summary metrics calculations
   const squadCount = players.length;
@@ -565,13 +569,42 @@ export default function AdminScreen({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Teams Management */}
             <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
-              <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
-                <Landmark className="w-4 h-4 text-[var(--blue)]" />
-                <span>Teams & Clubs ({teams.length})</span>
-              </h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
+                  <Landmark className="w-4 h-4 text-[var(--blue)]" />
+                  <span>Teams & Clubs ({teams.length})</span>
+                </h3>
+                {onForceSyncTeams && (
+                  <button
+                    disabled={isSyncingTeams}
+                    onClick={async () => {
+                      setIsSyncingTeams(true);
+                      setTeamSyncMsg(null);
+                      const res = await onForceSyncTeams();
+                      setIsSyncingTeams(false);
+                      setTeamSyncMsg(res.message);
+                      setTimeout(() => setTeamSyncMsg(null), 8000);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                    title="Push all local team profiles to Cloud Firestore and sync remote team roster data"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isSyncingTeams ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingTeams ? 'Syncing...' : 'Sync Teams to Cloud'}</span>
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
                 Manage your registered sports clubs. Active coaches can be assigned directly to individual team datasets.
               </p>
+
+              {teamSyncMsg && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-950 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-2xs">
+                  <span>{teamSyncMsg}</span>
+                  <button onClick={() => setTeamSyncMsg(null)} className="text-indigo-600 hover:text-indigo-800 p-0.5 rounded cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-2 pt-1">
                 {teams.map((t, index) => {

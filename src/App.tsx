@@ -1426,6 +1426,9 @@ export default function App() {
             onNavigate={handleSelectTab}
             onStartNewGame={handleStartNewGame}
             onForceSync={handleForceSync}
+            teams={teams}
+            activeTeamId={activeTeamId}
+            onSelectTeam={handleSwitchTeam}
           />
         )}
         {activeTab === 'lineup' && (
@@ -1542,6 +1545,7 @@ export default function App() {
             savedLineups={savedLineups}
             history={history}
             lineup={lineup}
+            onForceSyncTeams={handleForceSyncTeams}
           />
         )}
         {activeTab === 'settings' && (

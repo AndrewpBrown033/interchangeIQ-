@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Player, GameInfo } from '../types';
-import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Player, GameInfo, TeamProfile } from '../types';
+import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, RefreshCw, CheckCircle2, Landmark, Check } from 'lucide-react';
 
 interface SummaryScreenProps {
   players: Player[];
@@ -15,6 +15,9 @@ interface SummaryScreenProps {
   onNavigate: (tabId: string) => void;
   onStartNewGame: () => void;
   onForceSync?: () => Promise<boolean>;
+  teams?: TeamProfile[];
+  activeTeamId?: string | null;
+  onSelectTeam?: (teamId: string) => void;
 }
 
 export default function SummaryScreen({
@@ -30,6 +33,9 @@ export default function SummaryScreen({
   onNavigate,
   onStartNewGame,
   onForceSync,
+  teams = [],
+  activeTeamId = null,
+  onSelectTeam,
 }: SummaryScreenProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -69,6 +75,41 @@ export default function SummaryScreen({
           New Game Line Up
         </button>
       </div>
+
+      {/* Squad / Team Select Toggle Tab Bar */}
+      {teams && teams.length > 0 && onSelectTeam && (
+        <div className="bg-white p-4.5 rounded-2xl border border-[var(--line)] shadow-sm space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-blue-50 text-[var(--blue)] rounded-lg">
+                <Landmark className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-black tracking-wider uppercase text-[var(--navy)]">Select Active Squad</span>
+            </div>
+            <span className="text-[11px] font-bold text-[var(--muted)]">{teams.length} Squads Registered</span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {teams.map((t) => {
+              const isActive = t.id === activeTeamId;
+              return (
+                <button
+                  key={`summary-team-tab-${t.id}`}
+                  onClick={() => onSelectTeam(t.id)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer shrink-0 flex items-center gap-2 border ${
+                    isActive
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white border-emerald-700 shadow-sm scale-[1.01]'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  {isActive && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  <span>{t.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Stats Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
