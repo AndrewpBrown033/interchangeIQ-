@@ -328,36 +328,12 @@ export default function App() {
   const isSyncingFromServerRef = useRef(false);
   const currentTeamSyncedIdRef = useRef<string | null>(null);
 
-  // Switch active team and publish selection to Firestore settings so all devices sync instantly
+  // Switch active team
   const handleSwitchTeam = (teamId: string) => {
     if (!teamId) return;
     setActiveTeamId(teamId);
     localStorage.setItem('iiq_active_team_id', teamId);
-    
-    // Publish active team selection to Firestore
-    setDoc(doc(db, 'settings', 'active_team'), {
-      activeTeamId: teamId,
-      updatedAt: Date.now(),
-    }).catch(err => console.warn("Error syncing active team selection to Firestore:", err));
   };
-
-  // Real-time active team state subscriber across devices
-  useEffect(() => {
-    const activeTeamRef = doc(db, 'settings', 'active_team');
-    const unsubscribe = onSnapshot(activeTeamRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.activeTeamId && data.activeTeamId !== activeTeamId) {
-          setActiveTeamId(data.activeTeamId);
-          localStorage.setItem('iiq_active_team_id', data.activeTeamId);
-        }
-      }
-    }, (error) => {
-      console.warn("Active team listener notice:", error.message);
-    });
-
-    return () => unsubscribe();
-  }, [activeTeamId]);
 
   // Real-time Firestore teams collection subscriber
   useEffect(() => {
@@ -366,9 +342,10 @@ export default function App() {
       const teamsList: TeamProfile[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        if (data.id) {
+        const teamId = data.id || docSnap.id;
+        if (teamId) {
           teamsList.push({
-            id: data.id,
+            id: teamId,
             name: data.name || 'Unnamed Squad',
             createdAt: data.createdAt || Date.now(),
           });
@@ -376,8 +353,9 @@ export default function App() {
       });
       if (teamsList.length > 0) {
         // Sort teams newest created first
-        teamsList.sort((a, b) => b.createdAt - a.createdAt);
+        teamsList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setTeams(teamsList);
+        localStorage.setItem('iiq_teams', JSON.stringify(teamsList));
       }
     }, (error) => {
       console.warn("Teams collection listener notice:", error.message);
@@ -389,15 +367,16 @@ export default function App() {
   // Ensure activeTeamId points to a valid team in teams array
   useEffect(() => {
     if (Array.isArray(teams) && teams.length > 0) {
-      const exists = teams.some(t => t.id === activeTeamId);
-      if (!exists && activeTeamId) {
-        const latestTeam = teams[0];
-        if (latestTeam) {
-          handleSwitchTeam(latestTeam.id);
+      if (!activeTeamId) {
+        handleSwitchTeam(teams[0].id);
+      } else {
+        const exists = teams.some(t => t.id === activeTeamId);
+        if (!exists) {
+          handleSwitchTeam(teams[0].id);
         }
       }
     }
-  }, [teams, activeTeamId]);
+  }, [teams]);
 
   // Sync team updates and deletions to Firestore
   const handleUpdateTeams = async (newTeamsList: TeamProfile[]) => {
@@ -411,16 +390,41 @@ export default function App() {
       await deleteDoc(doc(db, 'teams', deleted.id)).catch(err => console.warn("Error deleting team doc from Firestore:", err));
     }
 
-    // 2. Update names / created dates for updated teams
+    // 2. Update names / created dates for updated teams, or initialize new team documents
     for (const t of newTeamsList) {
-      const existing = previousTeams.find(prev => prev.id === t.id);
-      if (!existing || existing.name !== t.name) {
-        const teamDocRef = doc(db, 'teams', t.id);
-        await setDoc(teamDocRef, { name: t.name, id: t.id, createdAt: t.createdAt || Date.now() }, { merge: true }).catch(err => console.warn("Error updating team doc name in Firestore:", err));
+      const teamDocRef = doc(db, 'teams', t.id);
+      const docSnap = await getDoc(teamDocRef).catch(() => null);
+      if (!docSnap || !docSnap.exists()) {
+        await setDoc(teamDocRef, {
+          id: t.id,
+          name: t.name,
+          createdAt: t.createdAt || Date.now(),
+          players: [],
+          lineup: {},
+          score: {
+            quarter: 1,
+            home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+            away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+          },
+          gameInfo: { opponent: 'Opponent', round: 'Round 1', date: new Date().toISOString().slice(0, 10), venue: 'Home Ground' },
+          rotations: [],
+          plans: [{ id: 'plan1', name: 'Q1 Rotation' }],
+          history: [],
+          savedLineups: [],
+          drills: [],
+          growthRecords: [],
+          updatedAt: Date.now(),
+        }, { merge: true }).catch(err => console.warn("Error creating new team doc in Firestore:", err));
+      } else {
+        const existing = previousTeams.find(prev => prev.id === t.id);
+        if (!existing || existing.name !== t.name) {
+          await setDoc(teamDocRef, { name: t.name, id: t.id, createdAt: t.createdAt || Date.now() }, { merge: true }).catch(err => console.warn("Error updating team doc name in Firestore:", err));
+        }
       }
     }
 
     setTeams(newTeamsList);
+    localStorage.setItem('iiq_teams', JSON.stringify(newTeamsList));
 
     // If active team was deleted, select the first remaining team
     if (activeTeamId && !currentTeamIds.has(activeTeamId)) {
@@ -842,7 +846,7 @@ export default function App() {
     }, 1000); // 1.0 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, growthRecords, activeTeamId]);
+  }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, growthRecords, activeTeamId, isSyncingFromServer]);
 
   // Log audit helper
   const logAudit = (action: string) => {
