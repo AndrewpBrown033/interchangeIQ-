@@ -328,12 +328,35 @@ export default function App() {
   const isSyncingFromServerRef = useRef(false);
   const currentTeamSyncedIdRef = useRef<string | null>(null);
 
-  // Instantly lock upstream sync when activeTeamId changes
+  // Switch active team and publish selection to Firestore settings so all devices sync instantly
+  const handleSwitchTeam = (teamId: string) => {
+    if (!teamId) return;
+    setActiveTeamId(teamId);
+    localStorage.setItem('iiq_active_team_id', teamId);
+    
+    // Publish active team selection to Firestore
+    setDoc(doc(db, 'settings', 'active_team'), {
+      activeTeamId: teamId,
+      updatedAt: Date.now(),
+    }).catch(err => console.warn("Error syncing active team selection to Firestore:", err));
+  };
+
+  // Real-time active team state subscriber across devices
   useEffect(() => {
-    if (activeTeamId) {
-      isSyncingFromServerRef.current = true;
-      setIsSyncingFromServer(true);
-    }
+    const activeTeamRef = doc(db, 'settings', 'active_team');
+    const unsubscribe = onSnapshot(activeTeamRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.activeTeamId && data.activeTeamId !== activeTeamId) {
+          setActiveTeamId(data.activeTeamId);
+          localStorage.setItem('iiq_active_team_id', data.activeTeamId);
+        }
+      }
+    }, (error) => {
+      console.warn("Active team listener notice:", error.message);
+    });
+
+    return () => unsubscribe();
   }, [activeTeamId]);
 
   // Real-time Firestore teams collection subscriber
@@ -352,12 +375,9 @@ export default function App() {
         }
       });
       if (teamsList.length > 0) {
-        setTeams((prev) => {
-          const teamMap = new Map<string, TeamProfile>();
-          prev.forEach(t => teamMap.set(t.id, t));
-          teamsList.forEach(t => teamMap.set(t.id, t));
-          return Array.from(teamMap.values());
-        });
+        // Sort teams newest created first
+        teamsList.sort((a, b) => b.createdAt - a.createdAt);
+        setTeams(teamsList);
       }
     }, (error) => {
       console.warn("Teams collection listener notice:", error.message);
@@ -365,6 +385,51 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Ensure activeTeamId points to a valid team in teams array
+  useEffect(() => {
+    if (Array.isArray(teams) && teams.length > 0) {
+      const exists = teams.some(t => t.id === activeTeamId);
+      if (!exists && activeTeamId) {
+        const latestTeam = teams[0];
+        if (latestTeam) {
+          handleSwitchTeam(latestTeam.id);
+        }
+      }
+    }
+  }, [teams, activeTeamId]);
+
+  // Sync team updates and deletions to Firestore
+  const handleUpdateTeams = async (newTeamsList: TeamProfile[]) => {
+    if (!Array.isArray(newTeamsList)) return;
+    const currentTeamIds = new Set(newTeamsList.map(t => t.id));
+    const previousTeams = Array.isArray(teams) ? teams : [];
+    
+    // 1. Delete removed team documents from Firestore
+    const deletedTeams = previousTeams.filter(t => !currentTeamIds.has(t.id));
+    for (const deleted of deletedTeams) {
+      await deleteDoc(doc(db, 'teams', deleted.id)).catch(err => console.warn("Error deleting team doc from Firestore:", err));
+    }
+
+    // 2. Update names / created dates for updated teams
+    for (const t of newTeamsList) {
+      const existing = previousTeams.find(prev => prev.id === t.id);
+      if (!existing || existing.name !== t.name) {
+        const teamDocRef = doc(db, 'teams', t.id);
+        await setDoc(teamDocRef, { name: t.name, id: t.id, createdAt: t.createdAt || Date.now() }, { merge: true }).catch(err => console.warn("Error updating team doc name in Firestore:", err));
+      }
+    }
+
+    setTeams(newTeamsList);
+
+    // If active team was deleted, select the first remaining team
+    if (activeTeamId && !currentTeamIds.has(activeTeamId)) {
+      const nextActiveId = newTeamsList.length > 0 ? newTeamsList[0].id : null;
+      if (nextActiveId) {
+        handleSwitchTeam(nextActiveId);
+      }
+    }
+  };
 
   // Manual Force Sync function
   const handleForceSync = async (): Promise<boolean> => {
@@ -1109,7 +1174,7 @@ export default function App() {
           {teams.length > 0 && (
             <select
               value={activeTeamId || ''}
-              onChange={(e) => setActiveTeamId(e.target.value)}
+              onChange={(e) => handleSwitchTeam(e.target.value)}
               className="bg-slate-50 border border-gray-200 rounded-lg px-2 py-1 text-[11px] font-black text-[var(--navy)] focus:outline-none max-w-[130px] truncate cursor-pointer"
             >
               {teams.map((t) => (
@@ -1191,7 +1256,7 @@ export default function App() {
               </div>
               <select
                 value={activeTeamId || ''}
-                onChange={(e) => setActiveTeamId(e.target.value)}
+                onChange={(e) => handleSwitchTeam(e.target.value)}
                 className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-[var(--navy)] focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer truncate"
               >
                 {teams.map((t) => (
@@ -1399,11 +1464,11 @@ export default function App() {
         {activeTab === 'admin' && (
           <AdminScreen
             teams={teams}
-            onUpdateTeams={setTeams}
+            onUpdateTeams={handleUpdateTeams}
             users={users}
             onUpdateUsers={handleUpdateUsers}
             activeTeamId={activeTeamId}
-            onSelectTeam={setActiveTeamId}
+            onSelectTeam={handleSwitchTeam}
             currentUserRole="Admin"
             onNavigateTab={handleSelectTab}
             players={players}
