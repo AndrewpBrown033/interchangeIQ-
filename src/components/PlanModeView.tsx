@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Player, Rotation, Plan } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
 import {
@@ -68,6 +68,12 @@ export default function PlanModeView({
   onTogglePlanRunning,
 }: PlanModeViewProps) {
   const [selectedPlanId, setSelectedPlanId] = useState<string>(plans[0]?.id || '');
+
+  useEffect(() => {
+    if (!plans.some((p) => p.id === selectedPlanId)) {
+      setSelectedPlanId(plans[0]?.id || '');
+    }
+  }, [plans, selectedPlanId]);
   const [selectedQuarter, setSelectedQuarter] = useState<number>(currentQuarter);
   const [selectedMinute, setSelectedMinute] = useState<number>(7);
 

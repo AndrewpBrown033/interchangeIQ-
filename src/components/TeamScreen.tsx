@@ -431,27 +431,11 @@ export default function TeamScreen({
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={handleExportCSV}
-            className="px-3.5 py-2 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl border border-emerald-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Export full roster to CSV file"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Export Players (.CSV)</span>
-          </button>
-          <button
             onClick={() => setShowCsvModal(!showCsvModal)}
             className="px-3.5 py-2 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
             <span>{showCsvModal ? 'Close CSV Guide' : 'Import CSV Roster'}</span>
-          </button>
-          <button
-            onClick={handleRestoreDefaultSquad}
-            className="px-3.5 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Reload default sample squad of 22 AFL players"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-gray-600" />
-            <span>Load Sample Squad</span>
           </button>
           <button
             onClick={handleOpenAddPlayer}

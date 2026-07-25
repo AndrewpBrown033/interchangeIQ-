@@ -782,12 +782,6 @@ export default function GameDayScreen({
             <span>Visual Plan Mode</span>
           </button>
           <button
-            onClick={onCompleteGame}
-            className="px-3.5 py-2 text-xs font-bold bg-red-500/20 text-red-200 hover:bg-red-500/30 rounded-xl transition shadow-xs cursor-pointer"
-          >
-            Game Complete
-          </button>
-          <button
             onClick={onSaveLineup}
             className="px-3.5 py-2 text-xs font-bold bg-white/10 text-white border border-white/20 rounded-xl hover:bg-white/20 transition cursor-pointer"
           >
@@ -838,7 +832,7 @@ export default function GameDayScreen({
         <div
           onClick={() => setScoreboardCollapsed(!scoreboardCollapsed)}
           className="p-4 flex items-center justify-between cursor-pointer transition text-white"
-          style={{ backgroundColor: '#053f83' }}
+          style={{ backgroundColor: '#023d7a' }}
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/10 text-cyan-300 flex items-center justify-center font-bold text-sm">

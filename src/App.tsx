@@ -331,9 +331,45 @@ export default function App() {
 
   // Switch active team
   const handleSwitchTeam = (teamId: string) => {
-    if (!teamId) return;
+    if (!teamId || teamId === activeTeamId) return;
+
+    // Persist current team data to local cache before switching
+    if (activeTeamId) {
+      const currentCache = {
+        players,
+        lineup,
+        score,
+        gameInfo,
+        rotations,
+        plans,
+        activePlanIds,
+        history,
+        savedLineups,
+      };
+      localStorage.setItem(`iiq_team_data_${activeTeamId}`, JSON.stringify(currentCache));
+    }
+
     setActiveTeamId(teamId);
     localStorage.setItem('iiq_active_team_id', teamId);
+
+    // Load target team cached data immediately for instant offline/responsive switching
+    try {
+      const cached = localStorage.getItem(`iiq_team_data_${teamId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed.players)) setPlayers(parsed.players);
+        if (parsed.lineup) setLineup(parsed.lineup);
+        if (parsed.score) setScore(parsed.score);
+        if (parsed.gameInfo) setGameInfo(parsed.gameInfo);
+        if (Array.isArray(parsed.rotations)) setRotations(parsed.rotations);
+        if (Array.isArray(parsed.plans)) setPlans(parsed.plans);
+        if (Array.isArray(parsed.activePlanIds)) setActivePlanIds(parsed.activePlanIds);
+        if (Array.isArray(parsed.history)) setHistory(parsed.history);
+        if (Array.isArray(parsed.savedLineups)) setSavedLineups(parsed.savedLineups);
+      }
+    } catch (e) {
+      console.warn("Failed to parse cached team data:", e);
+    }
   };
 
   // Real-time Firestore teams collection subscriber
@@ -448,6 +484,7 @@ export default function App() {
             gameInfo,
             rotations,
             plans,
+            activePlanIds,
             history,
             savedLineups,
             drills: sanitizeDrillList(drills),
@@ -526,6 +563,7 @@ export default function App() {
         gameInfo,
         rotations,
         plans,
+        activePlanIds,
         history,
         savedLineups,
         drills: sanitizeDrillList(drills),
@@ -821,6 +859,9 @@ export default function App() {
           : { team: activeTeamName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' };
         const activeRotations = (data.rotations && Array.isArray(data.rotations)) ? data.rotations : [];
         const activePlans = (data.plans && Array.isArray(data.plans)) ? data.plans : [{ id: 'plan1', name: 'Q1 Rotation' }];
+        const activePlanIdsLoaded = (data.activePlanIds && Array.isArray(data.activePlanIds) && data.activePlanIds.some((id: string) => activePlans.some(p => p.id === id)))
+          ? data.activePlanIds
+          : activePlans.map(p => p.id);
         const activeHistory = (data.history && Array.isArray(data.history)) ? data.history : [];
         const activeSavedLineups = (data.savedLineups && Array.isArray(data.savedLineups)) ? data.savedLineups : [];
         const activeDrills = (data.drills && Array.isArray(data.drills)) ? parseDrillList(data.drills) : [];
@@ -847,6 +888,7 @@ export default function App() {
           gameInfo: activeGameInfo,
           rotations: activeRotations,
           plans: activePlans,
+          activePlanIds: activePlanIdsLoaded,
           history: activeHistory,
           savedLineups: activeSavedLineups,
           drills: sanitizeDrillList(activeDrills),
@@ -862,6 +904,7 @@ export default function App() {
         setGameInfo(activeGameInfo);
         setRotations(activeRotations);
         setPlans(activePlans);
+        setActivePlanIds(activePlanIdsLoaded);
         setHistory(activeHistory);
         setSavedLineups(activeSavedLineups);
         setDrills(activeDrills);
@@ -896,6 +939,7 @@ export default function App() {
           opponent: '',
         };
         const freshPlans = [{ id: 'plan1', name: 'Q1 Rotation' }];
+        const freshActivePlanIds = ['plan1'];
         const freshTrainingState: TrainingState = {
           view: 'library',
           filter: 'All',
@@ -915,6 +959,7 @@ export default function App() {
           gameInfo: freshGameInfo,
           rotations: [],
           plans: freshPlans,
+          activePlanIds: freshActivePlanIds,
           history: [],
           savedLineups: [],
           drills: sanitizeDrillList(drills),
@@ -932,6 +977,7 @@ export default function App() {
         setHistory([]);
         setRotations([]);
         setPlans(freshPlans);
+        setActivePlanIds(freshActivePlanIds);
         setTrainingState(freshTrainingState);
 
         setDoc(docRef, { ...initialDataToSync, updatedAt: Date.now() }).catch(err => console.warn("Error creating team doc:", err.message));
@@ -977,6 +1023,7 @@ export default function App() {
       gameInfo,
       rotations,
       plans,
+      activePlanIds,
       history,
       savedLineups,
       drills: sanitizeDrillList(drills),
@@ -1007,7 +1054,7 @@ export default function App() {
     }, 1000); // 1.0 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, growthRecords, trainingState, activeTeamId, isSyncingFromServer]);
+  }, [players, lineup, score, gameInfo, rotations, plans, activePlanIds, history, savedLineups, drills, growthRecords, trainingState, activeTeamId, isSyncingFromServer]);
 
   // Log audit helper
   const logAudit = (action: string) => {
@@ -1252,8 +1299,35 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const activeTeamProfile = teams.find((t) => t.id === activeTeamId) || teams[0];
+
+  const matchedUserProfile = users.find(
+    (u) =>
+      (currentUser?.uid && u.uid === currentUser.uid) ||
+      (currentUser?.email && u.email.toLowerCase() === currentUser.email.toLowerCase())
+  ) || users.find((u) => u.role === 'Admin') || users[0];
+
+  const currentUserRole = matchedUserProfile?.role === 'Head Coach' ? 'Coach' : (matchedUserProfile?.role || 'Coach');
+
+  // Role permissions check
+  // Coach and Admin have elevated access
+  const isElevatedRole =
+    currentUserRole === 'Admin' ||
+    currentUserRole === 'Coach';
+
+  // Feature toggles for active team (default to true if not set)
+  const isTrainingEnabled = isElevatedRole && (activeTeamProfile?.showTraining !== false);
+  const isGrowthEnabled = isElevatedRole && (activeTeamProfile?.showPlayerGrowth !== false);
+  const isJarvisEnabled = isElevatedRole && (activeTeamProfile?.showJarvis !== false);
+
+  useEffect(() => {
+    if (activeTab === 'jarvis' && !isJarvisEnabled) setActiveTab('summary');
+    if (activeTab === 'growth' && !isGrowthEnabled) setActiveTab('summary');
+    if (activeTab === 'training' && !isTrainingEnabled) setActiveTab('summary');
+  }, [activeTab, isJarvisEnabled, isGrowthEnabled, isTrainingEnabled]);
+
   // Nav configuration
-  const navItems = [
+  const allNavItems = [
     { id: 'summary', label: 'Summary', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'lineup', label: 'Game Day', icon: <Play className="w-5 h-5 text-[var(--green)]" /> },
     { id: 'rotations', label: 'Rotations', icon: <RefreshCw className="w-5 h-5 text-[var(--cyan)]" /> },
@@ -1266,6 +1340,13 @@ export default function App() {
     { id: 'admin', label: 'Admin', icon: <Shield className="w-5 h-5 text-red-400" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ];
+
+  const navItems = allNavItems.filter((item) => {
+    if (item.id === 'jarvis') return isJarvisEnabled;
+    if (item.id === 'growth') return isGrowthEnabled;
+    if (item.id === 'training') return isTrainingEnabled;
+    return true;
+  });
 
   if (isTimedOut) {
     return (
@@ -1619,7 +1700,7 @@ export default function App() {
             onUpdateUsers={handleUpdateUsers}
             activeTeamId={activeTeamId}
             onSelectTeam={handleSwitchTeam}
-            currentUserRole="Admin"
+            currentUserRole={currentUserRole}
             onNavigateTab={handleSelectTab}
             players={players}
             onUpdatePlayers={setPlayers}

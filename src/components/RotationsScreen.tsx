@@ -28,6 +28,12 @@ export default function RotationsScreen({
   onUpdateLineup,
 }: RotationsScreenProps) {
   const [selectedPlanId, setSelectedPlanId] = useState<string>(plans[0]?.id || '');
+
+  React.useEffect(() => {
+    if (!plans.some((p) => p.id === selectedPlanId)) {
+      setSelectedPlanId(plans[0]?.id || '');
+    }
+  }, [plans, selectedPlanId]);
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [showPlanMode, setShowPlanMode] = useState(false);
   const [editingRotation, setEditingRotation] = useState<Rotation | null>(null);

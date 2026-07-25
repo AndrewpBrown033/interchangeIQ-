@@ -32,7 +32,9 @@ import {
   Trophy,
   Activity,
   Award,
-  FileText
+  FileText,
+  Download,
+  TrendingUp
 } from 'lucide-react';
 
 interface AdminScreenProps {
@@ -239,7 +241,7 @@ export default function AdminScreen({
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState<'Coach' | 'Manager' | 'Admin'>('Coach');
+  const [inviteRole, setInviteRole] = useState<'Coach' | 'Assistant Coach' | 'Manager' | 'Admin'>('Coach');
   const [inviteSelectedTeams, setInviteSelectedTeams] = useState<string[]>(activeTeamId ? [activeTeamId] : []);
   const [activeUserSubTab, setActiveUserSubTab] = useState<'active' | 'pending'>('active');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -500,6 +502,55 @@ export default function AdminScreen({
     onUpdateUsers(updated);
   };
 
+  const handleChangeUserRole = (uid: string, newRole: string) => {
+    const updated = users.map((u) => {
+      if (u.uid === uid) {
+        return { ...u, role: newRole };
+      }
+      return u;
+    });
+    onUpdateUsers(updated);
+  };
+
+  const isElevatedRole = currentUserRole === 'Admin' || currentUserRole === 'Coach';
+
+  const handleExportCSV = () => {
+    if (!players || players.length === 0) {
+      alert('No players in squad to export.');
+      return;
+    }
+    const headers = ['Name', 'Nickname', 'Jumper Number', 'Primary Zone', 'Positions', 'Status', 'Note'];
+    const rows = players.map((p) => [
+      `"${p.name || ''}"`,
+      `"${p.nick || ''}"`,
+      `"${p.number || ''}"`,
+      `"${p.primaryZone || ''}"`,
+      `"${(p.positions || []).join(';')}"`,
+      `"${p.status || 'available'}"`,
+      `"${(p.note || '').replace(/"/g, '""')}"`,
+    ]);
+    const activeTeamName = teams.find((t) => t.id === activeTeamId)?.name || 'squad';
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${activeTeamName.toLowerCase().replace(/\s+/g, '_')}_roster.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleToggleTeamFeature = (teamId: string, featureKey: 'showTraining' | 'showPlayerGrowth' | 'showJarvis') => {
+    const updated = teams.map((t) => {
+      if (t.id === teamId) {
+        const currentVal = t[featureKey] !== false;
+        return { ...t, [featureKey]: !currentVal };
+      }
+      return t;
+    });
+    onUpdateTeams(updated);
+  };
+
   const activeCoaches = users.filter((u) => u.status !== 'Pending' && u.email !== 'anonymous@interchangeiq.com');
   const pendingInvites = users.filter((u) => u.status === 'Pending');
 
@@ -549,21 +600,154 @@ export default function AdminScreen({
       {/* SECTION 1: Squad Access & Licenses */}
       {adminSection === 'access' && (
         <>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={handleCreateTeam}
-              className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Team</span>
-            </button>
-            <button
-              onClick={handleOpenInviteModal}
-              className="px-3.5 py-2 text-xs font-bold bg-[var(--blue)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Invite User</span>
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-xs">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-red-500" />
+              <div>
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">Admin & Coach Controls</h3>
+                <p className="text-[11px] text-gray-500 font-medium">Manage team rosters, elevated feature access, and user credentials</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleExportCSV}
+                className="px-3.5 py-2 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl border border-emerald-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                title="Export active team squad to CSV file"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Export Players (.CSV)</span>
+              </button>
+              <button
+                onClick={handleCreateTeam}
+                className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Team</span>
+              </button>
+              <button
+                onClick={handleOpenInviteModal}
+                className="px-3.5 py-2 text-xs font-bold bg-[var(--blue)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Invite User</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Elevated Access & Team Feature Toggles Card */}
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-purple-600" />
+                  <span>Elevated Access & Feature Visibility ({teams.find(t => t.id === activeTeamId)?.name || 'Active Team'})</span>
+                </h3>
+                <p className="text-xs text-gray-500 font-semibold mt-0.5">
+                  Choose which features are enabled for this team. Admins and Coaches have elevated access to view these modules. Assistant Coaches and Managers are restricted.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                  Role: {currentUserRole}
+                </span>
+              </div>
+            </div>
+
+            {!isElevatedRole && (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Elevated access restricted. Only Coaches and Admins can configure or access these features.</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              {/* Training Toggle */}
+              <div className={`p-4 rounded-xl border transition ${
+                (teams.find(t => t.id === activeTeamId)?.showTraining !== false)
+                  ? 'bg-indigo-50/60 border-indigo-200'
+                  : 'bg-gray-50 border-gray-200 opacity-60'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-black text-gray-900">Training Module</span>
+                  </div>
+                  <button
+                    disabled={!isElevatedRole}
+                    onClick={() => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showTraining')}
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                      (teams.find(t => t.id === activeTeamId)?.showTraining !== false)
+                        ? 'bg-indigo-600 justify-end'
+                        : 'bg-gray-300 justify-start'
+                    } flex items-center`}
+                    title="Toggle Training module visibility"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500 font-semibold">
+                  Drill library, tactical training plans, and session builder.
+                </p>
+              </div>
+
+              {/* Player Growth Toggle */}
+              <div className={`p-4 rounded-xl border transition ${
+                (teams.find(t => t.id === activeTeamId)?.showPlayerGrowth !== false)
+                  ? 'bg-emerald-50/60 border-emerald-200'
+                  : 'bg-gray-50 border-gray-200 opacity-60'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-black text-gray-900">Player Growth</span>
+                  </div>
+                  <button
+                    disabled={!isElevatedRole}
+                    onClick={() => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showPlayerGrowth')}
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                      (teams.find(t => t.id === activeTeamId)?.showPlayerGrowth !== false)
+                        ? 'bg-emerald-600 justify-end'
+                        : 'bg-gray-300 justify-start'
+                    } flex items-center`}
+                    title="Toggle Player Growth module visibility"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500 font-semibold">
+                  Skill assessments, 2km time trials, and year-on-year player metrics.
+                </p>
+              </div>
+
+              {/* Jarvis AI Toggle */}
+              <div className={`p-4 rounded-xl border transition ${
+                (teams.find(t => t.id === activeTeamId)?.showJarvis !== false)
+                  ? 'bg-purple-50/60 border-purple-200'
+                  : 'bg-gray-50 border-gray-200 opacity-60'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-purple-600" />
+                    <span className="text-xs font-black text-gray-900">JARVIS AI Assistant</span>
+                  </div>
+                  <button
+                    disabled={!isElevatedRole}
+                    onClick={() => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showJarvis')}
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                      (teams.find(t => t.id === activeTeamId)?.showJarvis !== false)
+                        ? 'bg-purple-600 justify-end'
+                        : 'bg-gray-300 justify-start'
+                    } flex items-center`}
+                    title="Toggle JARVIS AI Assistant visibility"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500 font-semibold">
+                  Tactical AI analysis, session prompt builder, and AI recommendations.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -708,7 +892,7 @@ export default function AdminScreen({
                       key={`active-coach-${u.uid || 'coach'}-${idx}`}
                       className="p-4 border border-gray-100 bg-white rounded-xl space-y-3 shadow-xs"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
                           <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
                             {u.name}
@@ -716,11 +900,19 @@ export default function AdminScreen({
                           </b>
                           <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
                         </div>
-                        <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-full uppercase ${
-                          u.role === 'Admin' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-[var(--blue)]'
-                        }`}>
-                          {u.role}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-black uppercase text-gray-400">Role:</label>
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
+                            className="px-2.5 py-1 text-xs font-extrabold bg-gray-50 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="Coach">Coach</option>
+                            <option value="Assistant Coach">Assistant Coach</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Admin">Admin</option>
+                          </select>
+                        </div>
                       </div>
 
                       {/* Team assignments */}
@@ -795,9 +987,16 @@ export default function AdminScreen({
                           </div>
                           
                           <div className="flex flex-col items-end gap-1">
-                            <span className="px-2 py-0.5 bg-blue-50 text-[var(--blue)] text-[9px] font-black rounded uppercase">
-                              {u.role}
-                            </span>
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
+                              className="px-2 py-0.5 bg-white border border-blue-200 text-[var(--blue)] text-[10px] font-black rounded uppercase focus:outline-none cursor-pointer"
+                            >
+                              <option value="Coach">Coach</option>
+                              <option value="Assistant Coach">Assistant Coach</option>
+                              <option value="Manager">Manager</option>
+                              <option value="Admin">Admin</option>
+                            </select>
                             {u.invitedAt && (
                               <span className="text-[9px] text-gray-400 font-bold flex items-center gap-0.5">
                                 <Calendar className="w-2.5 h-2.5" />
@@ -1141,27 +1340,28 @@ export default function AdminScreen({
                 <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Assigned System Role *
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['Coach', 'Manager', 'Admin'] as const).map((role, idx) => (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(['Coach', 'Assistant Coach', 'Manager', 'Admin'] as const).map((role, idx) => (
                     <button
                       key={`role-option-${role}-${idx}`}
                       type="button"
                       onClick={() => setInviteRole(role)}
-                      className={`p-2.5 border rounded-xl flex flex-col items-center justify-center gap-1.5 transition cursor-pointer ${
+                      className={`p-2 border rounded-xl flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
                         inviteRole === role
                           ? 'border-[var(--blue)] bg-blue-50/20 text-[var(--blue)]'
                           : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
                       }`}
                     >
-                      <Shield className={`w-4 h-4 ${inviteRole === role ? 'text-[var(--blue)]' : 'text-gray-400'}`} />
-                      <span className="text-[10px] font-black tracking-wider uppercase">{role}</span>
+                      <Shield className={`w-3.5 h-3.5 ${inviteRole === role ? 'text-[var(--blue)]' : 'text-gray-400'}`} />
+                      <span className="text-[9px] font-black tracking-wider uppercase text-center">{role}</span>
                     </button>
                   ))}
                 </div>
                 <p className="text-[9px] text-gray-400 mt-1 font-bold">
-                  {inviteRole === 'Admin' && 'Admins possess full read/write clearance across all rosters and license configs.'}
-                  {inviteRole === 'Coach' && 'Coaches are bounded to squad-specific lineup plans and timer controllers.'}
-                  {inviteRole === 'Manager' && 'Managers enjoy strategic planner utilities without administrative profile edits.'}
+                  {inviteRole === 'Admin' && 'Admins possess full universal clearance across all rosters and features.'}
+                  {inviteRole === 'Coach' && 'Coaches have elevated access to Training, Growth, and Jarvis features.'}
+                  {inviteRole === 'Assistant Coach' && 'Assistant Coaches manage lineups and rotations with restricted feature access.'}
+                  {inviteRole === 'Manager' && 'Managers view stats and game plans without administrative profile edits.'}
                 </p>
               </div>
 

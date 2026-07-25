@@ -111,6 +111,9 @@ export interface TeamProfile {
   id: string;
   name: string;
   createdAt: number;
+  showTraining?: boolean;
+  showPlayerGrowth?: boolean;
+  showJarvis?: boolean;
 }
 
 export interface SkillAssessment {
@@ -142,7 +145,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   name: string;
-  role: 'Coach' | 'Manager' | 'Admin';
+  role: 'Coach' | 'Assistant Coach' | 'Manager' | 'Admin' | string;
   teamIds: string[];
   status?: 'Pending' | 'Active';
   invitedBy?: string;
