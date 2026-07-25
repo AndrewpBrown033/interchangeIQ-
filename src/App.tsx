@@ -3,7 +3,7 @@ import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
   Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment
 } from './types';
-import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS } from './constants';
+import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION } from './constants';
 
 // Firebase Integrations
 import { auth, db, signInAnonymously, onAuthStateChanged, User } from './lib/firebase';
@@ -347,15 +347,27 @@ export default function App() {
           teamsList.push({
             id: teamId,
             name: data.name || 'Unnamed Squad',
-            createdAt: data.createdAt || Date.now(),
+            createdAt: typeof data.createdAt === 'number' && data.createdAt > 0 ? data.createdAt : 0,
           });
         }
       });
       if (teamsList.length > 0) {
-        // Sort teams newest created first
-        teamsList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setTeams(teamsList);
-        localStorage.setItem('iiq_teams', JSON.stringify(teamsList));
+        // Sort teams deterministically: highest createdAt first, then alphabetically by name/id
+        teamsList.sort((a, b) => {
+          if ((b.createdAt || 0) !== (a.createdAt || 0)) {
+            return (b.createdAt || 0) - (a.createdAt || 0);
+          }
+          return a.id.localeCompare(b.id);
+        });
+
+        // Only update state if team list actually changed to avoid re-render loops
+        setTeams((prevTeams) => {
+          if (Array.isArray(prevTeams) && JSON.stringify(prevTeams) === JSON.stringify(teamsList)) {
+            return prevTeams;
+          }
+          localStorage.setItem('iiq_teams', JSON.stringify(teamsList));
+          return teamsList;
+        });
       }
     }, (error) => {
       console.warn("Teams collection listener notice:", error.message);
@@ -376,7 +388,7 @@ export default function App() {
         }
       }
     }
-  }, [teams]);
+  }, [teams, activeTeamId]);
 
   // Sync team updates and deletions to Firestore
   const handleUpdateTeams = async (newTeamsList: TeamProfile[]) => {
@@ -626,7 +638,7 @@ export default function App() {
       active = false;
       unsub();
     };
-  }, [userName, activeTeamId]);
+  }, [userName]);
 
   // Real-time Firestore users synchronization
   useEffect(() => {
@@ -648,7 +660,12 @@ export default function App() {
         });
       });
       if (snapshot.size > 0) {
-        setUsers(usersList);
+        setUsers((prevUsers) => {
+          if (Array.isArray(prevUsers) && JSON.stringify(prevUsers) === JSON.stringify(usersList)) {
+            return prevUsers;
+          }
+          return usersList;
+        });
       }
     }, (error) => {
       console.warn("Error subscribing to users collection:", error.message);
@@ -1290,7 +1307,7 @@ export default function App() {
               {!sidebarCollapsed && (
                 <div>
                   <h1 className="text-sm font-black text-[var(--navy)] tracking-tight">InterchangeIQ</h1>
-                  <span className="text-[10px] text-[var(--muted)] font-bold">making coaching easier v1.3.0</span>
+                  <span className="text-[10px] text-[var(--muted)] font-bold">making coaching easier {APP_VERSION}</span>
                 </div>
               )}
             </button>
@@ -1310,29 +1327,7 @@ export default function App() {
             </button>
           </div>
 
-          {/* Active Team Switcher */}
-          {(!sidebarCollapsed || mobileMenuOpen) && teams.length > 0 && (
-            <div className="px-3.5 py-2.5 border-b border-[var(--line)] bg-slate-50/80">
-              <div className="flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
-                <span className="flex items-center gap-1 text-[var(--navy)]">
-                  <Landmark className="w-3 h-3 text-blue-600" />
-                  Active Squad
-                </span>
-                <span className="text-[9px] text-emerald-600 font-extrabold">{cloudConnected ? '• Synced' : '• Local'}</span>
-              </div>
-              <select
-                value={activeTeamId || ''}
-                onChange={(e) => handleSwitchTeam(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-[var(--navy)] focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer truncate"
-              >
-                {teams.map((t) => (
-                  <option key={`sidebar-team-${t.id}`} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+
 
           {/* Navigation Links */}
           <nav className="p-3 space-y-1">

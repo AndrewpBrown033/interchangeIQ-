@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { APP_VERSION } from '../constants';
 import { 
   Lock, 
   User, 
@@ -375,7 +376,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
 
         {/* Footer */}
         <div className="border-t border-gray-100 pt-4 flex items-center justify-between text-gray-400">
-          <span className="text-[9px] font-bold tracking-wider">v1.4.0</span>
+          <span className="text-[9px] font-bold tracking-wider">{APP_VERSION}</span>
           <span className="text-[9px] font-semibold">InterchangeIQ Secure Access</span>
         </div>
 

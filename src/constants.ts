@@ -1,5 +1,7 @@
 import { Player, Drill, SkillAssessment } from './types';
 
+export const APP_VERSION = 'v1.4.0';
+
 export const POSITIONS: [string, string, number, number][] = [
   // Full Back Line (Top)
   ['RBP', 'RBP', 27, 13],
