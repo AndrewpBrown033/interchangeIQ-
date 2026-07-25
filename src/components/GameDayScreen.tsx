@@ -766,10 +766,10 @@ export default function GameDayScreen({
   return (
     <div className="space-y-6 relative">
       {/* Top action header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl border border-blue-900/30 shadow-sm text-white" style={{ backgroundColor: '#030345' }}>
         <div>
-          <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Game Day</h2>
-          <p className="text-xs text-[var(--muted)] font-semibold mt-1">
+          <h2 className="text-xl font-black tracking-tight" style={{ color: '#f2f3f6' }}>Game Day</h2>
+          <p className="text-xs text-blue-200 font-semibold mt-1">
             Match management, scoreboard scoring, dynamic oval lineup and alerts
           </p>
         </div>
@@ -783,19 +783,19 @@ export default function GameDayScreen({
           </button>
           <button
             onClick={onCompleteGame}
-            className="px-3.5 py-2 text-xs font-bold bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition shadow-xs"
+            className="px-3.5 py-2 text-xs font-bold bg-red-500/20 text-red-200 hover:bg-red-500/30 rounded-xl transition shadow-xs cursor-pointer"
           >
             Game Complete
           </button>
           <button
             onClick={onSaveLineup}
-            className="px-3.5 py-2 text-xs font-bold bg-[#FAFBFF] text-[var(--blue)] border border-blue-100 rounded-xl hover:bg-blue-50 transition"
+            className="px-3.5 py-2 text-xs font-bold bg-white/10 text-white border border-white/20 rounded-xl hover:bg-white/20 transition cursor-pointer"
           >
             Save Lineup Template
           </button>
           <button
             onClick={onOpenLoadLineup}
-            className="px-3.5 py-2 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-xl hover:bg-gray-200 transition"
+            className="px-3.5 py-2 text-xs font-bold bg-white/10 text-white border border-white/20 rounded-xl hover:bg-white/20 transition cursor-pointer"
           >
             Load Saved Lineup
           </button>
@@ -837,33 +837,34 @@ export default function GameDayScreen({
       <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
         <div
           onClick={() => setScoreboardCollapsed(!scoreboardCollapsed)}
-          className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50/80 transition"
+          className="p-4 flex items-center justify-between cursor-pointer transition text-white"
+          style={{ backgroundColor: '#053f83' }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[var(--blue)] flex items-center justify-center font-bold text-sm">
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-cyan-300 flex items-center justify-center font-bold text-sm">
               🏉
             </div>
             <div>
-              <h3 className="font-black text-sm text-[var(--navy)]">
+              <h3 className="font-black text-sm text-white">
                 Scoreboard & Quarter Clock
               </h3>
               {scoreboardCollapsed && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-bold text-gray-500">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-bold text-blue-200">
                   <span className="px-1.5 py-0.5 bg-[var(--cyan)] text-black text-[10px] font-black rounded uppercase">
                     Q{score.quarter}
                   </span>
-                  <span className="font-mono text-gray-700">{fmt(clockRemaining)}</span>
-                  <span className="w-1 h-1 rounded-full bg-gray-300" />
-                  <span className="text-gray-700">
-                    {gameInfo.team || 'OUR TEAM'}: <b className="text-[var(--navy)]">{totalPoints(score.home)}</b> ({score.home.goals}.{score.home.behinds})
+                  <span className="font-mono text-white">{fmt(clockRemaining)}</span>
+                  <span className="w-1 h-1 rounded-full bg-blue-300" />
+                  <span className="text-white">
+                    {gameInfo.team || 'OUR TEAM'}: <b className="text-cyan-300">{totalPoints(score.home)}</b> ({score.home.goals}.{score.home.behinds})
                   </span>
-                  <span className="text-gray-300 font-normal">vs</span>
-                  <span className="text-gray-700">
-                    {gameInfo.opponent ? gameInfo.opponent.toUpperCase() : 'OPPONENT'}: <b className="text-red-600">{totalPoints(score.away)}</b> ({score.away.goals}.{score.away.behinds})
+                  <span className="text-blue-300 font-normal">vs</span>
+                  <span className="text-white">
+                    {gameInfo.opponent ? gameInfo.opponent.toUpperCase() : 'OPPONENT'}: <b className="text-red-300">{totalPoints(score.away)}</b> ({score.away.goals}.{score.away.behinds})
                   </span>
                   {clockRunning && (
-                    <span className="flex items-center gap-1 text-emerald-600 animate-pulse ml-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="flex items-center gap-1 text-emerald-400 animate-pulse ml-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                       Live
                     </span>
                   )}
@@ -872,13 +873,13 @@ export default function GameDayScreen({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+            <span className="text-[10px] font-black text-blue-100 bg-white/10 px-2.5 py-1 rounded-lg uppercase tracking-wider">
               {scoreboardCollapsed ? 'Expand Score' : 'Collapse Score'}
             </span>
             {scoreboardCollapsed ? (
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+              <ChevronDown className="w-4 h-4 text-blue-200" />
             ) : (
-              <ChevronUp className="w-4 h-4 text-gray-400" />
+              <ChevronUp className="w-4 h-4 text-blue-200" />
             )}
           </div>
         </div>

@@ -50,11 +50,11 @@ export default function ScoringScreen({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm space-y-3">
+      <div className="p-4 rounded-2xl border border-blue-900/30 shadow-sm space-y-3 text-white" style={{ backgroundColor: '#030345' }}>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Match Scoring</h2>
-            <p className="text-xs text-[var(--muted)] font-semibold mt-0.5">
+            <h2 className="text-xl font-black tracking-tight" style={{ color: '#f2f3f6' }}>Match Scoring</h2>
+            <p className="text-xs text-blue-200 font-semibold mt-0.5">
               Direct scoreboard panel to increment goals and behinds
             </p>
           </div>
