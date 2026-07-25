@@ -55,6 +55,7 @@ export interface GameInfo {
   opponent?: string;
   round: string;
   date: string;
+  time?: string;
 }
 
 export interface GameHistory {

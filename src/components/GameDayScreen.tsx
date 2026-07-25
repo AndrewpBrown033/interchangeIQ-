@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Score, Rotation, Plan, GameInfo } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
-import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers } from 'lucide-react';
+import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 
 const POSITION_DESCRIPTIONS: Record<string, string> = {
@@ -107,6 +107,8 @@ export default function GameDayScreen({
   const [alertCollapsed, setAlertCollapsed] = useState(false);
   const [gameDayInsightsCollapsed, setGameDayInsightsCollapsed] = useState(true);
   const [scoreboardCollapsed, setScoreboardCollapsed] = useState(false);
+  const [isEditingGameDetails, setIsEditingGameDetails] = useState(false);
+  const [editGameDraft, setEditGameDraft] = useState<GameInfo>({ team: '', opponent: '', round: '', date: '', time: '' });
 
   // Drag State
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
@@ -857,7 +859,7 @@ export default function GameDayScreen({
                   </span>
                   <span className="text-gray-300 font-normal">vs</span>
                   <span className="text-gray-700">
-                    OPPONENT: <b className="text-red-600">{totalPoints(score.away)}</b> ({score.away.goals}.{score.away.behinds})
+                    {gameInfo.opponent ? gameInfo.opponent.toUpperCase() : 'OPPONENT'}: <b className="text-red-600">{totalPoints(score.away)}</b> ({score.away.goals}.{score.away.behinds})
                   </span>
                   {clockRunning && (
                     <span className="flex items-center gap-1 text-emerald-600 animate-pulse ml-1">
@@ -916,107 +918,218 @@ export default function GameDayScreen({
                 </div>
               </div>
 
-              {/* Scoreboard Card */}
+              {/* Scoreboard Card / Game Details Card */}
               <div className="lg:col-span-2 bg-gradient-to-br from-gray-900 to-[var(--navy)] text-white p-4 rounded-2xl shadow-md flex flex-col justify-between min-h-[140px]">
-                <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                <div className="flex justify-between items-center pb-2 border-b border-white/10 flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 bg-[var(--cyan)] text-black font-black text-[10px] rounded-md uppercase">
                       Q{score.quarter}
                     </span>
                     <span className="text-[10px] font-black uppercase text-gray-300">
-                      AFL Live Scores
+                      {isEditingGameDetails ? 'Edit Game Details' : 'AFL Live Scores'}
                     </span>
+                    {!isEditingGameDetails && (gameInfo.round || gameInfo.opponent) && (
+                      <span className="text-[10px] text-gray-400 font-semibold hidden sm:inline">
+                        • {gameInfo.round || 'Match'} {gameInfo.opponent ? `vs ${gameInfo.opponent}` : ''}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    {[1, 2, 3, 4].map((q) => (
-                      <button
-                        key={q}
-                        onClick={() => handleSetQuarter(q)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-black transition ${
-                          score.quarter === q ? 'bg-[var(--blue)] text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                      >
-                        Q{q}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {!isEditingGameDetails && (
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4].map((q) => (
+                          <button
+                            key={q}
+                            onClick={() => handleSetQuarter(q)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-black transition cursor-pointer ${
+                              score.quarter === q ? 'bg-[var(--blue)] text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                          >
+                            Q{q}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!isEditingGameDetails) {
+                          setEditGameDraft({
+                            team: gameInfo.team || '',
+                            opponent: gameInfo.opponent || '',
+                            round: gameInfo.round || '',
+                            date: gameInfo.date || new Date().toISOString().slice(0, 10),
+                            time: gameInfo.time || '',
+                          });
+                          setIsEditingGameDetails(true);
+                        } else {
+                          setIsEditingGameDetails(false);
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[10px] font-black flex items-center gap-1 transition cursor-pointer"
+                      title={isEditingGameDetails ? "Back to Scorecard" : "Edit Game Details"}
+                    >
+                      <Settings className="w-3 h-3 text-[var(--cyan)]" />
+                      <span>{isEditingGameDetails ? 'Scorecard' : 'Edit Game Details'}</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 py-3">
-                  {/* Home Side */}
-                  <div className="flex flex-col items-center border-r border-white/10 pr-2">
-                    <div className="text-[11px] font-black text-gray-400 tracking-wider uppercase mb-1">
-                      {gameInfo.team || 'OUR TEAM'}
+                {!isEditingGameDetails ? (
+                  <div className="grid grid-cols-2 gap-4 py-3">
+                    {/* Home Side */}
+                    <div className="flex flex-col items-center border-r border-white/10 pr-2">
+                      <div className="text-[11px] font-black text-gray-300 tracking-wider uppercase mb-1 text-center">
+                        {gameInfo.team || 'OUR TEAM'}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-[var(--cyan)]">{totalPoints(score.home)}</span>
+                        <span className="text-sm font-bold text-gray-300">({score.home.goals}.{score.home.behinds})</span>
+                      </div>
+                      <div className="flex gap-1 mt-2.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleScore('home', 'goal')}
+                          className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-[10px] font-black cursor-pointer"
+                        >
+                          +G
+                        </button>
+                        <button
+                          onClick={() => handleScore('home', 'behind')}
+                          className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[10px] font-black cursor-pointer"
+                        >
+                          +B
+                        </button>
+                        <button
+                          onClick={() => handleScore('home', 'undoGoal')}
+                          className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold cursor-pointer"
+                        >
+                          -G
+                        </button>
+                        <button
+                          onClick={() => handleScore('home', 'undoBehind')}
+                          className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold cursor-pointer"
+                        >
+                          -B
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-[var(--cyan)]">{totalPoints(score.home)}</span>
-                      <span className="text-sm font-bold text-gray-300">({score.home.goals}.{score.home.behinds})</span>
-                    </div>
-                    <div className="flex gap-1 mt-2.5" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleScore('home', 'goal')}
-                        className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-[10px] font-black"
-                      >
-                        +G
-                      </button>
-                      <button
-                        onClick={() => handleScore('home', 'behind')}
-                        className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[10px] font-black"
-                      >
-                        +B
-                      </button>
-                      <button
-                        onClick={() => handleScore('home', 'undoGoal')}
-                        className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold"
-                      >
-                        -G
-                      </button>
-                      <button
-                        onClick={() => handleScore('home', 'undoBehind')}
-                        className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold"
-                      >
-                        -B
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Away Side */}
-                  <div className="flex flex-col items-center pl-2">
-                    <div className="text-[11px] font-black text-gray-400 tracking-wider uppercase mb-1">
-                      OPPONENT
+                    {/* Away Side */}
+                    <div className="flex flex-col items-center pl-2">
+                      <div className="text-[11px] font-black text-gray-300 tracking-wider uppercase mb-1 text-center">
+                        {gameInfo.opponent || 'OPPONENT'}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-red-400">{totalPoints(score.away)}</span>
+                        <span className="text-sm font-bold text-gray-300">({score.away.goals}.{score.away.behinds})</span>
+                      </div>
+                      <div className="flex gap-1 mt-2.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleScore('away', 'goal')}
+                          className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-[10px] font-black cursor-pointer"
+                        >
+                          +G
+                        </button>
+                        <button
+                          onClick={() => handleScore('away', 'behind')}
+                          className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[10px] font-black cursor-pointer"
+                        >
+                          +B
+                        </button>
+                        <button
+                          onClick={() => handleScore('away', 'undoGoal')}
+                          className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold cursor-pointer"
+                        >
+                          -G
+                        </button>
+                        <button
+                          onClick={() => handleScore('away', 'undoBehind')}
+                          className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold cursor-pointer"
+                        >
+                          -B
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-red-400">{totalPoints(score.away)}</span>
-                      <span className="text-sm font-bold text-gray-300">({score.away.goals}.{score.away.behinds})</span>
+                  </div>
+                ) : (
+                  <div className="py-3 space-y-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+                          Our Team Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editGameDraft.team}
+                          onChange={(e) => setEditGameDraft({ ...editGameDraft, team: e.target.value })}
+                          className="w-full bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold placeholder-gray-400 focus:outline-none focus:border-[var(--cyan)]"
+                          placeholder="Our Team Name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+                          Opponent Team Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editGameDraft.opponent}
+                          onChange={(e) => setEditGameDraft({ ...editGameDraft, opponent: e.target.value })}
+                          className="w-full bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold placeholder-gray-400 focus:outline-none focus:border-[var(--cyan)]"
+                          placeholder="e.g. Lions, Magpies"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+                          Round / Match Title
+                        </label>
+                        <input
+                          type="text"
+                          value={editGameDraft.round}
+                          onChange={(e) => setEditGameDraft({ ...editGameDraft, round: e.target.value })}
+                          className="w-full bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold placeholder-gray-400 focus:outline-none focus:border-[var(--cyan)]"
+                          placeholder="e.g. Round 1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+                          Match Date & Time
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="date"
+                            value={editGameDraft.date}
+                            onChange={(e) => setEditGameDraft({ ...editGameDraft, date: e.target.value })}
+                            className="flex-1 bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-[var(--cyan)]"
+                          />
+                          <input
+                            type="time"
+                            value={editGameDraft.time || ''}
+                            onChange={(e) => setEditGameDraft({ ...editGameDraft, time: e.target.value })}
+                            className="w-24 bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-[var(--cyan)]"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-1 mt-2.5" onClick={(e) => e.stopPropagation()}>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
                       <button
-                        onClick={() => handleScore('away', 'goal')}
-                        className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-[10px] font-black"
+                        onClick={() => setIsEditingGameDetails(false)}
+                        className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-gray-200 rounded-lg text-xs font-bold transition cursor-pointer"
                       >
-                        +G
+                        Cancel
                       </button>
                       <button
-                        onClick={() => handleScore('away', 'behind')}
-                        className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[10px] font-black"
+                        onClick={() => {
+                          onUpdateGameInfo(editGameDraft);
+                          setIsEditingGameDetails(false);
+                        }}
+                        className="px-4 py-1.5 bg-[var(--cyan)] hover:brightness-110 text-black font-black rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                       >
-                        +B
-                      </button>
-                      <button
-                        onClick={() => handleScore('away', 'undoGoal')}
-                        className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold"
-                      >
-                        -G
-                      </button>
-                      <button
-                        onClick={() => handleScore('away', 'undoBehind')}
-                        className="px-1.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-md text-[10px] font-bold"
-                      >
-                        -B
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>Save Details</span>
                       </button>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 

@@ -50,11 +50,53 @@ export default function ScoringScreen({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
-        <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Match Scoring</h2>
-        <p className="text-xs text-[var(--muted)] font-semibold mt-1">
-          Direct scoreboard panel to increment goals and behinds
-        </p>
+      <div className="bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Match Scoring</h2>
+            <p className="text-xs text-[var(--muted)] font-semibold mt-0.5">
+              Direct scoreboard panel to increment goals and behinds
+            </p>
+          </div>
+        </div>
+
+        {/* Game Details Bar */}
+        <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+              Round / Match Title
+            </label>
+            <input
+              type="text"
+              value={gameInfo.round || ''}
+              onChange={(e) => onUpdateGameInfo({ ...gameInfo, round: e.target.value })}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-800 focus:outline-none focus:border-[var(--blue)]"
+              placeholder="e.g. Round 1"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+              Match Date
+            </label>
+            <input
+              type="date"
+              value={gameInfo.date || ''}
+              onChange={(e) => onUpdateGameInfo({ ...gameInfo, date: e.target.value })}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-800 focus:outline-none focus:border-[var(--blue)]"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+              Match Time
+            </label>
+            <input
+              type="time"
+              value={gameInfo.time || ''}
+              onChange={(e) => onUpdateGameInfo({ ...gameInfo, time: e.target.value })}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-800 focus:outline-none focus:border-[var(--blue)]"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-3xl border border-[var(--line)] shadow-md">
@@ -147,9 +189,13 @@ export default function ScoringScreen({
         {/* Away Score Card */}
         <div className="p-6 rounded-2xl border border-gray-100 bg-[#FAFBFF] space-y-6 flex flex-col items-center justify-between min-h-[300px]">
           <div className="text-center space-y-1">
-            <span className="text-sm font-black text-gray-400 tracking-wider uppercase block">
-              OPPONENT
-            </span>
+            <input
+              type="text"
+              value={gameInfo.opponent || ''}
+              onChange={(e) => onUpdateGameInfo({ ...gameInfo, opponent: e.target.value })}
+              className="text-center text-sm font-black text-red-500 tracking-wider uppercase bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[var(--blue)] focus:outline-none focus:bg-white px-2 py-1"
+              placeholder="OPPONENT NAME"
+            />
             <div className="text-5xl font-black text-red-500 font-mono">
               {totalPoints(score.away)}
             </div>

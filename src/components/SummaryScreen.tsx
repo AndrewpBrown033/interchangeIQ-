@@ -81,7 +81,7 @@ export default function SummaryScreen({
         <div className="bg-white p-4.5 rounded-2xl border border-[var(--line)] shadow-sm space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-blue-50 text-[var(--blue)] rounded-lg">
+              <div className="p-1.5 bg-blue-900 text-white rounded-lg shadow-2xs">
                 <Landmark className="w-4 h-4" />
               </div>
               <span className="text-xs font-black tracking-wider uppercase text-[var(--navy)]">Select Active Squad</span>
@@ -98,11 +98,11 @@ export default function SummaryScreen({
                   onClick={() => onSelectTeam(t.id)}
                   className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer shrink-0 flex items-center gap-2 border ${
                     isActive
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white border-emerald-700 shadow-sm scale-[1.01]'
+                      ? 'bg-blue-900 hover:bg-blue-950 text-white border-blue-950 shadow-sm scale-[1.01]'
                       : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                   }`}
                 >
-                  {isActive && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  {isActive && <Check className="w-3.5 h-3.5 stroke-[3] text-blue-300" />}
                   <span>{t.name}</span>
                 </button>
               );
@@ -191,7 +191,7 @@ export default function SummaryScreen({
                     {gameInfo.team ? `${gameInfo.team}${gameInfo.opponent ? ` vs ${gameInfo.opponent}` : ''}` : (gameInfo.opponent ? `vs ${gameInfo.opponent}` : 'Match Setup')}
                   </p>
                   <p className="text-xs text-[var(--muted)] font-semibold">
-                    Date: {gameInfo.date}
+                    Date: {gameInfo.date}{gameInfo.time ? ` @ ${gameInfo.time}` : ''}
                   </p>
                 </div>
               ) : (
