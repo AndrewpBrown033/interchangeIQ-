@@ -26,7 +26,7 @@ import LoginScreen from './components/LoginScreen';
 // Lucide Icons
 import {
   LayoutDashboard, Play, RefreshCw, Users, History, BarChart3,
-  BookOpen, Shield, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot
+  BookOpen, Shield, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot, Landmark
 } from 'lucide-react';
 
 // Helper functions to serialize/deserialize Drill steps to avoid nested arrays in Firestore
@@ -326,6 +326,45 @@ export default function App() {
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [isSyncingFromServer, setIsSyncingFromServer] = useState(false);
   const isSyncingFromServerRef = useRef(false);
+  const currentTeamSyncedIdRef = useRef<string | null>(null);
+
+  // Instantly lock upstream sync when activeTeamId changes
+  useEffect(() => {
+    if (activeTeamId) {
+      isSyncingFromServerRef.current = true;
+      setIsSyncingFromServer(true);
+    }
+  }, [activeTeamId]);
+
+  // Real-time Firestore teams collection subscriber
+  useEffect(() => {
+    const teamsRef = collection(db, 'teams');
+    const unsubscribe = onSnapshot(teamsRef, (snapshot) => {
+      const teamsList: TeamProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.id) {
+          teamsList.push({
+            id: data.id,
+            name: data.name || 'Unnamed Squad',
+            createdAt: data.createdAt || Date.now(),
+          });
+        }
+      });
+      if (teamsList.length > 0) {
+        setTeams((prev) => {
+          const teamMap = new Map<string, TeamProfile>();
+          prev.forEach(t => teamMap.set(t.id, t));
+          teamsList.forEach(t => teamMap.set(t.id, t));
+          return Array.from(teamMap.values());
+        });
+      }
+    }, (error) => {
+      console.warn("Teams collection listener notice:", error.message);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Manual Force Sync function
   const handleForceSync = async (): Promise<boolean> => {
@@ -337,7 +376,7 @@ export default function App() {
       const cleanData = JSON.parse(JSON.stringify({
         id: activeTeamId,
         name: teamName,
-        players: players && players.length > 0 ? players : DEFAULT_PLAYERS,
+        players: Array.isArray(players) ? players : [],
         lineup,
         score,
         gameInfo,
@@ -590,16 +629,9 @@ export default function App() {
     setUsers(newUsers);
   };
 
-  // Helper to generate a fresh, team-isolated 22-player default squad with team-prefixed unique IDs
-  const createFreshSquadForTeam = (teamId: string): Player[] => {
-    const cleanId = teamId.replace(/[^a-zA-Z0-9]/g, '');
-    return DEFAULT_PLAYERS.map((p, index) => ({
-      ...p,
-      id: `p_${cleanId}_${index + 1}_${Math.random().toString(36).substring(2, 6)}`,
-      active: 0,
-      bench: 0,
-      slotTimes: {},
-    }));
+  // Helper to generate a fresh, team-isolated squad (empty by default for new teams)
+  const createFreshSquadForTeam = (_teamId: string): Player[] => {
+    return [];
   };
 
   // Real-time Firestore document subscriber (Downstream sync)
@@ -641,11 +673,14 @@ export default function App() {
         setLastSyncedAt(data.updatedAt || Date.now());
         setCloudConnected(true);
 
+        // Mark activeTeamId as fully downloaded
+        currentTeamSyncedIdRef.current = activeTeamId;
+
         // Reset the server-sync flag after states have processed
         setTimeout(() => {
           isSyncingFromServerRef.current = false;
           setIsSyncingFromServer(false);
-        }, 400);
+        }, 800);
       } else {
         // Document does not exist in Firestore yet (new team). We create a fresh isolated squad!
         setCloudConnected(true);
@@ -680,10 +715,12 @@ export default function App() {
 
         setDoc(docRef, initialData).catch(err => console.warn("Error creating team doc:", err.message));
 
+        currentTeamSyncedIdRef.current = activeTeamId;
+
         setTimeout(() => {
           isSyncingFromServerRef.current = false;
           setIsSyncingFromServer(false);
-        }, 400);
+        }, 800);
       }
     }, (error) => {
       console.warn("Firestore onSnapshot notice:", error.message);
@@ -691,7 +728,7 @@ export default function App() {
       setTimeout(() => {
         isSyncingFromServerRef.current = false;
         setIsSyncingFromServer(false);
-      }, 400);
+      }, 800);
     });
 
     return () => unsubscribe();
@@ -699,14 +736,22 @@ export default function App() {
 
   // Firestore document publisher with debounce (Upstream sync)
   useEffect(() => {
-    if (!activeTeamId || isSyncingFromServer || isSyncingFromServerRef.current) return;
+    // CRITICAL: Lock upstream publishing if server sync is active OR if activeTeamId has changed but downstream sync has not completed
+    if (
+      !activeTeamId ||
+      isSyncingFromServer ||
+      isSyncingFromServerRef.current ||
+      currentTeamSyncedIdRef.current !== activeTeamId
+    ) {
+      return;
+    }
 
     const docRef = doc(db, 'teams', activeTeamId);
     const currentTeams = Array.isArray(teams) ? teams : [];
     const data = JSON.parse(JSON.stringify({
       id: activeTeamId,
       name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
-      players: players && players.length > 0 ? players : createFreshSquadForTeam(activeTeamId),
+      players: Array.isArray(players) ? players : [],
       lineup,
       score,
       gameInfo,
@@ -1061,6 +1106,19 @@ export default function App() {
           <span className="font-black text-sm tracking-tight text-[var(--navy)]">InterchangeIQ</span>
         </button>
         <div className="flex items-center gap-1.5">
+          {teams.length > 0 && (
+            <select
+              value={activeTeamId || ''}
+              onChange={(e) => setActiveTeamId(e.target.value)}
+              className="bg-slate-50 border border-gray-200 rounded-lg px-2 py-1 text-[11px] font-black text-[var(--navy)] focus:outline-none max-w-[130px] truncate cursor-pointer"
+            >
+              {teams.map((t) => (
+                <option key={`mobile-team-${t.id}`} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             onClick={() => {
               localStorage.removeItem('iiq_authenticated');
@@ -1120,6 +1178,30 @@ export default function App() {
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Active Team Switcher */}
+          {(!sidebarCollapsed || mobileMenuOpen) && teams.length > 0 && (
+            <div className="px-3.5 py-2.5 border-b border-[var(--line)] bg-slate-50/80">
+              <div className="flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
+                <span className="flex items-center gap-1 text-[var(--navy)]">
+                  <Landmark className="w-3 h-3 text-blue-600" />
+                  Active Squad
+                </span>
+                <span className="text-[9px] text-emerald-600 font-extrabold">{cloudConnected ? '• Synced' : '• Local'}</span>
+              </div>
+              <select
+                value={activeTeamId || ''}
+                onChange={(e) => setActiveTeamId(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-[var(--navy)] focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer truncate"
+              >
+                {teams.map((t) => (
+                  <option key={`sidebar-team-${t.id}`} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Navigation Links */}
           <nav className="p-3 space-y-1">

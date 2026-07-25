@@ -4,8 +4,9 @@ import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS } from '../constants';
 import { 
   Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, 
   Check, X, Flame, Sparkles, Clock, Activity, RotateCcw, Landmark, 
-  Users, Trophy, Shield, Layers, Play, ArrowRight 
+  Users, Trophy, Shield, Layers, Play, ArrowRight, FileSpreadsheet
 } from 'lucide-react';
+import CsvImportGuide from './CsvImportGuide';
 
 interface TeamScreenProps {
   players: Player[];
@@ -35,6 +36,7 @@ export default function TeamScreen({
   const [filterZone, setFilterZone] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'number' | 'name'>('number');
   const [showAddEditModal, setShowAddEditModal] = useState(false);
+  const [showCsvModal, setShowCsvModal] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
 
   // Player Form states
@@ -406,12 +408,19 @@ export default function TeamScreen({
         </div>
         <div className="flex flex-wrap gap-2">
           <button
+            onClick={() => setShowCsvModal(!showCsvModal)}
+            className="px-3.5 py-2 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+            <span>{showCsvModal ? 'Close CSV Guide' : 'Import CSV Roster'}</span>
+          </button>
+          <button
             onClick={handleRestoreDefaultSquad}
             className="px-3.5 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Reload default squad of 22 players"
+            title="Reload default sample squad of 22 AFL players"
           >
             <RotateCcw className="w-3.5 h-3.5 text-gray-600" />
-            <span>Restore Default Squad</span>
+            <span>Load Sample Squad</span>
           </button>
           <button
             onClick={handleOpenAddPlayer}
@@ -422,6 +431,17 @@ export default function TeamScreen({
           </button>
         </div>
       </div>
+
+      {/* CSV Import Drawer / Guide Modal */}
+      {showCsvModal && (
+        <CsvImportGuide
+          players={players}
+          onUpdatePlayers={onUpdatePlayers}
+          onUpdateLineup={onUpdateLineup}
+          title="Import Roster from CSV / Excel"
+          onSuccess={() => setShowCsvModal(false)}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Players List */}
@@ -495,15 +515,32 @@ export default function TeamScreen({
             })}
 
             {filtered.length === 0 && (
-              <div className="p-8 text-center space-y-3 bg-gray-50/50">
-                <p className="text-xs font-extrabold text-gray-500">No players found in active squad roster.</p>
-                <button
-                  onClick={handleRestoreDefaultSquad}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 mx-auto cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Restore Default Squad (22 Players)</span>
-                </button>
+              <div className="p-8 text-center space-y-4 bg-slate-50/70">
+                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-black text-sm text-[var(--navy)]">Roster is Empty</h4>
+                  <p className="text-xs text-gray-500 font-semibold mt-1 max-w-sm mx-auto">
+                    This squad currently has no players. Add players manually, import a CSV roster file, or load sample AFL data.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  <button
+                    onClick={handleOpenAddPlayer}
+                    className="px-4 py-2 bg-[var(--green)] hover:opacity-95 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add First Player</span>
+                  </button>
+                  <button
+                    onClick={handleRestoreDefaultSquad}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Load Sample Squad</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -806,8 +843,20 @@ export default function TeamScreen({
               </div>
             </>
           ) : (
-            <div className="text-center py-12 text-gray-400 font-semibold">
-              Add players to view detailed profiles.
+            <div className="space-y-6">
+              <div className="p-6 text-center bg-slate-50 border border-slate-200 rounded-xl">
+                <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                <h4 className="font-black text-sm text-[var(--navy)]">No Player Selected</h4>
+                <p className="text-xs text-gray-500 font-semibold mt-1">
+                  Select a player from the roster list on the left to view their profile, edit details, or track playtime heatmaps.
+                </p>
+              </div>
+              <CsvImportGuide
+                players={players}
+                onUpdatePlayers={onUpdatePlayers}
+                onUpdateLineup={onUpdateLineup}
+                title="CSV Roster Bulk Import & File Format Guide"
+              />
             </div>
           )}
         </div>

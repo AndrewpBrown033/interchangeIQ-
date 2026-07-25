@@ -374,15 +374,30 @@ export default function AdminScreen({
   const handleCreateTeam = () => {
     const name = prompt('New team name?');
     if (!name || !name.trim()) return;
+    const newTeamId = `team-${Date.now()}`;
     const newTeam: TeamProfile = {
-      id: `team-${Date.now()}`,
+      id: newTeamId,
       name: name.trim(),
       createdAt: Date.now(),
     };
+
+    // 1. Update teams list
     onUpdateTeams([...teams, newTeam]);
-    if (!activeTeamId) {
-      onSelectTeam(newTeam.id);
+
+    // 2. Automatically assign new teamId to active coaches/users so they have permission & access
+    if (Array.isArray(users) && users.length > 0) {
+      const updatedUsers = users.map((u) => {
+        const currentTeamIds = Array.isArray(u.teamIds) ? u.teamIds : [];
+        return {
+          ...u,
+          teamIds: currentTeamIds.includes(newTeamId) ? currentTeamIds : [...currentTeamIds, newTeamId],
+        };
+      });
+      onUpdateUsers(updatedUsers);
     }
+
+    // 3. Immediately select the new team so the coach switches to the 2nd team squad
+    onSelectTeam(newTeamId);
   };
 
   const handleRenameTeam = (teamId: string) => {

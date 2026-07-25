@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Player, AuditLogEntry } from '../types';
 import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet } from 'lucide-react';
+import CsvImportGuide from './CsvImportGuide';
 
 interface SettingsScreenProps {
   currentTheme: string;
@@ -637,47 +638,11 @@ export default function SettingsScreen({
           </div>
 
           {/* Bulk Load Roster from Excel / CSV */}
-          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
-            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
-              <FileSpreadsheet className="w-4 h-4 text-[var(--blue)]" />
-              <span>Bulk Load Roster from Excel / CSV</span>
-            </h3>
-            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-              Upload a standard comma-separated file (.csv) containing columns for <b>Name</b>, <b>Number</b>, <b>Positions</b>, <b>Nickname</b>, and <b>Note</b>.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={csvMode}
-                onChange={(e) => setCsvMode(e.target.value as any)}
-                className="px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-[var(--ink)] focus:outline-none"
-              >
-                <option value="replace">Replace full squad with this file</option>
-                <option value="append">Append unique players to current squad</option>
-              </select>
-
-              <label className="px-4 py-2 bg-[#EEF2FF] hover:bg-blue-50 text-[var(--blue)] font-bold text-xs rounded-xl transition border border-blue-100 cursor-pointer text-center flex items-center gap-1.5">
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Upload CSV File</span>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCSVImport}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {csvStatus && (
-              <div className={`p-3 text-xs font-bold rounded-xl border ${
-                csvStatus.type === 'ok' ? 'bg-green-50 border-green-200 text-[#0E7A48]' :
-                csvStatus.type === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-                'bg-red-50 border-red-200 text-red-700'
-              }`}>
-                {csvStatus.text}
-              </div>
-            )}
-          </div>
+          <CsvImportGuide
+            players={players || []}
+            onUpdatePlayers={onUpdatePlayers}
+            onUpdateLineup={onUpdateLineup}
+          />
 
           {/* Backup Restore Card */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
