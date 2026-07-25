@@ -40,6 +40,34 @@ export default function CsvImportGuide({
     document.body.removeChild(link);
   };
 
+  const handleExportPlayersCSV = () => {
+    if (!players || players.length === 0) {
+      setCsvStatus({ type: 'err', text: 'No players in active squad roster to export.' });
+      return;
+    }
+    const headers = "Name,Number,Positions,Status,Nickname,Note";
+    const rows = players.map((p) => {
+      const name = `"${(p.name || '').replace(/"/g, '""')}"`;
+      const num = `"${(p.number || '').replace(/"/g, '""')}"`;
+      const pos = `"${(p.positions || []).join('; ')}"`;
+      const status = p.status || 'available';
+      const nick = `"${(p.nick || '').replace(/"/g, '""')}"`;
+      const note = `"${(p.note || '').replace(/"/g, '""')}"`;
+      return `${name},${num},${pos},${status},${nick},${note}`;
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `roster_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setCsvStatus({ type: 'ok', text: `Successfully exported ${players.length} players to CSV!` });
+  };
+
   const splitCSVRow = (row: string) => {
     const out = [];
     let cur = '';
@@ -227,6 +255,14 @@ export default function CsvImportGuide({
             className="hidden"
           />
         </label>
+
+        <button
+          onClick={handleExportPlayersCSV}
+          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Export Roster (.CSV)</span>
+        </button>
 
         <button
           onClick={handleDownloadCSVTemplate}

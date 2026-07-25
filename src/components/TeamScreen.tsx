@@ -4,7 +4,7 @@ import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS } from '../constants';
 import { 
   Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, 
   Check, X, Flame, Sparkles, Clock, Activity, RotateCcw, Landmark, 
-  Users, Trophy, Shield, Layers, Play, ArrowRight, FileSpreadsheet
+  Users, Trophy, Shield, Layers, Play, ArrowRight, FileSpreadsheet, Download
 } from 'lucide-react';
 import CsvImportGuide from './CsvImportGuide';
 
@@ -51,6 +51,29 @@ export default function TeamScreen({
 
   const activeId = selectedPlayerId || players[0]?.id || null;
   const activePlayer = players.find((p) => p.id === activeId) || null;
+
+  const handleExportCSV = () => {
+    if (!players || players.length === 0) return;
+    const headers = "Name,Number,Positions,Status,Nickname,Note";
+    const rows = players.map((p) => {
+      const name = `"${(p.name || '').replace(/"/g, '""')}"`;
+      const num = `"${(p.number || '').replace(/"/g, '""')}"`;
+      const pos = `"${(p.positions || []).join('; ')}"`;
+      const status = p.status || 'available';
+      const nick = `"${(p.nick || '').replace(/"/g, '""')}"`;
+      const note = `"${(p.note || '').replace(/"/g, '""')}"`;
+      return `${name},${num},${pos},${status},${nick},${note}`;
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${(teamName || 'squad').toLowerCase().replace(/\s+/g, '_')}_players_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Sorting and filtering list
   const filtered = players
@@ -407,6 +430,14 @@ export default function TeamScreen({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="px-3.5 py-2 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl border border-emerald-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Export full roster to CSV file"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Export Players (.CSV)</span>
+          </button>
           <button
             onClick={() => setShowCsvModal(!showCsvModal)}
             className="px-3.5 py-2 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"

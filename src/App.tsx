@@ -7,7 +7,7 @@ import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS } from './const
 
 // Firebase Integrations
 import { auth, db, signInAnonymously, onAuthStateChanged, User } from './lib/firebase';
-import { doc, setDoc, getDoc, onSnapshot, collection, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, collection, deleteDoc, getDocs } from 'firebase/firestore';
 
 // Screens imports
 import SummaryScreen from './components/SummaryScreen';
@@ -390,37 +390,15 @@ export default function App() {
       await deleteDoc(doc(db, 'teams', deleted.id)).catch(err => console.warn("Error deleting team doc from Firestore:", err));
     }
 
-    // 2. Update names / created dates for updated teams, or initialize new team documents
+    // 2. Unconditionally set/merge each team in newTeamsList to Firestore
     for (const t of newTeamsList) {
       const teamDocRef = doc(db, 'teams', t.id);
-      const docSnap = await getDoc(teamDocRef).catch(() => null);
-      if (!docSnap || !docSnap.exists()) {
-        await setDoc(teamDocRef, {
-          id: t.id,
-          name: t.name,
-          createdAt: t.createdAt || Date.now(),
-          players: [],
-          lineup: {},
-          score: {
-            quarter: 1,
-            home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
-            away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
-          },
-          gameInfo: { opponent: 'Opponent', round: 'Round 1', date: new Date().toISOString().slice(0, 10), venue: 'Home Ground' },
-          rotations: [],
-          plans: [{ id: 'plan1', name: 'Q1 Rotation' }],
-          history: [],
-          savedLineups: [],
-          drills: [],
-          growthRecords: [],
-          updatedAt: Date.now(),
-        }, { merge: true }).catch(err => console.warn("Error creating new team doc in Firestore:", err));
-      } else {
-        const existing = previousTeams.find(prev => prev.id === t.id);
-        if (!existing || existing.name !== t.name) {
-          await setDoc(teamDocRef, { name: t.name, id: t.id, createdAt: t.createdAt || Date.now() }, { merge: true }).catch(err => console.warn("Error updating team doc name in Firestore:", err));
-        }
-      }
+      await setDoc(teamDocRef, {
+        id: t.id,
+        name: t.name,
+        createdAt: t.createdAt || Date.now(),
+        updatedAt: Date.now()
+      }, { merge: true }).catch(err => console.warn("Error saving team doc to Firestore:", err));
     }
 
     setTeams(newTeamsList);
@@ -432,6 +410,90 @@ export default function App() {
       if (nextActiveId) {
         handleSwitchTeam(nextActiveId);
       }
+    }
+  };
+
+  // Dedicated Admin Team Sync: pushes local teams & pulls all remote teams from Firestore
+  const handleForceSyncTeams = async (): Promise<{ success: boolean; teamCount: number; message: string }> => {
+    try {
+      setIsSyncingFromServer(true);
+      isSyncingFromServerRef.current = true;
+
+      const currentTeams = Array.isArray(teams) ? teams : [];
+
+      // 1. Push all local teams to Firestore
+      for (const t of currentTeams) {
+        const teamDocRef = doc(db, 'teams', t.id);
+        if (t.id === activeTeamId) {
+          const fullData = JSON.parse(JSON.stringify({
+            id: t.id,
+            name: t.name,
+            createdAt: t.createdAt || Date.now(),
+            players: Array.isArray(players) ? players : [],
+            lineup,
+            score,
+            gameInfo,
+            rotations,
+            plans,
+            history,
+            savedLineups,
+            drills: sanitizeDrillList(drills),
+            growthRecords,
+            updatedAt: Date.now()
+          }));
+          await setDoc(teamDocRef, fullData, { merge: true });
+        } else {
+          await setDoc(teamDocRef, {
+            id: t.id,
+            name: t.name,
+            createdAt: t.createdAt || Date.now(),
+            updatedAt: Date.now()
+          }, { merge: true });
+        }
+      }
+
+      // 2. Query ALL team docs from Firestore
+      const querySnap = await getDocs(collection(db, 'teams'));
+      const teamMap = new Map<string, TeamProfile>();
+      currentTeams.forEach(t => teamMap.set(t.id, t));
+
+      querySnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const teamId = data.id || docSnap.id;
+        if (teamId) {
+          teamMap.set(teamId, {
+            id: teamId,
+            name: data.name || 'Unnamed Squad',
+            createdAt: data.createdAt || Date.now(),
+          });
+        }
+      });
+
+      const mergedList = Array.from(teamMap.values());
+      mergedList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      setTeams(mergedList);
+      localStorage.setItem('iiq_teams', JSON.stringify(mergedList));
+
+      setLastSyncedAt(Date.now());
+      setCloudConnected(true);
+      isSyncingFromServerRef.current = false;
+      setIsSyncingFromServer(false);
+
+      return {
+        success: true,
+        teamCount: mergedList.length,
+        message: `Successfully synced ${mergedList.length} team(s) with the Cloud database! Mobile & desktop devices can now switch between all these teams.`
+      };
+    } catch (err: any) {
+      console.warn("Error force syncing teams:", err);
+      isSyncingFromServerRef.current = false;
+      setIsSyncingFromServer(false);
+      return {
+        success: false,
+        teamCount: teams.length,
+        message: `Sync warning: ${err?.message || 'Could not connect to Cloud database.'}`
+      };
     }
   };
 
