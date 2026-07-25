@@ -327,6 +327,7 @@ export default function App() {
   const [isSyncingFromServer, setIsSyncingFromServer] = useState(false);
   const isSyncingFromServerRef = useRef(false);
   const currentTeamSyncedIdRef = useRef<string | null>(null);
+  const lastPublishedSerializedRef = useRef<string>('');
 
   // Switch active team
   const handleSwitchTeam = (teamId: string) => {
@@ -794,6 +795,10 @@ export default function App() {
     const docRef = doc(db, 'teams', activeTeamId);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      const currentTeams = Array.isArray(teams) ? teams : [];
+      const activeTeamObj = currentTeams.find(t => t.id === activeTeamId);
+      const activeTeamName = activeTeamObj?.name || 'My Squad';
+
       if (docSnap.exists()) {
         const data = docSnap.data();
         
@@ -801,22 +806,67 @@ export default function App() {
         isSyncingFromServerRef.current = true;
         setIsSyncingFromServer(true);
 
-        if (data.players && Array.isArray(data.players) && data.players.length > 0) {
-          setPlayers(data.players);
-        } else {
-          setPlayers(createFreshSquadForTeam(activeTeamId));
-        }
-        if (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) setLineup(data.lineup);
-        else setLineup({});
+        const activePlayers = (data.players && Array.isArray(data.players) && data.players.length > 0)
+          ? data.players
+          : createFreshSquadForTeam(activeTeamId);
+        const activeLineup = (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) ? data.lineup : {};
+        const defaultScore: Score = {
+          quarter: 1,
+          home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+          away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+        };
+        const activeScore = (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) ? data.score : defaultScore;
+        const activeGameInfo = (data.gameInfo && typeof data.gameInfo === 'object' && !Array.isArray(data.gameInfo))
+          ? { ...data.gameInfo, team: activeTeamName }
+          : { team: activeTeamName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' };
+        const activeRotations = (data.rotations && Array.isArray(data.rotations)) ? data.rotations : [];
+        const activePlans = (data.plans && Array.isArray(data.plans)) ? data.plans : [{ id: 'plan1', name: 'Q1 Rotation' }];
+        const activeHistory = (data.history && Array.isArray(data.history)) ? data.history : [];
+        const activeSavedLineups = (data.savedLineups && Array.isArray(data.savedLineups)) ? data.savedLineups : [];
+        const activeDrills = (data.drills && Array.isArray(data.drills)) ? parseDrillList(data.drills) : [];
+        const activeGrowthRecords = (data.growthRecords && Array.isArray(data.growthRecords)) ? data.growthRecords : [];
+        const defaultTrainingState: TrainingState = {
+          view: 'library',
+          filter: 'All',
+          activeId: 'one-v-one-kick-tennis',
+          step: 0,
+          motionPaused: false,
+          plans: [],
+          activePlanId: null,
+        };
+        const activeTrainingState = (data.trainingState && typeof data.trainingState === 'object' && !Array.isArray(data.trainingState))
+          ? data.trainingState
+          : defaultTrainingState;
 
-        if (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) setScore(data.score);
-        if (data.gameInfo && typeof data.gameInfo === 'object' && !Array.isArray(data.gameInfo)) setGameInfo(data.gameInfo);
-        if (data.rotations && Array.isArray(data.rotations)) setRotations(data.rotations); else setRotations([]);
-        if (data.plans && Array.isArray(data.plans)) setPlans(data.plans);
-        if (data.history && Array.isArray(data.history)) setHistory(data.history); else setHistory([]);
-        if (data.savedLineups && Array.isArray(data.savedLineups)) setSavedLineups(data.savedLineups); else setSavedLineups([]);
-        if (data.drills && Array.isArray(data.drills)) setDrills(parseDrillList(data.drills));
-        if (data.growthRecords && Array.isArray(data.growthRecords)) setGrowthRecords(data.growthRecords);
+        const incomingDataToSync = {
+          id: activeTeamId,
+          name: activeTeamName,
+          players: activePlayers,
+          lineup: activeLineup,
+          score: activeScore,
+          gameInfo: activeGameInfo,
+          rotations: activeRotations,
+          plans: activePlans,
+          history: activeHistory,
+          savedLineups: activeSavedLineups,
+          drills: sanitizeDrillList(activeDrills),
+          growthRecords: activeGrowthRecords,
+          trainingState: activeTrainingState,
+        };
+
+        lastPublishedSerializedRef.current = JSON.stringify(incomingDataToSync);
+
+        setPlayers(activePlayers);
+        setLineup(activeLineup);
+        setScore(activeScore);
+        setGameInfo(activeGameInfo);
+        setRotations(activeRotations);
+        setPlans(activePlans);
+        setHistory(activeHistory);
+        setSavedLineups(activeSavedLineups);
+        setDrills(activeDrills);
+        if (data.growthRecords) setGrowthRecords(activeGrowthRecords);
+        setTrainingState(activeTrainingState);
 
         setLastSyncedAt(data.updatedAt || Date.now());
         setCloudConnected(true);
@@ -830,38 +880,61 @@ export default function App() {
           setIsSyncingFromServer(false);
         }, 800);
       } else {
-        // Document does not exist in Firestore yet (new team). We create a fresh isolated squad!
+        // Document does not exist in Firestore yet (new team). We create a fresh isolated squad & team dataset!
         setCloudConnected(true);
         setLastSyncedAt(Date.now());
-        const currentTeams = Array.isArray(teams) ? teams : [];
         const freshPlayers = createFreshSquadForTeam(activeTeamId);
-        const initialData = JSON.parse(JSON.stringify({
+        const freshScore: Score = {
+          quarter: 1,
+          home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+          away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+        };
+        const freshGameInfo: GameInfo = {
+          team: activeTeamName,
+          round: 'Round 1',
+          date: new Date().toISOString().slice(0, 10),
+          opponent: '',
+        };
+        const freshPlans = [{ id: 'plan1', name: 'Q1 Rotation' }];
+        const freshTrainingState: TrainingState = {
+          view: 'library',
+          filter: 'All',
+          activeId: 'one-v-one-kick-tennis',
+          step: 0,
+          motionPaused: false,
+          plans: [],
+          activePlanId: null,
+        };
+
+        const initialDataToSync = {
           id: activeTeamId,
-          name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
+          name: activeTeamName,
           players: freshPlayers,
           lineup: {},
-          score: {
-            quarter: 1,
-            home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
-            away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
-          },
-          gameInfo,
+          score: freshScore,
+          gameInfo: freshGameInfo,
           rotations: [],
-          plans: [{ id: 'plan1', name: 'Q1 Rotation' }],
+          plans: freshPlans,
           history: [],
           savedLineups: [],
           drills: sanitizeDrillList(drills),
           growthRecords,
-          updatedAt: Date.now()
-        }));
+          trainingState: freshTrainingState,
+        };
+
+        lastPublishedSerializedRef.current = JSON.stringify(initialDataToSync);
 
         setPlayers(freshPlayers);
         setLineup({});
+        setScore(freshScore);
+        setGameInfo(freshGameInfo);
         setSavedLineups([]);
         setHistory([]);
         setRotations([]);
+        setPlans(freshPlans);
+        setTrainingState(freshTrainingState);
 
-        setDoc(docRef, initialData).catch(err => console.warn("Error creating team doc:", err.message));
+        setDoc(docRef, { ...initialDataToSync, updatedAt: Date.now() }).catch(err => console.warn("Error creating team doc:", err.message));
 
         currentTeamSyncedIdRef.current = activeTeamId;
 
@@ -894,9 +967,8 @@ export default function App() {
       return;
     }
 
-    const docRef = doc(db, 'teams', activeTeamId);
     const currentTeams = Array.isArray(teams) ? teams : [];
-    const data = JSON.parse(JSON.stringify({
+    const dataToSync = {
       id: activeTeamId,
       name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
       players: Array.isArray(players) ? players : [],
@@ -909,11 +981,21 @@ export default function App() {
       savedLineups,
       drills: sanitizeDrillList(drills),
       growthRecords,
-      updatedAt: Date.now()
-    }));
+      trainingState,
+    };
+
+    const currentSerialized = JSON.stringify(dataToSync);
+
+    // CRITICAL: Skip publishing if payload has not changed since last snapshot or last write
+    if (lastPublishedSerializedRef.current === currentSerialized) {
+      return;
+    }
+
+    const docRef = doc(db, 'teams', activeTeamId);
 
     const timer = setTimeout(() => {
-      setDoc(docRef, data)
+      lastPublishedSerializedRef.current = currentSerialized;
+      setDoc(docRef, { ...dataToSync, updatedAt: Date.now() })
         .then(() => {
           setLastSyncedAt(Date.now());
           setCloudConnected(true);
@@ -925,7 +1007,7 @@ export default function App() {
     }, 1000); // 1.0 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, growthRecords, activeTeamId, isSyncingFromServer]);
+  }, [players, lineup, score, gameInfo, rotations, plans, history, savedLineups, drills, growthRecords, trainingState, activeTeamId, isSyncingFromServer]);
 
   // Log audit helper
   const logAudit = (action: string) => {
@@ -1041,7 +1123,8 @@ export default function App() {
     });
     setRotations(rotations.map((r) => ({ ...r, applied: false, status: 'scheduled' })));
     setPlayers(players.map((p) => ({ ...p, active: 0, bench: 0 })));
-    setGameInfo({ team: '', round: '', date: new Date().toISOString().slice(0, 10) });
+    const activeTeamName = teams.find((t) => t.id === activeTeamId)?.name || 'My Squad';
+    setGameInfo({ team: activeTeamName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' });
 
     setActiveTab('history');
   };
@@ -1092,8 +1175,11 @@ export default function App() {
       return;
     }
 
+    const activeTeamName = teams.find((t) => t.id === activeTeamId)?.name || 'My Squad';
+
     setGameInfo({
-      team: formNewGameOpponent.trim(),
+      team: activeTeamName,
+      opponent: formNewGameOpponent.trim(),
       round: formNewGameRound.trim(),
       date: formNewGameDate,
     });

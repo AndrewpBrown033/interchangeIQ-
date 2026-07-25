@@ -52,6 +52,7 @@ export interface LineupTemplate {
 
 export interface GameInfo {
   team: string;
+  opponent?: string;
   round: string;
   date: string;
 }

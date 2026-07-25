@@ -188,7 +188,7 @@ export default function SummaryScreen({
                     {gameInfo.round || 'Active Round'}
                   </span>
                   <p className="text-lg font-black text-[var(--ink)]">
-                    vs {gameInfo.team || 'Opponent'}
+                    {gameInfo.team ? `${gameInfo.team}${gameInfo.opponent ? ` vs ${gameInfo.opponent}` : ''}` : (gameInfo.opponent ? `vs ${gameInfo.opponent}` : 'Match Setup')}
                   </p>
                   <p className="text-xs text-[var(--muted)] font-semibold">
                     Date: {gameInfo.date}
