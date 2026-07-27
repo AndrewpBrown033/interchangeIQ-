@@ -26,9 +26,9 @@ export const POSITIONS: [string, string, number, number][] = [
   ['M2', 'M2', 62, 61],
 
   // Half Back Line
-  ['LHB', 'LHB', 24, 74],
+  ['LBF', 'LBF', 24, 74],
   ['CHB', 'CHB', 50, 74],
-  ['RHB', 'RHB', 76, 74],
+  ['RBF', 'RBF', 76, 74],
 
   // Full Back Line (Bottom End - Defending Goal)
   ['LBP', 'LBP', 27, 87],
@@ -39,7 +39,7 @@ export const POSITIONS: [string, string, number, number][] = [
 export const POSITION_GROUPS: Record<string, string[]> = {
   FWD: ['LFP', 'FF', 'RFP', 'LHF', 'CHF', 'RHF'],
   MID: ['LW', 'M1', 'RW', 'M2', 'M3'],
-  DEF: ['LHB', 'CHB', 'RHB', 'LBP', 'FB', 'RBP'],
+  DEF: ['LBF', 'CHB', 'RBF', 'LBP', 'FB', 'RBP'],
   RUCK: ['R'],
 };
 
@@ -50,15 +50,16 @@ export const POSITION_FULL_NAMES: Record<string, string> = {
   LHF: 'Left Half Forward',
   CHF: 'Centre Half Forward',
   RHF: 'Right Half Forward',
-  M1: 'Midfield 1 (Centre)',
-  M2: 'Midfield 2',
-  M3: 'Midfield 3',
+  M1: 'Center',
+  M2: 'Rover',
+  M3: 'Ruck Rover',
   R: 'Ruck',
   LW: 'Left Wing',
   RW: 'Right Wing',
-  LHB: 'Left Half Back',
-  CHB: 'Centre Half Back',
-  RHB: 'Right Half Back',
+  LBF: 'Left Back Flank',
+  RBF: 'Right Back Flank',
+  LHB: 'Left Back Flank (LBF)',
+  RHB: 'Right Back Flank (RBF)',
   LBP: 'Left Back Pocket',
   FB: 'Full Back',
   RBP: 'Right Back Pocket',
