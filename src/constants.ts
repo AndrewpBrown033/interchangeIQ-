@@ -3,43 +3,43 @@ import { Player, Drill, SkillAssessment } from './types';
 export const APP_VERSION = 'v1.4.0';
 
 export const POSITIONS: [string, string, number, number][] = [
-  // Full Back Line (Top)
-  ['RBP', 'RBP', 27, 13],
-  ['FB', 'FB', 50, 9],
-  ['LBP', 'LBP', 73, 13],
-
-  // Half Back Line
-  ['RHB', 'RHB', 24, 26],
-  ['CHB', 'CHB', 50, 26],
-  ['LHB', 'LHB', 76, 26],
-
-  // Midfield 1 (Center Top)
-  ['M3', 'M3', 38, 39],
-  ['M2', 'M2', 62, 39],
-
-  // Wings
-  ['RW', 'RW', 20, 50],
-  ['LW', 'LW', 80, 50],
-
-  // Midfield 2 / Ruck
-  ['M1', 'M1', 38, 61],
-  ['R', 'R', 62, 61],
+  // Full Forward Line (Top End - Attacking Goal)
+  ['LFP', 'LFP', 27, 13],
+  ['FF', 'FF', 50, 9],
+  ['RFP', 'RFP', 73, 13],
 
   // Half Forward Line
-  ['RHF', 'RHF', 24, 74],
-  ['CHF', 'CHF', 50, 74],
-  ['LHF', 'LHF', 76, 74],
+  ['LHF', 'LHF', 24, 26],
+  ['CHF', 'CHF', 50, 26],
+  ['RHF', 'RHF', 76, 26],
 
-  // Full Forward Line (Bottom)
-  ['RFP', 'RFP', 27, 87],
-  ['FF', 'FF', 50, 91],
-  ['LFP', 'LFP', 73, 87],
+  // Midfield 1 (Center Top)
+  ['M1', 'M1', 38, 39],
+  ['R', 'R', 62, 39],
+
+  // Wings
+  ['LW', 'LW', 20, 50],
+  ['RW', 'RW', 80, 50],
+
+  // Midfield 2 (Center Bottom)
+  ['M3', 'M3', 38, 61],
+  ['M2', 'M2', 62, 61],
+
+  // Half Back Line
+  ['LHB', 'LHB', 24, 74],
+  ['CHB', 'CHB', 50, 74],
+  ['RHB', 'RHB', 76, 74],
+
+  // Full Back Line (Bottom End - Defending Goal)
+  ['LBP', 'LBP', 27, 87],
+  ['FB', 'FB', 50, 91],
+  ['RBP', 'RBP', 73, 87],
 ];
 
 export const POSITION_GROUPS: Record<string, string[]> = {
-  FWD: ['RFP', 'FF', 'LFP', 'RHF', 'CHF', 'LHF'],
-  MID: ['RW', 'M3', 'LW', 'M1', 'M2'],
-  DEF: ['RHB', 'CHB', 'LHB', 'RBP', 'FB', 'LBP'],
+  FWD: ['LFP', 'FF', 'RFP', 'LHF', 'CHF', 'RHF'],
+  MID: ['LW', 'M1', 'RW', 'M2', 'M3'],
+  DEF: ['LHB', 'CHB', 'RHB', 'LBP', 'FB', 'RBP'],
   RUCK: ['R'],
 };
 

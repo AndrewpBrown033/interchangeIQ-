@@ -728,7 +728,7 @@ export default function TeamScreen({
                       <div className="fifty-arc-top"></div>
                       <div className="fifty-arc-bottom"></div>
 
-                      {/* AFL Goal Posts & Markings - Top End */}
+                      {/* AFL Goal Posts & Markings - Top End (Forwards) */}
                       <div className="goal-line-top"></div>
                       <div className="goal-square-top"></div>
                       <div className="goal-post behind top-left-behind"></div>
@@ -736,13 +736,21 @@ export default function TeamScreen({
                       <div className="goal-post main top-right-main"></div>
                       <div className="goal-post behind top-right-behind"></div>
 
-                      {/* AFL Goal Posts & Markings - Bottom End */}
+                      <div className="absolute top-1 left-1/2 -translate-x-1/2 z-10 pointer-events-none opacity-80 flex items-center gap-1 bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-red-300 tracking-wider border border-red-500/30">
+                        <span>🔥 Forwards / Attacking Goal</span>
+                      </div>
+
+                      {/* AFL Goal Posts & Markings - Bottom End (Defenders) */}
                       <div className="goal-line-bottom"></div>
                       <div className="goal-square-bottom"></div>
                       <div className="goal-post behind bottom-left-behind"></div>
                       <div className="goal-post main bottom-left-main"></div>
                       <div className="goal-post main bottom-right-main"></div>
                       <div className="goal-post behind bottom-right-behind"></div>
+
+                      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 pointer-events-none opacity-80 flex items-center gap-1 bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-emerald-300 tracking-wider border border-emerald-500/30">
+                        <span>🛡️ Defenders / Defending Goal</span>
+                      </div>
 
                       {/* Map slots & Heatmap Overlay */}
                       {POSITIONS.map(([slotName, label, x, y]) => {

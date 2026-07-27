@@ -311,7 +311,7 @@ export default function PlanModeView({
             <div className="fifty-arc-top"></div>
             <div className="fifty-arc-bottom"></div>
 
-            {/* AFL Goal Posts & Markings - Top End */}
+            {/* AFL Goal Posts & Markings - Top End (Forwards) */}
             <div className="goal-line-top" id="afl-goal-line-top"></div>
             <div className="goal-square-top" id="afl-goal-square-top"></div>
             <div className="goal-post behind top-left-behind" id="afl-goal-post-top-1"></div>
@@ -319,13 +319,21 @@ export default function PlanModeView({
             <div className="goal-post main top-right-main" id="afl-goal-post-top-3"></div>
             <div className="goal-post behind top-right-behind" id="afl-goal-post-top-4"></div>
 
-            {/* AFL Goal Posts & Markings - Bottom End */}
+            <div className="absolute top-1 left-1/2 -translate-x-1/2 z-10 pointer-events-none opacity-80 flex items-center gap-1 bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-red-300 tracking-wider border border-red-500/30">
+              <span>🔥 Forwards / Attacking Goal</span>
+            </div>
+
+            {/* AFL Goal Posts & Markings - Bottom End (Defenders) */}
             <div className="goal-line-bottom" id="afl-goal-line-bottom"></div>
             <div className="goal-square-bottom" id="afl-goal-square-bottom"></div>
             <div className="goal-post behind bottom-left-behind" id="afl-goal-post-bottom-1"></div>
             <div className="goal-post main bottom-left-main" id="afl-goal-post-bottom-2"></div>
             <div className="goal-post main bottom-right-main" id="afl-goal-post-bottom-3"></div>
             <div className="goal-post behind bottom-right-behind" id="afl-goal-post-bottom-4"></div>
+
+            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 pointer-events-none opacity-80 flex items-center gap-1 bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-emerald-300 tracking-wider border border-emerald-500/30">
+              <span>🛡️ Defenders / Defending Goal</span>
+            </div>
 
             {/* BOLD HIGH-CONTRAST DASHED CONNECTING ARROWS */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
