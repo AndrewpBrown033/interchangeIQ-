@@ -3,6 +3,7 @@ import { Player, Rotation, Plan, LineupTemplate } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
 import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers } from 'lucide-react';
 import PlanModeView from './PlanModeView';
+import ThreeWayRotationModal from './ThreeWayRotationModal';
 
 interface RotationsScreenProps {
   players: Player[];
@@ -35,6 +36,7 @@ export default function RotationsScreen({
     }
   }, [plans, selectedPlanId]);
   const [showRotationModal, setShowRotationModal] = useState(false);
+  const [showThreeWayModal, setShowThreeWayModal] = useState(false);
   const [showPlanMode, setShowPlanMode] = useState(false);
   const [editingRotation, setEditingRotation] = useState<Rotation | null>(null);
 
@@ -280,6 +282,13 @@ export default function RotationsScreen({
         </div>
         <div className="flex flex-wrap gap-2">
           <button
+            onClick={() => setShowThreeWayModal(true)}
+            className="px-3.5 py-2 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>3-Way Rotation Builder</span>
+          </button>
+          <button
             onClick={() => setShowPlanMode(true)}
             className="px-3.5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-600 text-black rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
@@ -380,16 +389,23 @@ export default function RotationsScreen({
                 Define timing triggers in goals quarters
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowThreeWayModal(true)}
+                className="px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-black rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>🔄 3-Way Generator</span>
+              </button>
               <button
                 onClick={handleOpenAddRotation}
-                className="px-3 py-1.5 text-xs font-bold bg-[var(--blue)] text-white rounded-lg hover:opacity-95 transition"
+                className="px-3 py-1.5 text-xs font-bold bg-[var(--blue)] text-white rounded-lg hover:opacity-95 transition cursor-pointer"
               >
                 + Add Rotation
               </button>
               <button
                 onClick={handleAutoBuild}
-                className="px-3 py-1.5 text-xs font-bold bg-purple-50 text-[#8B5CF6] border border-purple-100 rounded-lg hover:bg-purple-100 transition"
+                className="px-3 py-1.5 text-xs font-bold bg-purple-50 text-[#8B5CF6] border border-purple-100 rounded-lg hover:bg-purple-100 transition cursor-pointer"
               >
                 ⚡ Auto Build
               </button>
@@ -646,6 +662,19 @@ export default function RotationsScreen({
           </div>
         </div>
       )}
+
+      {/* Three Way Rotation Modal */}
+      <ThreeWayRotationModal
+        isOpen={showThreeWayModal}
+        onClose={() => setShowThreeWayModal(false)}
+        players={players}
+        lineup={lineup}
+        plans={plans}
+        currentPlanId={selectedPlanId}
+        onUpdatePlans={onUpdatePlans}
+        rotations={rotations}
+        onUpdateRotations={onUpdateRotations}
+      />
 
       {/* Visual Oval Plan Mode View Modal */}
       {showPlanMode && (

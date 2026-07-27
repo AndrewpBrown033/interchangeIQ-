@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Player, Rotation, Plan } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
+import ThreeWayRotationModal from './ThreeWayRotationModal';
 import {
   ArrowLeft,
   Trash2,
@@ -76,6 +77,7 @@ export default function PlanModeView({
   }, [plans, selectedPlanId]);
   const [selectedQuarter, setSelectedQuarter] = useState<number>(currentQuarter);
   const [selectedMinute, setSelectedMinute] = useState<number>(7);
+  const [showThreeWayModal, setShowThreeWayModal] = useState(false);
 
   // Link selection state for rotation linking
   const [selectedSource, setSelectedSource] = useState<{ type: 'bench' | 'field'; id: string; slot?: string } | null>(null);
@@ -204,8 +206,16 @@ export default function PlanModeView({
           </div>
         </div>
 
-        {/* Quarter Selector */}
+        {/* Quarter Selector & 3-Way Generator */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowThreeWayModal(true)}
+            className="px-2.5 py-1 text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-md transition cursor-pointer flex items-center gap-1 shadow-2xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>3-Way Generator</span>
+          </button>
+
           <div className="flex bg-slate-100 p-0.5 rounded-md gap-1">
             {[1, 2, 3, 4].map((q) => (
               <button
@@ -582,6 +592,19 @@ export default function PlanModeView({
         </div>
 
       </div>
+
+      {/* 3-Way Set Rotation Generator Modal */}
+      <ThreeWayRotationModal
+        isOpen={showThreeWayModal}
+        onClose={() => setShowThreeWayModal(false)}
+        players={players}
+        lineup={lineup}
+        plans={plans}
+        currentPlanId={selectedPlanId}
+        onUpdatePlans={onUpdatePlans}
+        rotations={rotations}
+        onUpdateRotations={onUpdateRotations}
+      />
     </div>
   );
 }

@@ -1421,19 +1421,6 @@ export default function App() {
           <span className="font-black text-sm tracking-tight text-[var(--navy)]">InterchangeIQ</span>
         </button>
         <div className="flex items-center gap-1.5">
-          {teams.length > 0 && (
-            <select
-              value={activeTeamId || ''}
-              onChange={(e) => handleSwitchTeam(e.target.value)}
-              className="bg-slate-50 border border-gray-200 rounded-lg px-2 py-1 text-[11px] font-black text-[var(--navy)] focus:outline-none max-w-[130px] truncate cursor-pointer"
-            >
-              {teams.map((t) => (
-                <option key={`mobile-team-${t.id}`} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          )}
           <button
             onClick={() => {
               localStorage.removeItem('iiq_authenticated');
@@ -1447,7 +1434,7 @@ export default function App() {
           </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-gray-500 hover:text-gray-700"
+            className="p-2 text-gray-500 hover:text-gray-700 cursor-pointer"
           >
             <Menu className="w-6 h-6" />
           </button>
