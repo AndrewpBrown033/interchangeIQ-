@@ -1621,6 +1621,7 @@ export default function App() {
             onTogglePlanRunning={handleTogglePlanRunning}
             lineup={lineup}
             onUpdateLineup={setLineup}
+            onNavigate={handleSelectTab}
           />
         )}
         {activeTab === 'jarvis' && (

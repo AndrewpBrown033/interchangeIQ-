@@ -43,6 +43,36 @@ export const POSITION_GROUPS: Record<string, string[]> = {
   RUCK: ['R'],
 };
 
+export const POSITION_FULL_NAMES: Record<string, string> = {
+  LFP: 'Left Forward Pocket',
+  FF: 'Full Forward',
+  RFP: 'Right Forward Pocket',
+  LHF: 'Left Half Forward',
+  CHF: 'Centre Half Forward',
+  RHF: 'Right Half Forward',
+  M1: 'Midfield 1 (Centre)',
+  M2: 'Midfield 2',
+  M3: 'Midfield 3',
+  R: 'Ruck',
+  LW: 'Left Wing',
+  RW: 'Right Wing',
+  LHB: 'Left Half Back',
+  CHB: 'Centre Half Back',
+  RHB: 'Right Half Back',
+  LBP: 'Left Back Pocket',
+  FB: 'Full Back',
+  RBP: 'Right Back Pocket',
+  'FP-L': 'Forward Pocket Left',
+  'FP-R': 'Forward Pocket Right',
+  'HF-L': 'Half Forward Left',
+  'HF-R': 'Half Forward Right',
+  'HB-L': 'Half Back Left',
+  'HB-R': 'Half Back Right',
+  'BP-L': 'Back Pocket Left',
+  'BP-R': 'Back Pocket Right',
+  C: 'Centre',
+};
+
 export const DEFAULT_PLAYERS: Player[] = [
   { id: 'p1', name: 'Alex Morgan', nick: '', number: '7', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1980, bench: 720, note: '', slotTimes: { 'C': 1200, 'ROV': 480, 'RR': 300 } },
   { id: 'p2', name: 'Bella Hart', nick: '', number: '12', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1620, bench: 1080, note: '', slotTimes: { 'FF': 1020, 'FP-L': 600 } },

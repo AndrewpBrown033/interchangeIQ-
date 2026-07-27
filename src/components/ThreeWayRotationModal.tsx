@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Player, Rotation, Plan } from '../types';
-import { RefreshCw, Clock, Users, ShieldAlert, CheckCircle2, Sparkles, Layers, ArrowRight, X } from 'lucide-react';
+import { POSITION_FULL_NAMES } from '../constants';
+import { RefreshCw, Clock, Users, ShieldAlert, Sparkles, Layers, ArrowRight, X } from 'lucide-react';
 
 interface ThreeWayRotationModalProps {
   isOpen: boolean;
@@ -33,6 +34,28 @@ export default function ThreeWayRotationModal({
   const fieldPlayers = availablePlayers.filter((p) => onFieldIds.has(p.id));
   const benchPlayers = availablePlayers.filter((p) => !onFieldIds.has(p.id));
 
+  // Helper to resolve player's position from Game Day starting lineup template
+  const getPlayerPosLabel = (playerId: string) => {
+    const slotKey = Object.keys(lineup).find((k) => lineup[k] === playerId);
+    if (slotKey) {
+      const fullName = POSITION_FULL_NAMES[slotKey] || slotKey;
+      return {
+        slotKey,
+        fullName,
+        isOnField: true,
+        text: `${slotKey} (${fullName})`,
+      };
+    }
+    const p = players.find((pl) => pl.id === playerId);
+    const zones = p?.positions?.length ? p.positions.join('/') : (p?.primaryZone || 'Bench');
+    return {
+      slotKey: null,
+      fullName: `Bench (${zones})`,
+      isOnField: false,
+      text: `Bench (${zones})`,
+    };
+  };
+
   // Default player selections
   const [p1Id, setP1Id] = useState<string>(() => fieldPlayers[0]?.id || availablePlayers[0]?.id || '');
   const [p2Id, setP2Id] = useState<string>(() => fieldPlayers[1]?.id || availablePlayers[1]?.id || '');
@@ -53,6 +76,10 @@ export default function ThreeWayRotationModal({
   const p1 = players.find((p) => p.id === p1Id);
   const p2 = players.find((p) => p.id === p2Id);
   const p3 = players.find((p) => p.id === p3Id);
+
+  const p1Pos = p1 ? getPlayerPosLabel(p1.id) : null;
+  const p2Pos = p2 ? getPlayerPosLabel(p2.id) : null;
+  const p3Pos = p3 ? getPlayerPosLabel(p3.id) : null;
 
   // Auto pick smart default players
   const handleAutoPick = () => {
@@ -88,13 +115,14 @@ export default function ThreeWayRotationModal({
       for (let min = intervalMinutes; min <= quarterLength; min += intervalMinutes) {
         const outPlayer = field[offIndex];
         const inPlayer = bench;
+        const outPos = getPlayerPosLabel(outPlayer.id);
 
         scheduleByQuarter.push({
           quarter: q,
           minute: min,
           outP: outPlayer,
           inP: inPlayer,
-          note: `3-Way Rotation: #${outPlayer.number} ${outPlayer.name} ➔ Bench | #${inPlayer.number} ${inPlayer.name} ➔ Field`,
+          note: `3-Way Rotation${outPos.slotKey ? ` [${outPos.slotKey}]` : ''}: #${outPlayer.number} ${outPlayer.name} ➔ Bench | #${inPlayer.number} ${inPlayer.name} ➔ Field`,
         });
 
         // Update active positions for next interval
@@ -203,7 +231,7 @@ export default function ThreeWayRotationModal({
 
           {/* Section 1: Player Selection */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <label className="text-xs font-black uppercase tracking-wider text-[var(--navy)] flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-[var(--blue)]" />
                 <span>Select 3 Players for Rotation Group</span>
@@ -211,11 +239,27 @@ export default function ThreeWayRotationModal({
               <button
                 type="button"
                 onClick={handleAutoPick}
-                className="px-2.5 py-1 text-[11px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition cursor-pointer flex items-center gap-1"
+                className="px-2.5 py-1 text-[11px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition cursor-pointer flex items-center gap-1 self-start sm:self-auto"
               >
                 <Sparkles className="w-3 h-3" />
                 <span>Auto-Select First 3</span>
               </button>
+            </div>
+
+            {/* Starting Lineup Template Banner */}
+            <div className="bg-blue-50/80 border border-blue-200 p-2.5 rounded-xl flex items-center justify-between text-xs text-blue-950 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-blue-600 shrink-0" />
+                <div>
+                  <span className="font-extrabold text-blue-900">Game Day Position Template: </span>
+                  <span className="font-semibold text-blue-800">
+                    {Object.keys(lineup).length} positions mapped on field
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded-md shrink-0">
+                Active Lineup
+              </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -230,12 +274,25 @@ export default function ThreeWayRotationModal({
                   className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="">Select Player A</option>
-                  {availablePlayers.map((p) => (
-                    <option key={`p1-${p.id}`} value={p.id}>
-                      #{p.number} {p.name} {onFieldIds.has(p.id) ? '(Field)' : '(Bench)'}
-                    </option>
-                  ))}
+                  {availablePlayers.map((p) => {
+                    const pos = getPlayerPosLabel(p.id);
+                    return (
+                      <option key={`p1-${p.id}`} value={p.id}>
+                        #{p.number} {p.name} {pos.isOnField ? `— ${pos.slotKey} (${pos.fullName})` : `— Bench`}
+                      </option>
+                    );
+                  })}
                 </select>
+                {p1 && p1Pos && (
+                  <div className="mt-1.5 p-2 bg-emerald-50/90 border border-emerald-200 rounded-lg text-[11px] font-bold text-emerald-950 flex items-center justify-between shadow-2xs">
+                    <span className="truncate pr-1">
+                      📍 {p1Pos.isOnField ? `${p1Pos.slotKey} - ${p1Pos.fullName}` : p1Pos.text}
+                    </span>
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p1Pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>
+                      {p1Pos.isOnField ? 'Field' : 'Bench'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Player 2 (Field) */}
@@ -249,12 +306,25 @@ export default function ThreeWayRotationModal({
                   className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="">Select Player B</option>
-                  {availablePlayers.map((p) => (
-                    <option key={`p2-${p.id}`} value={p.id}>
-                      #{p.number} {p.name} {onFieldIds.has(p.id) ? '(Field)' : '(Bench)'}
-                    </option>
-                  ))}
+                  {availablePlayers.map((p) => {
+                    const pos = getPlayerPosLabel(p.id);
+                    return (
+                      <option key={`p2-${p.id}`} value={p.id}>
+                        #{p.number} {p.name} {pos.isOnField ? `— ${pos.slotKey} (${pos.fullName})` : `— Bench`}
+                      </option>
+                    );
+                  })}
                 </select>
+                {p2 && p2Pos && (
+                  <div className="mt-1.5 p-2 bg-emerald-50/90 border border-emerald-200 rounded-lg text-[11px] font-bold text-emerald-950 flex items-center justify-between shadow-2xs">
+                    <span className="truncate pr-1">
+                      📍 {p2Pos.isOnField ? `${p2Pos.slotKey} - ${p2Pos.fullName}` : p2Pos.text}
+                    </span>
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p2Pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>
+                      {p2Pos.isOnField ? 'Field' : 'Bench'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Player 3 (Bench) */}
@@ -268,12 +338,25 @@ export default function ThreeWayRotationModal({
                   className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="">Select Player C</option>
-                  {availablePlayers.map((p) => (
-                    <option key={`p3-${p.id}`} value={p.id}>
-                      #{p.number} {p.name} {!onFieldIds.has(p.id) ? '(Bench)' : '(Field)'}
-                    </option>
-                  ))}
+                  {availablePlayers.map((p) => {
+                    const pos = getPlayerPosLabel(p.id);
+                    return (
+                      <option key={`p3-${p.id}`} value={p.id}>
+                        #{p.number} {p.name} {pos.isOnField ? `— ${pos.slotKey} (${pos.fullName})` : `— Bench`}
+                      </option>
+                    );
+                  })}
                 </select>
+                {p3 && p3Pos && (
+                  <div className="mt-1.5 p-2 bg-amber-50/90 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-950 flex items-center justify-between shadow-2xs">
+                    <span className="truncate pr-1">
+                      📍 {p3Pos.isOnField ? `${p3Pos.slotKey} - ${p3Pos.fullName}` : p3Pos.text}
+                    </span>
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p3Pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'}`}>
+                      {p3Pos.isOnField ? 'Field' : 'Bench'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

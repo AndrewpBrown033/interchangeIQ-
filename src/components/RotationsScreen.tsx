@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Player, Rotation, Plan, LineupTemplate } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
-import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers } from 'lucide-react';
+import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers, ArrowLeft } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 import ThreeWayRotationModal from './ThreeWayRotationModal';
 
@@ -15,6 +15,7 @@ interface RotationsScreenProps {
   onTogglePlanRunning: (planId: string) => void;
   lineup: Record<string, string>;
   onUpdateLineup: (lineup: Record<string, string>) => void;
+  onNavigate?: (tab: string) => void;
 }
 
 export default function RotationsScreen({
@@ -27,6 +28,7 @@ export default function RotationsScreen({
   onTogglePlanRunning,
   lineup,
   onUpdateLineup,
+  onNavigate,
 }: RotationsScreenProps) {
   const [selectedPlanId, setSelectedPlanId] = useState<string>(plans[0]?.id || '');
 
@@ -274,13 +276,33 @@ export default function RotationsScreen({
     <div className="space-y-6">
       {/* Top action header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
-        <div>
-          <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Rotations</h2>
-          <p className="text-xs text-[var(--muted)] font-semibold mt-1">
-            Build multi-quarter, time-scheduled rotation plans for Game Day alerts
-          </p>
+        <div className="flex items-center gap-3">
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('gameday')}
+              className="p-2 text-slate-700 hover:text-[var(--navy)] bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer flex items-center justify-center shrink-0"
+              title="Return to Game Day"
+            >
+              <ArrowLeft className="w-5 h-5 text-[var(--navy)]" />
+            </button>
+          )}
+          <div>
+            <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Rotations</h2>
+            <p className="text-xs text-[var(--muted)] font-semibold mt-0.5">
+              Build multi-quarter, time-scheduled rotation plans for Game Day alerts
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('gameday')}
+              className="px-3.5 py-2 text-xs font-black bg-[var(--navy)] hover:bg-[var(--navy)]/90 text-white rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 text-amber-400" />
+              <span>Back to Game Day</span>
+            </button>
+          )}
           <button
             onClick={() => setShowThreeWayModal(true)}
             className="px-3.5 py-2 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
