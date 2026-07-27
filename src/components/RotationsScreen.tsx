@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, Rotation, Plan, LineupTemplate } from '../types';
-import { POSITIONS, POSITION_GROUPS } from '../constants';
+import { POSITIONS, POSITION_GROUPS, POSITION_FULL_NAMES } from '../constants';
 import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers, ArrowLeft } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 import ThreeWayRotationModal from './ThreeWayRotationModal';
@@ -52,6 +52,28 @@ export default function RotationsScreen({
   const [formError, setFormError] = useState<string>('');
 
   const currentPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || null;
+
+  // Helper to resolve player's position from Game Day starting lineup template
+  const getPlayerPosLabel = (playerId: string) => {
+    const slotKey = Object.keys(lineup).find((k) => lineup[k] === playerId);
+    if (slotKey) {
+      const fullName = POSITION_FULL_NAMES[slotKey] || slotKey;
+      return {
+        slotKey,
+        fullName,
+        isOnField: true,
+        text: `${slotKey} (${fullName})`,
+      };
+    }
+    const p = players.find((pl) => pl.id === playerId);
+    const zones = p?.positions?.length ? p.positions.join('/') : (p?.primaryZone || 'Bench');
+    return {
+      slotKey: null,
+      fullName: `Bench (${zones})`,
+      isOnField: false,
+      text: `Bench (${zones})`,
+    };
+  };
 
   // Group current plan's rotations by Quarter
   const planRotations = rotations
@@ -195,8 +217,14 @@ export default function RotationsScreen({
 
     if (!outPlayer || !inPlayer) return;
 
-    const outText = formType === 'bench' ? `OFF #${outPlayer.number} ${outPlayer.name}` : `Pos A #${outPlayer.number} ${outPlayer.name}`;
-    const inText = formType === 'bench' ? `ON #${inPlayer.number} ${inPlayer.name}` : `Pos B #${inPlayer.number} ${inPlayer.name}`;
+    const outPos = getPlayerPosLabel(outPlayer.id);
+    const inPos = getPlayerPosLabel(inPlayer.id);
+
+    const outPosTag = outPos.slotKey ? ` [${outPos.slotKey}]` : '';
+    const inPosTag = inPos.slotKey ? ` [${inPos.slotKey}]` : '';
+
+    const outText = formType === 'bench' ? `OFF${outPosTag} #${outPlayer.number} ${outPlayer.name}` : `Pos A${outPosTag} #${outPlayer.number} ${outPlayer.name}`;
+    const inText = formType === 'bench' ? `ON${inPosTag} #${inPlayer.number} ${inPlayer.name}` : `Pos B${inPosTag} #${inPlayer.number} ${inPlayer.name}`;
 
     if (editingRotation) {
       const firstQ = selectedQuarters[0];
@@ -609,14 +637,27 @@ export default function RotationsScreen({
                 <select
                   value={formType}
                   onChange={(e) => setFormType(e.target.value as 'bench' | 'onfield')}
-                  className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)]"
+                  className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)] cursor-pointer"
                 >
                   <option value="bench">Bench interchange (OFF field player ➔ ON bench player)</option>
                   <option value="onfield">On-field swap (Move positions between two active players)</option>
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Starting Lineup Template Banner */}
+              <div className="bg-blue-50/80 border border-blue-200 p-2.5 rounded-xl flex items-center justify-between text-xs text-blue-950 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-600 shrink-0" />
+                  <div>
+                    <span className="font-extrabold text-blue-900">Game Day Positions: </span>
+                    <span className="font-semibold text-blue-800">
+                      Mapped from current starting lineup template
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Out Player */}
                 <div>
                   <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
@@ -625,13 +666,31 @@ export default function RotationsScreen({
                   <select
                     value={formOutId}
                     onChange={(e) => setFormOutId(e.target.value)}
-                    className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)]"
+                    className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)] cursor-pointer"
                   >
                     <option value="">Select player</option>
-                    {fieldPlayers.map((p) => (
-                      <option key={p.id} value={p.id}>#{p.number} {p.name}</option>
-                    ))}
+                    {fieldPlayers.map((p) => {
+                      const pos = getPlayerPosLabel(p.id);
+                      return (
+                        <option key={p.id} value={p.id}>
+                          #{p.number} {p.name} {pos.isOnField ? `— ${pos.slotKey} (${pos.fullName})` : `— Bench`}
+                        </option>
+                      );
+                    })}
                   </select>
+                  {formOutId && (() => {
+                    const pos = getPlayerPosLabel(formOutId);
+                    return (
+                      <div className="mt-1.5 p-2 bg-emerald-50/90 border border-emerald-200 rounded-lg text-[11px] font-bold text-emerald-950 flex items-center justify-between shadow-2xs">
+                        <span className="truncate pr-1">
+                          📍 {pos.isOnField ? `${pos.slotKey} - ${pos.fullName}` : pos.text}
+                        </span>
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>
+                          {pos.isOnField ? 'Field' : 'Bench'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* In Player */}
@@ -642,13 +701,31 @@ export default function RotationsScreen({
                   <select
                     value={formInId}
                     onChange={(e) => setFormInId(e.target.value)}
-                    className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)]"
+                    className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)] cursor-pointer"
                   >
                     <option value="">Select player</option>
-                    {(formType === 'bench' ? benchPlayers : fieldPlayers).map((p) => (
-                      <option key={p.id} value={p.id}>#{p.number} {p.name}</option>
-                    ))}
+                    {(formType === 'bench' ? benchPlayers : fieldPlayers).map((p) => {
+                      const pos = getPlayerPosLabel(p.id);
+                      return (
+                        <option key={p.id} value={p.id}>
+                          #{p.number} {p.name} {pos.isOnField ? `— ${pos.slotKey} (${pos.fullName})` : `— Bench`}
+                        </option>
+                      );
+                    })}
                   </select>
+                  {formInId && (() => {
+                    const pos = getPlayerPosLabel(formInId);
+                    return (
+                      <div className="mt-1.5 p-2 bg-amber-50/90 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-950 flex items-center justify-between shadow-2xs">
+                        <span className="truncate pr-1">
+                          📍 {pos.isOnField ? `${pos.slotKey} - ${pos.fullName}` : pos.text}
+                        </span>
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'}`}>
+                          {pos.isOnField ? 'Field' : 'Bench'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
