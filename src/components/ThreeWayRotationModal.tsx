@@ -3,6 +3,17 @@ import { Player, Rotation, Plan } from '../types';
 import { POSITION_FULL_NAMES } from '../constants';
 import { RefreshCw, Clock, Users, ShieldAlert, Sparkles, Layers, ArrowRight, X } from 'lucide-react';
 
+export interface ThreeWayGroupEditData {
+  groupId?: string;
+  p1Id?: string;
+  p2Id?: string;
+  p3Id?: string;
+  intervalMinutes?: number;
+  quarterLength?: number;
+  selectedQuarters?: number[];
+  planId?: string;
+}
+
 interface ThreeWayRotationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -13,6 +24,7 @@ interface ThreeWayRotationModalProps {
   onUpdatePlans: (plans: Plan[]) => void;
   rotations: Rotation[];
   onUpdateRotations: (rotations: Rotation[]) => void;
+  editingGroupData?: ThreeWayGroupEditData | null;
 }
 
 export default function ThreeWayRotationModal({
@@ -25,6 +37,7 @@ export default function ThreeWayRotationModal({
   onUpdatePlans,
   rotations,
   onUpdateRotations,
+  editingGroupData,
 }: ThreeWayRotationModalProps) {
   if (!isOpen) return null;
 
@@ -57,21 +70,52 @@ export default function ThreeWayRotationModal({
   };
 
   // Default player selections
-  const [p1Id, setP1Id] = useState<string>(() => fieldPlayers[0]?.id || availablePlayers[0]?.id || '');
-  const [p2Id, setP2Id] = useState<string>(() => fieldPlayers[1]?.id || availablePlayers[1]?.id || '');
-  const [p3Id, setP3Id] = useState<string>(() => benchPlayers[0]?.id || availablePlayers[2]?.id || '');
+  const [p1Id, setP1Id] = React.useState<string>(
+    editingGroupData?.p1Id || fieldPlayers[0]?.id || availablePlayers[0]?.id || ''
+  );
+  const [p2Id, setP2Id] = React.useState<string>(
+    editingGroupData?.p2Id || fieldPlayers[1]?.id || availablePlayers[1]?.id || ''
+  );
+  const [p3Id, setP3Id] = React.useState<string>(
+    editingGroupData?.p3Id || benchPlayers[0]?.id || availablePlayers[2]?.id || ''
+  );
 
   // Setup options
-  const [intervalMinutes, setIntervalMinutes] = useState<number>(5);
-  const [quarterLength, setQuarterLength] = useState<number>(20);
-  const [selectedQuarters, setSelectedQuarters] = useState<number[]>([1, 2, 3, 4]);
-  const [targetPlanOption, setTargetPlanOption] = useState<'new' | 'current'>(
+  const [intervalMinutes, setIntervalMinutes] = React.useState<number>(
+    editingGroupData?.intervalMinutes || 5
+  );
+  const [quarterLength, setQuarterLength] = React.useState<number>(
+    editingGroupData?.quarterLength || 20
+  );
+  const [selectedQuarters, setSelectedQuarters] = React.useState<number[]>(
+    editingGroupData?.selectedQuarters || [1, 2, 3, 4]
+  );
+  const [targetPlanOption, setTargetPlanOption] = React.useState<'new' | 'current'>(
     plans.length > 0 ? 'current' : 'new'
   );
-  const [selectedExistingPlanId, setSelectedExistingPlanId] = useState<string>(currentPlanId || plans[0]?.id || '');
-  const [newPlanName, setNewPlanName] = useState<string>('5-Min 3-Way Rotation Plan');
-  const [replaceExisting, setReplaceExisting] = useState<boolean>(true);
-  const [validationError, setValidationError] = useState<string>('');
+  const [selectedExistingPlanId, setSelectedExistingPlanId] = React.useState<string>(
+    editingGroupData?.planId || currentPlanId || plans[0]?.id || ''
+  );
+  const [newPlanName, setNewPlanName] = React.useState<string>('5-Min 3-Way Rotation Plan');
+  const [replaceExisting, setReplaceExisting] = React.useState<boolean>(
+    editingGroupData?.groupId ? false : true
+  );
+  const [validationError, setValidationError] = React.useState<string>('');
+
+  React.useEffect(() => {
+    if (editingGroupData) {
+      if (editingGroupData.p1Id) setP1Id(editingGroupData.p1Id);
+      if (editingGroupData.p2Id) setP2Id(editingGroupData.p2Id);
+      if (editingGroupData.p3Id) setP3Id(editingGroupData.p3Id);
+      if (editingGroupData.intervalMinutes) setIntervalMinutes(editingGroupData.intervalMinutes);
+      if (editingGroupData.quarterLength) setQuarterLength(editingGroupData.quarterLength);
+      if (editingGroupData.selectedQuarters?.length) setSelectedQuarters(editingGroupData.selectedQuarters);
+      if (editingGroupData.planId) {
+        setTargetPlanOption('current');
+        setSelectedExistingPlanId(editingGroupData.planId);
+      }
+    }
+  }, [editingGroupData]);
 
   const p1 = players.find((p) => p.id === p1Id);
   const p2 = players.find((p) => p.id === p2Id);
@@ -165,6 +209,8 @@ export default function ThreeWayRotationModal({
       planIdToUse = generatedPlanId;
     }
 
+    const groupIdToUse = editingGroupData?.groupId || `group-3way-${Date.now()}`;
+
     // Convert preview schedule to Rotation objects
     const newRotations: Rotation[] = previewSchedule.map((item) => ({
       id: `rot-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -179,9 +225,19 @@ export default function ThreeWayRotationModal({
       note: item.note,
       applied: false,
       status: 'scheduled',
+      groupId: groupIdToUse,
+      groupType: '3-way',
+      groupP1Id: p1.id,
+      groupP2Id: p2.id,
+      groupP3Id: p3.id,
+      groupInterval: intervalMinutes,
     }));
 
-    if (replaceExisting) {
+    if (editingGroupData?.groupId) {
+      // Remove previous group rotations across plans/same plan and replace with updated set
+      const otherRotations = rotations.filter((r) => r.groupId !== editingGroupData.groupId);
+      onUpdateRotations([...otherRotations, ...newRotations]);
+    } else if (replaceExisting) {
       const otherRotations = rotations.filter((r) => r.planId !== planIdToUse);
       onUpdateRotations([...otherRotations, ...newRotations]);
     } else {
@@ -202,13 +258,15 @@ export default function ThreeWayRotationModal({
             </div>
             <div>
               <h3 className="font-black text-base tracking-tight text-white flex items-center gap-2">
-                <span>3-Way Set Rotation Generator</span>
+                <span>{editingGroupData ? 'Edit 3-Way Rotation Group' : '3-Way Set Rotation Generator'}</span>
                 <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-amber-500 text-black rounded-md">
-                  5-Min Cycle
+                  {intervalMinutes}-Min Cycle
                 </span>
               </h3>
               <p className="text-xs text-slate-300 font-medium">
-                Continuous 3-girl rotation between 2 field positions & 1 bench spot
+                {editingGroupData
+                  ? 'Modify players, cycle interval, or active quarters for this 3-way set'
+                  : 'Continuous 3-girl rotation between 2 field positions & 1 bench spot'}
               </p>
             </div>
           </div>

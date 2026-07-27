@@ -1,9 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Player, Rotation, Plan, LineupTemplate } from '../types';
 import { POSITIONS, POSITION_GROUPS, POSITION_FULL_NAMES } from '../constants';
 import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers, ArrowLeft } from 'lucide-react';
 import PlanModeView from './PlanModeView';
-import ThreeWayRotationModal from './ThreeWayRotationModal';
+import ThreeWayRotationModal, { ThreeWayGroupEditData } from './ThreeWayRotationModal';
+
+interface ThreeWayGroupInfo {
+  groupId: string;
+  p1: Player | undefined;
+  p2: Player | undefined;
+  p3: Player | undefined;
+  p1Id: string;
+  p2Id: string;
+  p3Id: string;
+  intervalMinutes: number;
+  quarters: number[];
+  rotations: Rotation[];
+}
+
+const getThreeWayGroups = (planRotations: Rotation[], players: Player[]): ThreeWayGroupInfo[] => {
+  const groupsMap = new Map<string, Rotation[]>();
+
+  planRotations.forEach((r) => {
+    if (r.groupId) {
+      if (!groupsMap.has(r.groupId)) groupsMap.set(r.groupId, []);
+      groupsMap.get(r.groupId)!.push(r);
+    } else if (r.note && (r.note.includes('3-Way Rotation') || r.note.includes('3-Way Set'))) {
+      const fallbackKey = `legacy-3way-${r.planId}`;
+      if (!groupsMap.has(fallbackKey)) groupsMap.set(fallbackKey, []);
+      groupsMap.get(fallbackKey)!.push(r);
+    }
+  });
+
+  const result: ThreeWayGroupInfo[] = [];
+
+  groupsMap.forEach((rots, gId) => {
+    if (rots.length === 0) return;
+    const first = rots[0];
+
+    let p1Id = first.groupP1Id || '';
+    let p2Id = first.groupP2Id || '';
+    let p3Id = first.groupP3Id || '';
+    let intervalMinutes = first.groupInterval || 5;
+
+    if (!p1Id || !p2Id || !p3Id) {
+      const allPlayerIds = new Set<string>();
+      rots.forEach((r) => {
+        if (r.outId) allPlayerIds.add(r.outId);
+        if (r.inId) allPlayerIds.add(r.inId);
+      });
+      const ids = Array.from(allPlayerIds);
+      p1Id = ids[0] || '';
+      p2Id = ids[1] || '';
+      p3Id = ids[2] || '';
+
+      const minMinute = Math.min(...rots.map((r) => r.minute));
+      if (minMinute > 0) intervalMinutes = minMinute;
+    }
+
+    const quarters = Array.from(new Set(rots.map((r) => r.quarter))).sort((a, b) => a - b);
+
+    result.push({
+      groupId: gId,
+      p1: players.find((p) => p.id === p1Id),
+      p2: players.find((p) => p.id === p2Id),
+      p3: players.find((p) => p.id === p3Id),
+      p1Id,
+      p2Id,
+      p3Id,
+      intervalMinutes,
+      quarters,
+      rotations: rots,
+    });
+  });
+
+  return result;
+};
 
 interface RotationsScreenProps {
   players: Player[];
@@ -39,6 +111,7 @@ export default function RotationsScreen({
   }, [plans, selectedPlanId]);
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [showThreeWayModal, setShowThreeWayModal] = useState(false);
+  const [editingThreeWayData, setEditingThreeWayData] = useState<ThreeWayGroupEditData | null>(null);
   const [showPlanMode, setShowPlanMode] = useState(false);
   const [editingRotation, setEditingRotation] = useState<Rotation | null>(null);
 
@@ -79,6 +152,34 @@ export default function RotationsScreen({
   const planRotations = rotations
     .filter((r) => r.planId === (currentPlan?.id || ''))
     .sort((a, b) => a.quarter - b.quarter || a.minute - b.minute);
+
+  const threeWayGroups = useMemo(() => {
+    return getThreeWayGroups(planRotations, players);
+  }, [planRotations, players]);
+
+  const handleOpenCreateThreeWay = () => {
+    setEditingThreeWayData(null);
+    setShowThreeWayModal(true);
+  };
+
+  const handleOpenEditThreeWayGroup = (group: ThreeWayGroupInfo) => {
+    setEditingThreeWayData({
+      groupId: group.groupId,
+      p1Id: group.p1Id,
+      p2Id: group.p2Id,
+      p3Id: group.p3Id,
+      intervalMinutes: group.intervalMinutes,
+      selectedQuarters: group.quarters,
+      planId: currentPlan?.id,
+    });
+    setShowThreeWayModal(true);
+  };
+
+  const handleDeleteThreeWayGroup = (group: ThreeWayGroupInfo) => {
+    if (!window.confirm('Delete this full 3-Way rotation set and all its scheduled swaps?')) return;
+    const idsToDelete = new Set(group.rotations.map((r) => r.id));
+    onUpdateRotations(rotations.filter((r) => !idsToDelete.has(r.id) && r.groupId !== group.groupId));
+  };
 
   const handleCreatePlan = () => {
     const name = prompt('Enter plan name:', `Q${plans.length + 1} Rotation`);
@@ -332,7 +433,7 @@ export default function RotationsScreen({
             </button>
           )}
           <button
-            onClick={() => setShowThreeWayModal(true)}
+            onClick={handleOpenCreateThreeWay}
             className="px-3.5 py-2 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
@@ -441,7 +542,7 @@ export default function RotationsScreen({
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setShowThreeWayModal(true)}
+                onClick={handleOpenCreateThreeWay}
                 className="px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-black rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -462,6 +563,161 @@ export default function RotationsScreen({
             </div>
           </div>
 
+          {/* Active 3-Way Rotation Groups Overview */}
+          {threeWayGroups.length > 0 && (
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 rounded-2xl border border-indigo-500/30 text-white shadow-md space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                    <RefreshCw className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm text-white tracking-tight">
+                      Active 3-Way Rotation Sets ({threeWayGroups.length})
+                    </h4>
+                    <p className="text-[11px] text-slate-300 font-medium">
+                      Managed as synchronized 3-player continuous interchange sets
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleOpenCreateThreeWay}
+                  className="px-3 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-400 text-black rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New 3-Way Set</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {threeWayGroups.map((group, idx) => {
+                  const p1Pos = group.p1 ? getPlayerPosLabel(group.p1.id) : null;
+                  const p2Pos = group.p2 ? getPlayerPosLabel(group.p2.id) : null;
+                  const p3Pos = group.p3 ? getPlayerPosLabel(group.p3.id) : null;
+
+                  return (
+                    <div
+                      key={group.groupId || idx}
+                      className="bg-slate-800/90 border border-slate-700/80 p-3.5 rounded-xl space-y-3 text-xs"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700 pb-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-black text-[10px] uppercase border border-indigo-500/30">
+                            3-Way Group
+                          </span>
+                          <span className="font-extrabold text-amber-400">
+                            ⚡ {group.intervalMinutes}-Min Intervals
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-extrabold text-slate-200">
+                            Quarters: {group.quarters.map((q) => `Q${q}`).join(', ')}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-bold text-slate-300">
+                            {group.rotations.length} total scheduled swaps
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleOpenEditThreeWayGroup(group)}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Edit Full 3-Way Set</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteThreeWayGroup(group)}
+                            className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 transition cursor-pointer"
+                            title="Delete full 3-way rotation set"
+                          >
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 3 Players Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="bg-slate-900/90 border border-slate-700 p-2.5 rounded-lg space-y-1">
+                          <div className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
+                            Player A (Field)
+                          </div>
+                          {group.p1 ? (
+                            <div className="font-black text-white text-xs truncate">
+                              #{group.p1.number} {group.p1.name}
+                            </div>
+                          ) : (
+                            <div className="text-slate-400 font-semibold">Unknown</div>
+                          )}
+                          <div className="text-[10px] font-extrabold text-slate-300">
+                            📍 {p1Pos ? p1Pos.text : 'Position'}
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-900/90 border border-slate-700 p-2.5 rounded-lg space-y-1">
+                          <div className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
+                            Player B (Field)
+                          </div>
+                          {group.p2 ? (
+                            <div className="font-black text-white text-xs truncate">
+                              #{group.p2.number} {group.p2.name}
+                            </div>
+                          ) : (
+                            <div className="text-slate-400 font-semibold">Unknown</div>
+                          )}
+                          <div className="text-[10px] font-extrabold text-slate-300">
+                            📍 {p2Pos ? p2Pos.text : 'Position'}
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-900/90 border border-slate-700 p-2.5 rounded-lg space-y-1">
+                          <div className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
+                            Player C (Bench Start)
+                          </div>
+                          {group.p3 ? (
+                            <div className="font-black text-white text-xs truncate">
+                              #{group.p3.number} {group.p3.name}
+                            </div>
+                          ) : (
+                            <div className="text-slate-400 font-semibold">Unknown</div>
+                          )}
+                          <div className="text-[10px] font-extrabold text-slate-300">
+                            📍 {p3Pos ? p3Pos.text : 'Bench'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sequence Timeline Preview */}
+                      <details className="group/sched">
+                        <summary className="cursor-pointer text-[11px] font-black text-amber-400 hover:text-amber-300 flex items-center justify-between py-1 select-none">
+                          <span>View Full Swap Schedule Matrix ({group.rotations.length} swaps)</span>
+                          <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300 group-open/sched:rotate-180 transition-transform">
+                            ▼
+                          </span>
+                        </summary>
+                        <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                          {group.rotations.map((r) => (
+                            <div
+                              key={r.id}
+                              className="bg-slate-900/70 border border-slate-700/60 p-2 rounded text-[11px] flex items-center justify-between font-mono"
+                            >
+                              <span className="font-black text-amber-400">
+                                Q{r.quarter} @ {r.minute}m
+                              </span>
+                              <span className="text-slate-200 truncate pl-2">
+                                {r.out} ➔ {r.inn}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Group and list rotations */}
           <div className="space-y-6">
             {[1, 2, 3, 4].map((q) => {
@@ -477,80 +733,103 @@ export default function RotationsScreen({
                   </div>
 
                   <div className="space-y-2">
-                    {qRots.map((r) => (
-                      <div
-                        key={r.id}
-                        className={`p-3.5 border rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition ${
-                          r.applied
-                            ? 'border-gray-100 bg-gray-50/50 opacity-60'
-                            : 'border-[var(--line)] bg-white hover:shadow-xs'
-                        }`}
-                      >
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                          <div className="w-10 h-10 bg-[var(--navy)] text-white font-black text-xs rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm border border-slate-700">
-                            <span>Q{r.quarter}</span>
-                            <span className="text-[10px] text-amber-400">{r.minute}m</span>
-                          </div>
+                    {qRots.map((r) => {
+                      const belongingGroup = threeWayGroups.find(
+                        (g) => g.groupId === r.groupId || g.rotations.some((gr) => gr.id === r.id)
+                      );
 
-                          <div className="space-y-1.5">
-                            {/* Dual OFF / ON High-Contrast Interchange Badges */}
-                            <div className="flex flex-wrap items-center gap-2">
-                              {/* OFF Badge */}
-                              <span className="px-2.5 py-1 rounded-lg bg-red-950/80 border border-red-600/80 text-red-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
-                                <span className="bg-red-600 text-white w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↓</span>
-                                <span>OFF: {r.out}</span>
-                              </span>
-
-                              {/* Interchange Arrow */}
-                              <span className="text-slate-400 font-black text-xs">⇄</span>
-
-                              {/* ON Badge */}
-                              <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/80 text-emerald-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
-                                <span className="bg-emerald-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↑</span>
-                                <span>ON: {r.inn}</span>
-                              </span>
-
-                              <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${
-                                r.type === 'onfield' ? 'bg-cyan-50 text-cyan-700' : 'bg-blue-50 text-blue-700'
-                              }`}>
-                                {r.type === 'onfield' ? 'On Field Swap' : 'Interchange'}
-                              </span>
+                      return (
+                        <div
+                          key={r.id}
+                          className={`p-3.5 border rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition ${
+                            r.applied
+                              ? 'border-gray-100 bg-gray-50/50 opacity-60'
+                              : 'border-[var(--line)] bg-white hover:shadow-xs'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <div className="w-10 h-10 bg-[var(--navy)] text-white font-black text-xs rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm border border-slate-700">
+                              <span>Q{r.quarter}</span>
+                              <span className="text-[10px] text-amber-400">{r.minute}m</span>
                             </div>
 
-                            {r.note && (
-                              <p className="text-[10px] text-gray-500 font-semibold">
-                                Note: {r.note}
-                              </p>
+                            <div className="space-y-1.5">
+                              {/* Dual OFF / ON High-Contrast Interchange Badges */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                {/* OFF Badge */}
+                                <span className="px-2.5 py-1 rounded-lg bg-red-950/80 border border-red-600/80 text-red-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
+                                  <span className="bg-red-600 text-white w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↓</span>
+                                  <span>OFF: {r.out}</span>
+                                </span>
+
+                                {/* Interchange Arrow */}
+                                <span className="text-slate-400 font-black text-xs">⇄</span>
+
+                                {/* ON Badge */}
+                                <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/80 text-emerald-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
+                                  <span className="bg-emerald-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↑</span>
+                                  <span>ON: {r.inn}</span>
+                                </span>
+
+                                <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${
+                                  r.type === 'onfield' ? 'bg-cyan-50 text-cyan-700' : 'bg-blue-50 text-blue-700'
+                                }`}>
+                                  {r.type === 'onfield' ? 'On Field Swap' : 'Interchange'}
+                                </span>
+
+                                {belongingGroup && (
+                                  <span className="px-2 py-0.5 text-[9px] font-black rounded-md bg-amber-100 text-amber-800 border border-amber-200">
+                                    🔄 3-Way Set
+                                  </span>
+                                )}
+                              </div>
+
+                              {r.note && (
+                                <p className="text-[10px] text-gray-500 font-semibold">
+                                  Note: {r.note}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 self-end md:self-center">
+                            {belongingGroup && (
+                              <button
+                                onClick={() => handleOpenEditThreeWayGroup(belongingGroup)}
+                                className="px-2.5 py-1 text-[11px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg transition cursor-pointer flex items-center gap-1"
+                                title="Edit full 3-Way rotation sequence"
+                              >
+                                <RefreshCw className="w-3 h-3 text-indigo-600" />
+                                <span>Edit 3-Way Set</span>
+                              </button>
                             )}
+                            <button
+                              onClick={() => handleOpenEditRotation(r)}
+                              className="p-1.5 text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-lg transition cursor-pointer"
+                              title="Edit single rotation"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleToggleApplyRotation(r.id)}
+                              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition ${
+                                r.applied
+                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                  : 'bg-green-50 text-[#0E7A48] border-green-100'
+                              }`}
+                            >
+                              {r.applied ? 'Reset' : 'Apply'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRotation(r.id)}
+                              className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-1.5 self-end md:self-center">
-                          <button
-                            onClick={() => handleOpenEditRotation(r)}
-                            className="p-1.5 text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-lg transition"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleToggleApplyRotation(r.id)}
-                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition ${
-                              r.applied
-                                ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                : 'bg-green-50 text-[#0E7A48] border-green-100'
-                            }`}
-                          >
-                            {r.applied ? 'Reset' : 'Apply'}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRotation(r.id)}
-                            className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition"
-                          >
-                            <Trash className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {qRots.length === 0 && (
                       <p className="text-xs text-gray-400 font-semibold text-center py-4 bg-gray-50/50 rounded-xl border border-dashed border-gray-100">
@@ -773,6 +1052,7 @@ export default function RotationsScreen({
         onUpdatePlans={onUpdatePlans}
         rotations={rotations}
         onUpdateRotations={onUpdateRotations}
+        editingGroupData={editingThreeWayData}
       />
 
       {/* Visual Oval Plan Mode View Modal */}

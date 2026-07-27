@@ -37,6 +37,12 @@ export interface Rotation {
   note: string;
   applied: boolean;
   status: 'scheduled' | 'applied';
+  groupId?: string;
+  groupType?: '3-way' | 'pair' | string;
+  groupP1Id?: string;
+  groupP2Id?: string;
+  groupP3Id?: string;
+  groupInterval?: number;
 }
 
 export interface Plan {
