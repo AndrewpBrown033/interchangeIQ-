@@ -39,8 +39,6 @@ export default function ThreeWayRotationModal({
   onUpdateRotations,
   editingGroupData,
 }: ThreeWayRotationModalProps) {
-  if (!isOpen) return null;
-
   // Filter available players
   const availablePlayers = players.filter((p) => p.status === 'available');
   const onFieldIds = new Set(Object.values(lineup));
@@ -178,6 +176,8 @@ export default function ThreeWayRotationModal({
 
     return scheduleByQuarter;
   }, [p1, p2, p3, p1Id, p2Id, p3Id, intervalMinutes, quarterLength, selectedQuarters]);
+
+  if (!isOpen) return null;
 
   const handleGenerate = () => {
     if (!p1 || !p2 || !p3) {

@@ -121,6 +121,7 @@ export default function RotationsScreen({
   const [formType, setFormType] = useState<'bench' | 'onfield'>('bench');
   const [formOutId, setFormOutId] = useState<string>('');
   const [formInId, setFormInId] = useState<string>('');
+  const [formP3Id, setFormP3Id] = useState<string>('');
   const [formNote, setFormNote] = useState<string>('');
   const [formError, setFormError] = useState<string>('');
 
@@ -281,6 +282,7 @@ export default function RotationsScreen({
 
     setFormOutId(fieldPlayer?.id || '');
     setFormInId(benchPlayer?.id || '');
+    setFormP3Id('');
     setFormNote('');
     setFormError('');
     setShowRotationModal(true);
@@ -293,6 +295,17 @@ export default function RotationsScreen({
     setFormType(rot.type);
     setFormOutId(rot.outId);
     setFormInId(rot.inId);
+
+    // Derive 3rd player if part of a group or saved on rotation
+    let p3Id = rot.groupP3Id || '';
+    if (!p3Id && rot.groupId) {
+      const g = threeWayGroups.find((grp) => grp.groupId === rot.groupId);
+      if (g) {
+        p3Id = [g.p1Id, g.p2Id, g.p3Id].find((id) => id !== rot.outId && id !== rot.inId) || '';
+      }
+    }
+    setFormP3Id(p3Id);
+
     setFormNote(rot.note);
     setFormError('');
     setShowRotationModal(true);
@@ -306,6 +319,10 @@ export default function RotationsScreen({
     }
     if (formOutId === formInId) {
       setFormError('You cannot select the same player for both sides.');
+      return;
+    }
+    if (formP3Id && (formP3Id === formOutId || formP3Id === formInId)) {
+      setFormError('The 3rd player must be different from Player OFF and Player ON.');
       return;
     }
     if (selectedQuarters.length === 0) {
@@ -340,6 +357,7 @@ export default function RotationsScreen({
               type: formType,
               outId: formOutId,
               inId: formInId,
+              groupP3Id: formP3Id || undefined,
               out: outText,
               inn: inText,
               note: formNote.trim(),
@@ -355,6 +373,9 @@ export default function RotationsScreen({
         type: formType,
         outId: formOutId,
         inId: formInId,
+        groupP3Id: formP3Id || undefined,
+        groupId: editingRotation.groupId,
+        groupType: editingRotation.groupType,
         out: outText,
         inn: inText,
         note: formNote.trim(),
@@ -372,12 +393,15 @@ export default function RotationsScreen({
         type: formType,
         outId: formOutId,
         inId: formInId,
+        groupP3Id: formP3Id || undefined,
+        groupType: formP3Id ? '3-way' : undefined,
         out: outText,
         inn: inText,
         note: formNote.trim(),
         applied: false,
         status: 'scheduled',
       }));
+
       onUpdateRotations([...rotations, ...newRots]);
     }
 
@@ -738,6 +762,9 @@ export default function RotationsScreen({
                         (g) => g.groupId === r.groupId || g.rotations.some((gr) => gr.id === r.id)
                       );
 
+                      const p3Id = r.groupP3Id || (belongingGroup ? [belongingGroup.p1Id, belongingGroup.p2Id, belongingGroup.p3Id].find((id) => id !== r.outId && id !== r.inId) : null);
+                      const p3Player = p3Id ? players.find((p) => p.id === p3Id) : null;
+
                       return (
                         <div
                           key={r.id}
@@ -770,6 +797,14 @@ export default function RotationsScreen({
                                   <span className="bg-emerald-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↑</span>
                                   <span>ON: {r.inn}</span>
                                 </span>
+
+                                {/* 3rd Player Badge */}
+                                {p3Player && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-500/80 text-indigo-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
+                                    <span className="bg-amber-400 text-slate-950 w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-black">3</span>
+                                    <span>3rd Player: #{p3Player.number} {p3Player.name}</span>
+                                  </span>
+                                )}
 
                                 <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${
                                   r.type === 'onfield' ? 'bg-cyan-50 text-cyan-700' : 'bg-blue-50 text-blue-700'
@@ -847,7 +882,7 @@ export default function RotationsScreen({
       {/* MODAL: Add/Edit Rotation */}
       {showRotationModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-[2000] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md border border-[var(--line)] shadow-2xl p-5 space-y-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl border border-[var(--line)] shadow-2xl p-5 space-y-4">
             <h3 className="text-lg font-black text-[var(--navy)] border-b border-gray-100 pb-2">
               {editingRotation ? 'Edit Rotation' : 'Schedule New Rotation'}
             </h3>
@@ -936,7 +971,7 @@ export default function RotationsScreen({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {/* Out Player */}
                 <div>
                   <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
@@ -1006,7 +1041,104 @@ export default function RotationsScreen({
                     );
                   })()}
                 </div>
+
+                {/* 3rd Player / Cycle Partner */}
+                <div>
+                  <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-indigo-600 flex items-center gap-1">
+                    <span>3rd Player (Cycle Partner)</span>
+                    <span className="px-1.5 py-0.2 text-[8px] bg-indigo-100 text-indigo-800 rounded font-bold">3-Way</span>
+                  </label>
+                  <select
+                    value={formP3Id}
+                    onChange={(e) => setFormP3Id(e.target.value)}
+                    className="w-full p-2.5 border border-indigo-200 bg-indigo-50/30 rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)] cursor-pointer"
+                  >
+                    <option value="">None (Standard 2-player swap)</option>
+                    {players
+                      .filter((p) => p.status === 'available' && p.id !== formOutId && p.id !== formInId)
+                      .map((p) => {
+                        const pos = getPlayerPosLabel(p.id);
+                        return (
+                          <option key={p.id} value={p.id}>
+                            #{p.number} {p.name} {pos.isOnField ? `— ${pos.slotKey} (${pos.fullName})` : `— Bench`}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  {formP3Id && (() => {
+                    const pos = getPlayerPosLabel(formP3Id);
+                    return (
+                      <div className="mt-1.5 p-2 bg-indigo-50/90 border border-indigo-200 rounded-lg text-[11px] font-bold text-indigo-950 flex items-center justify-between shadow-2xs">
+                        <span className="truncate pr-1">
+                          📍 3rd: {pos.isOnField ? `${pos.slotKey} - ${pos.fullName}` : pos.text}
+                        </span>
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-indigo-200 text-indigo-900'}`}>
+                          {pos.isOnField ? 'Field' : 'Bench'}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
+
+              {/* 3-Way Group Summary Card inside Modal */}
+              {(editingRotation?.groupId || formP3Id) && (() => {
+                const group = threeWayGroups.find(
+                  (g) => g.groupId === editingRotation?.groupId || g.rotations.some((gr) => gr.id === editingRotation?.id)
+                );
+                const p1 = players.find((p) => p.id === formOutId);
+                const p2 = players.find((p) => p.id === formInId);
+                const p3 = players.find((p) => p.id === formP3Id);
+
+                return (
+                  <div className="bg-slate-900 text-white p-3.5 rounded-xl border border-indigo-500/40 space-y-2.5 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-amber-500 text-black font-black text-[10px] rounded uppercase">
+                          3-Way Rotation Active
+                        </span>
+                        <span className="text-xs font-bold text-amber-300">
+                          3-Player Continuous Interchange
+                        </span>
+                      </div>
+                      {group && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowRotationModal(false);
+                            handleOpenEditThreeWayGroup(group);
+                          }}
+                          className="px-2.5 py-1 text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition cursor-pointer flex items-center gap-1 shadow-2xs self-start sm:self-auto"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Edit Full 3-Way Set Matrix</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                      <div className="p-2 bg-slate-800 rounded-lg border border-slate-700">
+                        <div className="text-[9px] uppercase font-bold text-red-400">1. Player OFF</div>
+                        <div className="font-black text-white truncate">
+                          {p1 ? `#${p1.number} ${p1.name}` : 'Select Player'}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-slate-800 rounded-lg border border-slate-700">
+                        <div className="text-[9px] uppercase font-bold text-emerald-400">2. Player ON</div>
+                        <div className="font-black text-white truncate">
+                          {p2 ? `#${p2.number} ${p2.name}` : 'Select Player'}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-slate-800 rounded-lg border border-slate-700">
+                        <div className="text-[9px] uppercase font-bold text-amber-400">3. 3rd Player</div>
+                        <div className="font-black text-white truncate">
+                          {p3 ? `#${p3.number} ${p3.name}` : 'None Selected'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Note */}
               <div>
