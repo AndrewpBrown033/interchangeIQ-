@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Score, Rotation, Plan, GameInfo } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
-import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock } from 'lucide-react';
+import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 
 const POSITION_DESCRIPTIONS: Record<string, string> = {
@@ -1480,10 +1480,6 @@ export default function GameDayScreen({
                 <div className="goal-post main top-right-main" id="afl-goal-post-top-3"></div>
                 <div className="goal-post behind top-right-behind" id="afl-goal-post-top-4"></div>
 
-                <div className="absolute top-1 left-1/2 -translate-x-1/2 z-10 pointer-events-none opacity-80 flex items-center gap-1 bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-red-300 tracking-wider border border-red-500/30">
-                  <span>🔥 Forwards / Attacking Goal</span>
-                </div>
-
                 {/* AFL Goal Posts & Markings - Bottom End (Defenders) */}
                 <div className="goal-line-bottom" id="afl-goal-line-bottom"></div>
                 <div className="goal-square-bottom" id="afl-goal-square-bottom"></div>
@@ -1492,8 +1488,15 @@ export default function GameDayScreen({
                 <div className="goal-post main bottom-right-main" id="afl-goal-post-bottom-3"></div>
                 <div className="goal-post behind bottom-right-behind" id="afl-goal-post-bottom-4"></div>
 
-                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 pointer-events-none opacity-80 flex items-center gap-1 bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-emerald-300 tracking-wider border border-emerald-500/30">
-                  <span>🛡️ Defenders / Defending Goal</span>
+                {/* Left Direction of Play / Attacking Arrow Indicator */}
+                <div className="absolute left-2.5 top-6 bottom-6 z-20 pointer-events-none flex flex-col items-center justify-center gap-1 select-none">
+                  <div className="flex flex-col items-center bg-black/65 backdrop-blur-xs border border-emerald-400/40 rounded-full px-1.5 py-2.5 text-emerald-300 shadow-lg">
+                    <ArrowUp className="w-4 h-4 stroke-[3] text-emerald-400 animate-pulse" />
+                    <div className="w-0.5 h-10 bg-gradient-to-t from-emerald-500/20 via-emerald-400/80 to-emerald-300 rounded-full my-1"></div>
+                    <span className="text-[7px] font-black uppercase tracking-widest text-emerald-300 [writing-mode:vertical-lr] rotate-180">
+                      ATTACK
+                    </span>
+                  </div>
                 </div>
 
                 {/* Dynamic SVG Connecting Lines & Arrowhead Markers for Interchange / Swaps */}

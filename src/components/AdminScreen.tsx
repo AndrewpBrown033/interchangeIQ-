@@ -242,6 +242,7 @@ export default function AdminScreen({
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<'Coach' | 'Assistant Coach' | 'Manager' | 'Admin'>('Coach');
+  const [inviteAllowedFeatures, setInviteAllowedFeatures] = useState<string[]>(['training', 'growth', 'jarvis']);
   const [inviteSelectedTeams, setInviteSelectedTeams] = useState<string[]>(activeTeamId ? [activeTeamId] : []);
   const [activeUserSubTab, setActiveUserSubTab] = useState<'active' | 'pending'>('active');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -423,6 +424,7 @@ export default function AdminScreen({
     setInviteEmail('');
     setInviteName('');
     setInviteRole('Coach');
+    setInviteAllowedFeatures(['training', 'growth', 'jarvis']);
     if (teamId) {
       setInviteSelectedTeams([teamId]);
     } else if (activeTeamId) {
@@ -431,6 +433,17 @@ export default function AdminScreen({
       setInviteSelectedTeams([]);
     }
     setShowInviteModal(true);
+  };
+
+  const handleInviteRoleChange = (role: 'Coach' | 'Assistant Coach' | 'Manager' | 'Admin') => {
+    setInviteRole(role);
+    if (role === 'Admin' || role === 'Coach') {
+      setInviteAllowedFeatures(['training', 'growth', 'jarvis']);
+    } else if (role === 'Assistant Coach') {
+      setInviteAllowedFeatures(['training', 'growth']);
+    } else {
+      setInviteAllowedFeatures(['training']);
+    }
   };
 
   const handleSendInvite = (e: React.FormEvent) => {
@@ -453,6 +466,7 @@ export default function AdminScreen({
       name: inviteName.trim(),
       role: inviteRole,
       teamIds: inviteSelectedTeams,
+      allowedFeatures: inviteAllowedFeatures,
       status: 'Pending',
       invitedBy: 'Administrator',
       invitedAt: Date.now(),
@@ -512,6 +526,27 @@ export default function AdminScreen({
     const updated = users.map((u) => {
       if (u.uid === uid) {
         return { ...u, role: newRole };
+      }
+      return u;
+    });
+    onUpdateUsers(updated);
+  };
+
+  const handleToggleUserFeature = (uid: string, featureKey: string) => {
+    const updated = users.map((u) => {
+      if (u.uid === uid) {
+        const currentFeatures = u.allowedFeatures ?? (
+          u.role === 'Admin' || u.role === 'Coach'
+            ? ['training', 'growth', 'jarvis']
+            : u.role === 'Assistant Coach'
+            ? ['training', 'growth']
+            : []
+        );
+        const exists = currentFeatures.includes(featureKey);
+        const newFeatures = exists
+          ? currentFeatures.filter((f) => f !== featureKey)
+          : [...currentFeatures, featureKey];
+        return { ...u, allowedFeatures: newFeatures };
       }
       return u;
     });
@@ -659,7 +694,7 @@ export default function AdminScreen({
                   <span>Elevated Access & Feature Visibility ({teams.find(t => t.id === activeTeamId)?.name || 'Active Team'})</span>
                 </h3>
                 <p className="text-xs text-gray-500 font-semibold mt-0.5">
-                  Choose which features are enabled for this team. Admins and Coaches have elevated access to view these modules. Assistant Coaches and Managers are restricted.
+                  Choose which features are enabled for this active team. Feature permissions for specific coaches and roles can be configured per user in the Coaches & Roles section below.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -998,6 +1033,55 @@ export default function AdminScreen({
                         </div>
                       )}
 
+                      {/* Feature Permissions for this user */}
+                      <div className="pt-2 border-t border-dashed border-gray-100">
+                        <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                          <span className="text-[10px] font-black uppercase text-gray-400">
+                            Feature Access Permissions
+                          </span>
+                          {u.role === 'Admin' ? (
+                            <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+                              Admin Full Clearance
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-gray-400 font-bold">
+                              Select permitted modules
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { key: 'training', label: 'Training', icon: <BookOpen className="w-3 h-3 text-indigo-600" /> },
+                            { key: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-3 h-3 text-emerald-600" /> },
+                            { key: 'jarvis', label: 'JARVIS AI', icon: <Bot className="w-3 h-3 text-purple-600" /> },
+                          ].map((feat) => {
+                            const isAllowed = u.role === 'Admin' || (
+                              u.allowedFeatures
+                                ? u.allowedFeatures.includes(feat.key)
+                                : (u.role === 'Coach' ? true : u.role === 'Assistant Coach' ? feat.key !== 'jarvis' : false)
+                            );
+
+                            return (
+                              <button
+                                key={`user-feat-${u.uid}-${feat.key}`}
+                                disabled={u.role === 'Admin'}
+                                onClick={() => handleToggleUserFeature(u.uid, feat.key)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed ${
+                                  isAllowed
+                                    ? 'bg-blue-50/90 text-blue-900 border-blue-200 shadow-2xs'
+                                    : 'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'
+                                }`}
+                                title={u.role === 'Admin' ? 'Admins have full access' : `Toggle ${feat.label} access for ${u.name}`}
+                              >
+                                {feat.icon}
+                                <span>{feat.label}</span>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isAllowed ? 'bg-blue-600' : 'bg-gray-300'}`} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       <div className="flex justify-end pt-2">
                         <button
                           onClick={() => handleDeleteUser(u.uid)}
@@ -1083,6 +1167,42 @@ export default function AdminScreen({
                             ) : (
                               <span className="text-[9px] text-gray-400 font-bold">No specific team access assigned</span>
                             )}
+                          </div>
+                        </div>
+
+                        {/* Feature Permissions for Pending Invite */}
+                        <div className="pt-2 border-t border-dashed border-gray-100">
+                          <span className="text-[9px] font-black uppercase text-gray-400 block mb-1">
+                            Feature Access Permissions
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { key: 'training', label: 'Training', icon: <BookOpen className="w-3 h-3 text-indigo-600" /> },
+                              { key: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-3 h-3 text-emerald-600" /> },
+                              { key: 'jarvis', label: 'JARVIS AI', icon: <Bot className="w-3 h-3 text-purple-600" /> },
+                            ].map((feat) => {
+                              const isAllowed = u.role === 'Admin' || (
+                                u.allowedFeatures
+                                  ? u.allowedFeatures.includes(feat.key)
+                                  : (u.role === 'Coach' ? true : u.role === 'Assistant Coach' ? feat.key !== 'jarvis' : false)
+                              );
+
+                              return (
+                                <button
+                                  key={`pending-feat-${u.uid}-${feat.key}`}
+                                  disabled={u.role === 'Admin'}
+                                  onClick={() => handleToggleUserFeature(u.uid, feat.key)}
+                                  className={`px-2 py-0.5 rounded text-[9px] font-bold border transition flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed ${
+                                    isAllowed
+                                      ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                      : 'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'
+                                  }`}
+                                >
+                                  {feat.icon}
+                                  <span>{feat.label}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -1401,7 +1521,7 @@ export default function AdminScreen({
                     <button
                       key={`role-option-${role}-${idx}`}
                       type="button"
-                      onClick={() => setInviteRole(role)}
+                      onClick={() => handleInviteRoleChange(role)}
                       className={`p-2 border rounded-xl flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
                         inviteRole === role
                           ? 'border-[var(--blue)] bg-blue-50/20 text-[var(--blue)]'
@@ -1420,6 +1540,50 @@ export default function AdminScreen({
                   {inviteRole === 'Manager' && 'Managers view stats and game plans without administrative profile edits.'}
                 </p>
               </div>
+
+              {inviteRole !== 'Admin' && (
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-gray-400">
+                    Granted Feature Permissions
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { key: 'training', label: 'Training', desc: 'Drills & Plans', icon: <BookOpen className="w-3.5 h-3.5 text-indigo-600" /> },
+                      { key: 'growth', label: 'Player Growth', desc: 'Assessments', icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> },
+                      { key: 'jarvis', label: 'JARVIS AI', desc: 'Tactical AI', icon: <Bot className="w-3.5 h-3.5 text-purple-600" /> },
+                    ].map((feat) => {
+                      const isChecked = inviteAllowedFeatures.includes(feat.key);
+                      return (
+                        <button
+                          key={`invite-feat-${feat.key}`}
+                          type="button"
+                          onClick={() => {
+                            setInviteAllowedFeatures((prev) =>
+                              prev.includes(feat.key)
+                                ? prev.filter((k) => k !== feat.key)
+                                : [...prev, feat.key]
+                            );
+                          }}
+                          className={`p-2.5 border rounded-xl flex flex-col items-start gap-1 transition cursor-pointer text-left ${
+                            isChecked
+                              ? 'border-blue-500 bg-blue-50/40 text-blue-900 shadow-2xs'
+                              : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-1.5">
+                              {feat.icon}
+                              <span className="text-[10px] font-black tracking-wider uppercase">{feat.label}</span>
+                            </div>
+                            <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-blue-600' : 'bg-gray-300'}`} />
+                          </div>
+                          <span className="text-[9px] text-gray-500 font-semibold">{feat.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {inviteRole !== 'Admin' && (
                 <div className="space-y-2">

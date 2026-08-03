@@ -158,6 +158,7 @@ export interface UserProfile {
   invitedBy?: string;
   invitedAt?: number;
   inviteCode?: string;
+  allowedFeatures?: string[];
 }
 
 export interface TacticalPrompt {

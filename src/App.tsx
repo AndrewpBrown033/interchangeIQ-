@@ -1309,16 +1309,24 @@ export default function App() {
 
   const currentUserRole = matchedUserProfile?.role === 'Head Coach' ? 'Coach' : (matchedUserProfile?.role || 'Coach');
 
-  // Role permissions check
-  // Coach and Admin have elevated access
-  const isElevatedRole =
-    currentUserRole === 'Admin' ||
-    currentUserRole === 'Coach';
+  // Role & User Feature Access Permissions Check
+  // Admin role has universal clearance; other users/coaches use allowedFeatures or role defaults
+  const userAllowedFeatures = matchedUserProfile?.allowedFeatures ?? (
+    matchedUserProfile?.role === 'Admin' || matchedUserProfile?.role === 'Coach' || matchedUserProfile?.role === 'Head Coach'
+      ? ['training', 'growth', 'jarvis']
+      : matchedUserProfile?.role === 'Assistant Coach'
+      ? ['training', 'growth']
+      : []
+  );
 
-  // Feature toggles for active team (default to true if not set)
-  const isTrainingEnabled = isElevatedRole && (activeTeamProfile?.showTraining !== false);
-  const isGrowthEnabled = isElevatedRole && (activeTeamProfile?.showPlayerGrowth !== false);
-  const isJarvisEnabled = isElevatedRole && (activeTeamProfile?.showJarvis !== false);
+  const userHasTraining = currentUserRole === 'Admin' || userAllowedFeatures.includes('training');
+  const userHasGrowth = currentUserRole === 'Admin' || userAllowedFeatures.includes('growth');
+  const userHasJarvis = currentUserRole === 'Admin' || userAllowedFeatures.includes('jarvis');
+
+  // Feature toggles combined with active team toggles (default to true if active team hasn't explicitly disabled it)
+  const isTrainingEnabled = userHasTraining && (activeTeamProfile?.showTraining !== false);
+  const isGrowthEnabled = userHasGrowth && (activeTeamProfile?.showPlayerGrowth !== false);
+  const isJarvisEnabled = userHasJarvis && (activeTeamProfile?.showJarvis !== false);
 
   useEffect(() => {
     if (activeTab === 'jarvis' && !isJarvisEnabled) setActiveTab('summary');
@@ -1407,10 +1415,10 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-[var(--bg)] transition-all ${sidebarCollapsed ? 'ps-16 md:ps-20' : 'ps-0 md:ps-60'}`}>
+    <div className={`min-h-screen bg-[var(--bg)] transition-all ${sidebarCollapsed ? 'ps-16 lg:ps-20' : 'ps-0 lg:ps-60'}`}>
       
-      {/* Mobile top navigation header */}
-      <header className="flex md:hidden items-center justify-between px-4 py-3 bg-white border-b border-[var(--line)] sticky top-0 z-50 ios-header">
+      {/* Mobile / Tablet top navigation header */}
+      <header className="flex lg:hidden items-center justify-between px-4 py-3 bg-white border-b border-[var(--line)] sticky top-0 z-50 ios-header">
         <button
           onClick={() => setActiveTab('summary')}
           className="flex items-center gap-2 cursor-pointer focus:outline-none text-left"
@@ -1443,8 +1451,8 @@ export default function App() {
 
       {/* Sidebar navigation */}
       <aside className={`fixed inset-y-0 left-0 bg-white border-r border-[var(--line)] flex flex-col justify-between z-40 transition-all ios-sidebar ${
-        sidebarCollapsed ? 'w-16 md:w-20' : 'w-60'
-      } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        sidebarCollapsed ? 'w-16 lg:w-20' : 'w-60'
+      } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div>
           {/* Logo Brand */}
           <div className="flex items-center justify-between p-4 border-b border-[var(--line)]">
@@ -1468,14 +1476,14 @@ export default function App() {
             {/* Desktop toggle collapse arrow */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden md:flex p-1 hover:bg-gray-100 rounded-lg text-gray-400"
+              className="hidden lg:flex p-1 hover:bg-gray-100 rounded-lg text-gray-400"
             >
               {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </button>
-            {/* Mobile close toggle */}
+            {/* Mobile / Tablet close toggle */}
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="flex md:hidden p-1 hover:bg-gray-100 rounded-lg text-gray-400"
+              className="flex lg:hidden p-1 hover:bg-gray-100 rounded-lg text-gray-400"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1560,7 +1568,7 @@ export default function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 ios-main pb-24 md:pb-6">
+      <main className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6 ios-main pb-24 lg:pb-6">
         {activeTab === 'summary' && (
           <SummaryScreen
             players={players}
@@ -1965,8 +1973,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Mobile Bottom Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-50 flex items-center justify-around px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur-md bg-white/95">
+      {/* Mobile / Tablet Bottom Navigation Bar */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-50 flex items-center justify-around px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur-md bg-white/95">
         {[
           { id: 'summary', label: 'Summary', icon: <LayoutDashboard className="w-5 h-5" /> },
           { id: 'lineup', label: 'Game Day', icon: <Play className="w-5 h-5 text-[var(--green)]" /> },
