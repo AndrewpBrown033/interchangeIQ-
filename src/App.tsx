@@ -6,7 +6,7 @@ import {
 import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers } from './constants';
 
 // Firebase Integrations
-import { auth, db, signInAnonymously, onAuthStateChanged, User } from './lib/firebase';
+import { auth, db, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from './lib/firebase';
 import { doc, setDoc, getDoc, onSnapshot, collection, deleteDoc, getDocs } from 'firebase/firestore';
 
 // Screens imports
@@ -655,20 +655,33 @@ export default function App() {
             if (active) console.log('Firebase Anonymous Session Active:', cred.user.uid);
           })
           .catch((err) => {
-            console.warn('Firebase Auth fallback to local mode:', err.message);
-            const fallbackUid = localStorage.getItem('iiq_fallback_uid') || `local_${Math.random().toString(36).substr(2, 9)}`;
-            localStorage.setItem('iiq_fallback_uid', fallbackUid);
-            
-            const fallbackUser = {
-              uid: fallbackUid,
-              email: '',
-              displayName: userName || 'Coach Andrew',
-              isAnonymous: true,
-            } as any;
+            console.warn('Anonymous auth unavailable, attempting guest account sign-in:', err.message);
+            signInWithEmailAndPassword(auth, 'guest.coach@interchangeiq.app', 'InterchangeIQ2026!')
+              .then((cred) => {
+                if (active) console.log('Firebase Guest Session Active:', cred.user.uid);
+              })
+              .catch(() => {
+                return createUserWithEmailAndPassword(auth, 'guest.coach@interchangeiq.app', 'InterchangeIQ2026!')
+                  .then((cred) => {
+                    if (active) console.log('Firebase Created Guest Session:', cred.user.uid);
+                  });
+              })
+              .catch((emailErr) => {
+                console.warn('Firebase Auth fallback to local mode:', emailErr.message);
+                const fallbackUid = localStorage.getItem('iiq_fallback_uid') || `local_${Math.random().toString(36).substr(2, 9)}`;
+                localStorage.setItem('iiq_fallback_uid', fallbackUid);
+                
+                const fallbackUser = {
+                  uid: fallbackUid,
+                  email: '',
+                  displayName: userName || 'Coach Andrew',
+                  isAnonymous: true,
+                } as any;
 
-            if (active) {
-              setCurrentUser(fallbackUser);
-            }
+                if (active) {
+                  setCurrentUser(fallbackUser);
+                }
+              });
           });
       }
     });
