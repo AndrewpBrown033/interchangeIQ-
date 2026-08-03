@@ -114,8 +114,8 @@ body {
 
 /* Custom Field and Slot Styles */
 .field {
-  height: 620px;
-  max-width: 580px;
+  height: 740px;
+  max-width: 540px;
   width: 100%;
   margin: 0 auto;
   position: relative;
@@ -351,7 +351,7 @@ body {
     min-height: 44px;
   }
   .field {
-    height: 560px;
+    height: 660px;
   }
 }
 
