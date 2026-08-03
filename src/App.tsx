@@ -1780,17 +1780,9 @@ export default function App() {
               <span className="text-[10px] font-extrabold text-[var(--muted)] uppercase tracking-wider block leading-tight">
                 Active Squad
               </span>
-              <select
-                value={activeTeamId}
-                onChange={(e) => handleSwitchTeam(e.target.value)}
-                className="bg-transparent font-black text-sm text-[var(--navy)] focus:outline-none cursor-pointer truncate max-w-[170px] sm:max-w-[260px] py-0.5"
-              >
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name || 'Unnamed Squad'}
-                  </option>
-                ))}
-              </select>
+              <span className="font-black text-sm text-[var(--navy)] truncate block py-0.5">
+                {teams.find((t) => t.id === activeTeamId)?.name || 'Unnamed Squad'}
+              </span>
             </div>
           </div>
 
