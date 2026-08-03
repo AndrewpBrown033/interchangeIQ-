@@ -34,7 +34,8 @@ import {
   Award,
   FileText,
   Download,
-  TrendingUp
+  TrendingUp,
+  Terminal
 } from 'lucide-react';
 
 interface AdminScreenProps {
@@ -52,6 +53,9 @@ interface AdminScreenProps {
   history?: GameHistory[];
   lineup?: Record<string, string>;
   onForceSyncTeams?: () => Promise<{ success: boolean; teamCount: number; message: string }>;
+  isDebugEnabled?: boolean;
+  onToggleDebug?: (enabled: boolean) => void;
+  onOpenDebugModal?: () => void;
 }
 
 export const DEFAULT_TACTICAL_PROMPTS: TacticalPrompt[] = [
@@ -180,6 +184,9 @@ export default function AdminScreen({
   history = [],
   lineup = {},
   onForceSyncTeams,
+  isDebugEnabled = false,
+  onToggleDebug,
+  onOpenDebugModal,
 }: AdminScreenProps) {
   const [adminSection, setAdminSection] = useState<'access' | 'prompts'>('access');
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
@@ -732,7 +739,7 @@ export default function AdminScreen({
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
               {/* Training Toggle */}
               <div className={`p-4 rounded-xl border transition ${
                 (teams.find(t => t.id === activeTeamId)?.showTraining !== false)
@@ -818,6 +825,45 @@ export default function AdminScreen({
                 <p className="text-[11px] text-gray-500 font-semibold">
                   Tactical AI analysis, session prompt builder, and AI recommendations.
                 </p>
+              </div>
+
+              {/* Developer & System Debugger Toggle */}
+              <div className={`p-4 rounded-xl border transition ${
+                isDebugEnabled
+                  ? 'bg-blue-50/70 border-blue-200'
+                  : 'bg-gray-50 border-gray-200 opacity-60'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-black text-gray-900">System Debugger</span>
+                  </div>
+                  <button
+                    disabled={!isElevatedRole}
+                    onClick={() => onToggleDebug && onToggleDebug(!isDebugEnabled)}
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                      isDebugEnabled
+                        ? 'bg-blue-600 justify-end'
+                        : 'bg-gray-300 justify-start'
+                    } flex items-center`}
+                    title="Toggle System Debugger button on Login screen and top navigation bar"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500 font-semibold mb-2">
+                  Shows or hides the live system & Firebase diagnostics button on Login screen and app header.
+                </p>
+                {isDebugEnabled && onOpenDebugModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenDebugModal}
+                    className="mt-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                  >
+                    <Terminal className="w-3 h-3" />
+                    <span>Run Debugger</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@ import {
 import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers } from './constants';
 
 // Firebase Integrations
-import { auth, db, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from './lib/firebase';
+import { auth, db, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, ensureFirebaseAuthSession, User } from './lib/firebase';
 import { doc, setDoc, getDoc, onSnapshot, collection, deleteDoc, getDocs } from 'firebase/firestore';
 
 // Screens imports
@@ -22,11 +22,12 @@ import TrainingScreen from './components/TrainingScreen';
 import AdminScreen from './components/AdminScreen';
 import SettingsScreen from './components/SettingsScreen';
 import LoginScreen from './components/LoginScreen';
+import { FirebaseDebugModal } from './components/FirebaseDebug';
 
 // Lucide Icons
 import {
   LayoutDashboard, Play, RefreshCw, Users, History, BarChart3,
-  BookOpen, Shield, ShieldCheck, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot, Landmark
+  BookOpen, Shield, ShieldCheck, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot, Landmark, Terminal
 } from 'lucide-react';
 
 // Helper functions to serialize/deserialize Drill steps to avoid nested arrays in Firestore
@@ -289,6 +290,18 @@ export default function App() {
 
   // Selected player ID for deep linking profile card
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+
+  // Firebase Debugger Modal State & Admin Toggle
+  const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
+  const [isDebugEnabled, setIsDebugEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('iiq_debug_enabled') === 'true';
+  });
+
+  const handleToggleDebug = (enabled: boolean) => {
+    setIsDebugEnabled(enabled);
+    localStorage.setItem('iiq_debug_enabled', enabled ? 'true' : 'false');
+    logAudit(`${enabled ? 'Enabled' : 'Disabled'} System Debugger via Admin Controls.`);
+  };
 
   // Passkey Biometrics Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -764,37 +777,25 @@ export default function App() {
       if (user) {
         handleAuthenticatedUser(user);
       } else {
-        // Only trigger anonymous sign-in if no active Firebase Auth session exists
-        signInAnonymously(auth)
-          .then((cred) => {
-            if (active) console.log('Firebase Anonymous Session Active:', cred.user.uid);
+        const savedEmail = localStorage.getItem('iiq_user_email');
+        ensureFirebaseAuthSession(savedEmail || undefined)
+          .then((usr) => {
+            if (active && usr) console.log('Firebase Auth Session Active:', usr.email || usr.uid);
           })
           .catch(() => {
-            signInWithEmailAndPassword(auth, 'guest.coach@interchangeiq.app', 'InterchangeIQ2026!')
-              .then((cred) => {
-                if (active) console.log('Firebase Guest Session Active:', cred.user.uid);
-              })
-              .catch(() => {
-                return createUserWithEmailAndPassword(auth, 'guest.coach@interchangeiq.app', 'InterchangeIQ2026!')
-                  .then((cred) => {
-                    if (active) console.log('Firebase Created Guest Session:', cred.user.uid);
-                  });
-              })
-              .catch(() => {
-                const fallbackUid = localStorage.getItem('iiq_fallback_uid') || `local_${Math.random().toString(36).substr(2, 9)}`;
-                localStorage.setItem('iiq_fallback_uid', fallbackUid);
-                
-                const fallbackUser = {
-                  uid: fallbackUid,
-                  email: '',
-                  displayName: userName || 'Coach Andrew',
-                  isAnonymous: true,
-                } as any;
+            const fallbackUid = localStorage.getItem('iiq_fallback_uid') || `local_${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('iiq_fallback_uid', fallbackUid);
+            
+            const fallbackUser = {
+              uid: fallbackUid,
+              email: savedEmail || '',
+              displayName: userName || 'Coach Andrew',
+              isAnonymous: true,
+            } as any;
 
-                if (active) {
-                  setCurrentUser(fallbackUser);
-                }
-              });
+            if (active) {
+              setCurrentUser(fallbackUser);
+            }
           });
       }
     });
@@ -1575,6 +1576,7 @@ export default function App() {
     return (
       <LoginScreen
         defaultUserName={userName}
+        isDebugEnabled={isDebugEnabled}
         onLoginSuccess={(name, email) => {
           setUserName(name);
           localStorage.setItem('iiq_username', name);
@@ -1832,8 +1834,22 @@ export default function App() {
               <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-spin text-blue-600' : ''}`} />
               <span className="hidden sm:inline">{isManualSyncing ? 'Syncing...' : 'Sync Now'}</span>
             </button>
+
+            {isDebugEnabled && (
+              <button
+                onClick={() => setIsDebugModalOpen(true)}
+                title="Open Firebase & System Diagnostics Debugger"
+                className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer border border-blue-200 shadow-2xs active:scale-95"
+              >
+                <Terminal className="w-3.5 h-3.5 text-blue-600" />
+                <span className="hidden sm:inline">Debug</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Global Debugger Modal */}
+        <FirebaseDebugModal isOpen={isDebugModalOpen} onClose={() => setIsDebugModalOpen(false)} />
         {activeTab === 'summary' && (
           <SummaryScreen
             players={players}
@@ -1973,6 +1989,9 @@ export default function App() {
             history={history}
             lineup={lineup}
             onForceSyncTeams={handleForceSyncTeams}
+            isDebugEnabled={isDebugEnabled}
+            onToggleDebug={handleToggleDebug}
+            onOpenDebugModal={() => setIsDebugModalOpen(true)}
           />
         )}
         {activeTab === 'settings' && (

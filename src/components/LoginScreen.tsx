@@ -9,19 +9,23 @@ import {
   TrendingUp,
   ArrowRight,
   Info,
-  UserPlus
+  UserPlus,
+  Terminal
 } from 'lucide-react';
-import { auth, db, signInAnonymously } from '../lib/firebase';
+import { auth, db, signInAnonymously, ensureFirebaseAuthSession } from '../lib/firebase';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { FirebaseDebugModal } from './FirebaseDebug';
 
 interface LoginScreenProps {
   onLoginSuccess: (userName: string, email: string) => void;
   defaultUserName: string;
+  isDebugEnabled?: boolean;
 }
 
-export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginScreenProps) {
+export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEnabled = false }: LoginScreenProps) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
   
   // Login Form States
   const [email, setEmail] = useState('');
@@ -59,21 +63,16 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
     }
 
     try {
-      if (!auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-        } catch (aErr) {
-          console.warn("Auth pre-check notice during enrollment:", aErr);
-        }
-      }
+      // Ensure Firebase Auth session tied to user email
+      await ensureFirebaseAuthSession(trimmedEmail, trimmedPassword);
 
       // 1. Check if user already exists in Firestore 'passkeys' collection
       let querySnapshot: any = null;
       try {
         const q = query(collection(db, 'passkeys'), where('email', '==', trimmedEmail));
         querySnapshot = await getDocs(q);
-      } catch (qErr) {
-        console.warn("Firestore passkeys query notice:", qErr);
+      } catch (_qErr) {
+        // Quiet fallback to local check
       }
 
       if (querySnapshot && !querySnapshot.empty) {
@@ -94,8 +93,8 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
       // 3. Save to Firestore gracefully
       try {
         await setDoc(doc(db, 'passkeys', record.id), record);
-      } catch (fsErr) {
-        console.warn("Firestore passkey sync notice:", fsErr);
+      } catch (_fsErr) {
+        // Saved locally, Firestore optional cloud backup skipped
       }
 
       // 4. Save to local storage for quick offline access
@@ -139,14 +138,8 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
       return;
     }
 
-    // Ensure Auth session
-    if (!auth.currentUser) {
-      try {
-        await signInAnonymously(auth);
-      } catch (aErr) {
-        console.warn("Auth pre-check notice during login:", aErr);
-      }
-    }
+    // Ensure Auth session tied to user email
+    await ensureFirebaseAuthSession(enteredEmail, enteredPassword);
 
     // Special Admin Auto-Login & Enrollment (e.g. for andrewpbrown@me.com and andrewpbrown33@gmail.com)
     const isAdminEmail = enteredEmail === 'andrewpbrown@me.com' || enteredEmail === 'andrewpbrown33@gmail.com';
@@ -168,8 +161,8 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
 
       try {
         await setDoc(doc(db, 'passkeys', record.id), record);
-      } catch (fsErr) {
-        console.warn("Passkeys record sync notice:", fsErr);
+      } catch (_fsErr) {
+        // Saved locally, Firestore optional cloud backup skipped
       }
 
       setIsLoading(false);
@@ -183,8 +176,8 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
       try {
         const q = query(collection(db, 'passkeys'), where('email', '==', enteredEmail));
         querySnapshot = await getDocs(q);
-      } catch (qErr) {
-        console.warn("Firestore passkeys lookup notice:", qErr);
+      } catch (_qErr) {
+        // Quiet fallback to local cache check
       }
 
       if (querySnapshot && !querySnapshot.empty) {
@@ -406,11 +399,28 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
         )}
 
         {/* Footer */}
-        <div className="border-t border-gray-100 pt-4 flex items-center justify-between text-gray-400">
-          <span className="text-[9px] font-bold tracking-wider">{APP_VERSION}</span>
+        <div className="border-t border-gray-100 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-gray-400">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-bold tracking-wider">{APP_VERSION}</span>
+            {isDebugEnabled && (
+              <>
+                <span className="text-gray-300">•</span>
+                <button
+                  onClick={() => setIsDebugOpen(true)}
+                  type="button"
+                  className="text-[9px] font-black text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Terminal className="w-3 h-3" />
+                  <span>Debug System / Firebase</span>
+                </button>
+              </>
+            )}
+          </div>
           <span className="text-[9px] font-semibold">InterchangeIQ Secure Access</span>
         </div>
 
+        {/* Firebase Diagnostics Modal */}
+        <FirebaseDebugModal isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} />
       </div>
     </div>
   );
