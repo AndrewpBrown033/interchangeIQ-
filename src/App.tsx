@@ -329,14 +329,19 @@ export default function App() {
   const currentTeamSyncedIdRef = useRef<string | null>(null);
   const lastPublishedSerializedRef = useRef<string>('');
 
-  // Switch active team
+  // Helper to generate a fresh, team-isolated squad (populated with default AFL squad template)
+  const createFreshSquadForTeam = (_teamId: string): Player[] => {
+    return normalizePlayers(DEFAULT_PLAYERS);
+  };
+
+  // Switch active team safely
   const handleSwitchTeam = (teamId: string) => {
     if (!teamId || teamId === activeTeamId) return;
 
     // Persist current team data to local cache before switching
     if (activeTeamId) {
       const currentCache = {
-        players,
+        players: players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS),
         lineup,
         score,
         gameInfo,
@@ -345,6 +350,9 @@ export default function App() {
         activePlanIds,
         history,
         savedLineups,
+        drills: sanitizeDrillList(drills),
+        growthRecords,
+        trainingState,
       };
       localStorage.setItem(`iiq_team_data_${activeTeamId}`, JSON.stringify(currentCache));
     }
@@ -357,7 +365,11 @@ export default function App() {
       const cached = localStorage.getItem(`iiq_team_data_${teamId}`);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed.players)) setPlayers(parsed.players);
+        if (Array.isArray(parsed.players) && parsed.players.length > 0) {
+          setPlayers(normalizePlayers(parsed.players));
+        } else {
+          setPlayers(normalizePlayers(DEFAULT_PLAYERS));
+        }
         if (parsed.lineup) setLineup(parsed.lineup);
         if (parsed.score) setScore(parsed.score);
         if (parsed.gameInfo) setGameInfo(parsed.gameInfo);
@@ -366,46 +378,68 @@ export default function App() {
         if (Array.isArray(parsed.activePlanIds)) setActivePlanIds(parsed.activePlanIds);
         if (Array.isArray(parsed.history)) setHistory(parsed.history);
         if (Array.isArray(parsed.savedLineups)) setSavedLineups(parsed.savedLineups);
+      } else {
+        // First time switching to this team: give it default 22 players template
+        setPlayers(normalizePlayers(DEFAULT_PLAYERS));
       }
     } catch (e) {
       console.warn("Failed to parse cached team data:", e);
+      setPlayers(normalizePlayers(DEFAULT_PLAYERS));
     }
   };
 
-  // Real-time Firestore teams collection subscriber
+  // Real-time Firestore teams collection subscriber with local preservation & merging
   useEffect(() => {
     const teamsRef = collection(db, 'teams');
     const unsubscribe = onSnapshot(teamsRef, (snapshot) => {
-      const teamsList: TeamProfile[] = [];
+      const remoteTeams: TeamProfile[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         const teamId = data.id || docSnap.id;
         if (teamId) {
-          teamsList.push({
+          remoteTeams.push({
             id: teamId,
             name: data.name || 'Unnamed Squad',
             createdAt: typeof data.createdAt === 'number' && data.createdAt > 0 ? data.createdAt : 0,
           });
         }
       });
-      if (teamsList.length > 0) {
-        // Sort teams deterministically: highest createdAt first, then alphabetically by name/id
-        teamsList.sort((a, b) => {
+
+      setTeams((prevTeams) => {
+        let cachedLocalTeams: TeamProfile[] = [];
+        try {
+          const raw = localStorage.getItem('iiq_teams');
+          if (raw) cachedLocalTeams = JSON.parse(raw);
+        } catch (e) {
+          console.warn("Error reading iiq_teams from localStorage:", e);
+        }
+
+        const teamMap = new Map<string, TeamProfile>();
+        // 1. Existing state teams
+        (Array.isArray(prevTeams) ? prevTeams : []).forEach(t => teamMap.set(t.id, t));
+        // 2. Cached local teams
+        (Array.isArray(cachedLocalTeams) ? cachedLocalTeams : []).forEach(t => teamMap.set(t.id, t));
+        // 3. Remote cloud teams
+        remoteTeams.forEach(t => teamMap.set(t.id, t));
+
+        const merged = Array.from(teamMap.values());
+        if (merged.length === 0) {
+          merged.push({ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() });
+        }
+
+        merged.sort((a, b) => {
           if ((b.createdAt || 0) !== (a.createdAt || 0)) {
             return (b.createdAt || 0) - (a.createdAt || 0);
           }
           return a.id.localeCompare(b.id);
         });
 
-        // Only update state if team list actually changed to avoid re-render loops
-        setTeams((prevTeams) => {
-          if (Array.isArray(prevTeams) && JSON.stringify(prevTeams) === JSON.stringify(teamsList)) {
-            return prevTeams;
-          }
-          localStorage.setItem('iiq_teams', JSON.stringify(teamsList));
-          return teamsList;
-        });
-      }
+        if (JSON.stringify(prevTeams) === JSON.stringify(merged)) {
+          return prevTeams;
+        }
+        localStorage.setItem('iiq_teams', JSON.stringify(merged));
+        return merged;
+      });
     }, (error) => {
       console.warn("Teams collection listener notice:", error.message);
     });
@@ -628,6 +662,46 @@ export default function App() {
   useEffect(() => { if (activeTeamId) localStorage.setItem('iiq_active_team_id', activeTeamId); }, [activeTeamId]);
   useEffect(() => { localStorage.setItem('iiq_saved_lineups', JSON.stringify(savedLineups)); }, [savedLineups]);
 
+  // Auto-persist per-team isolated cache whenever active team state changes
+  useEffect(() => {
+    if (!activeTeamId) return;
+    const teamCache = {
+      players: players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS),
+      lineup,
+      score,
+      gameInfo,
+      rotations,
+      plans,
+      activePlanIds,
+      history,
+      savedLineups,
+      drills: sanitizeDrillList(drills),
+      growthRecords,
+      trainingState,
+    };
+    try {
+      localStorage.setItem(`iiq_team_data_${activeTeamId}`, JSON.stringify(teamCache));
+    } catch (e) {
+      console.warn("Error saving team cache:", e);
+    }
+  }, [activeTeamId, players, lineup, score, gameInfo, rotations, plans, activePlanIds, history, savedLineups, drills, growthRecords, trainingState]);
+
+  // Automatically keep team list name in sync with gameInfo.team
+  useEffect(() => {
+    if (!activeTeamId || !gameInfo.team) return;
+    setTeams((prevTeams) => {
+      const list = Array.isArray(prevTeams) ? prevTeams : [];
+      const idx = list.findIndex(t => t.id === activeTeamId);
+      if (idx !== -1 && list[idx].name !== gameInfo.team) {
+        const updated = [...list];
+        updated[idx] = { ...updated[idx], name: gameInfo.team };
+        localStorage.setItem('iiq_teams', JSON.stringify(updated));
+        return updated;
+      }
+      return prevTeams;
+    });
+  }, [activeTeamId, gameInfo.team]);
+
   // Sync sound & haptic preferences to localStorage
   useEffect(() => { localStorage.setItem('iiq_sound_enabled', String(soundEnabled)); }, [soundEnabled]);
   useEffect(() => { localStorage.setItem('iiq_sound_volume', String(soundVolume)); }, [soundVolume]);
@@ -709,33 +783,53 @@ export default function App() {
     };
   }, [userName]);
 
-  // Real-time Firestore users synchronization
+  // Real-time Firestore users synchronization with local preservation & merging
   useEffect(() => {
     const usersRef = collection(db, 'users');
     const unsubscribe = onSnapshot(usersRef, (snapshot) => {
-      const usersList: UserProfile[] = [];
+      const remoteUsers: UserProfile[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        usersList.push({
-          uid: data.uid,
-          email: data.email,
-          name: data.name,
-          role: data.role,
-          teamIds: data.teamIds || [],
-          status: data.status,
-          invitedBy: data.invitedBy,
-          invitedAt: data.invitedAt,
-          inviteCode: data.inviteCode,
-        });
+        if (data && data.uid) {
+          remoteUsers.push({
+            uid: data.uid,
+            email: data.email || '',
+            name: data.name || '',
+            role: data.role || 'Coach',
+            teamIds: Array.isArray(data.teamIds) ? data.teamIds : [],
+            status: data.status || 'Active',
+            invitedBy: data.invitedBy || '',
+            invitedAt: data.invitedAt || 0,
+            inviteCode: data.inviteCode || '',
+          });
+        }
       });
-      if (snapshot.size > 0) {
-        setUsers((prevUsers) => {
-          if (Array.isArray(prevUsers) && JSON.stringify(prevUsers) === JSON.stringify(usersList)) {
-            return prevUsers;
-          }
-          return usersList;
-        });
-      }
+
+      setUsers((prevUsers) => {
+        let cachedLocalUsers: UserProfile[] = [];
+        try {
+          const raw = localStorage.getItem('iiq_users');
+          if (raw) cachedLocalUsers = JSON.parse(raw);
+        } catch (e) {
+          console.warn("Error reading iiq_users from localStorage:", e);
+        }
+
+        const userMap = new Map<string, UserProfile>();
+        (Array.isArray(prevUsers) ? prevUsers : []).forEach(u => userMap.set(u.uid, u));
+        (Array.isArray(cachedLocalUsers) ? cachedLocalUsers : []).forEach(u => userMap.set(u.uid, u));
+        remoteUsers.forEach(u => userMap.set(u.uid, u));
+
+        const merged = Array.from(userMap.values());
+        if (merged.length === 0) {
+          merged.push({ uid: 'u1', email: 'coach@example.com', name: userName || 'Coach Andrew', role: 'Admin', teamIds: ['team1'] });
+        }
+
+        if (JSON.stringify(prevUsers) === JSON.stringify(merged)) {
+          return prevUsers;
+        }
+        localStorage.setItem('iiq_users', JSON.stringify(merged));
+        return merged;
+      });
     }, (error) => {
       console.warn("Error subscribing to users collection:", error.message);
     });
@@ -846,11 +940,6 @@ export default function App() {
     setUsers(newUsers);
   };
 
-  // Helper to generate a fresh, team-isolated squad (empty by default for new teams)
-  const createFreshSquadForTeam = (_teamId: string): Player[] => {
-    return [];
-  };
-
   // Real-time Firestore document subscriber (Downstream sync)
   useEffect(() => {
     if (!activeTeamId) return;
@@ -865,7 +954,30 @@ export default function App() {
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       const currentTeams = Array.isArray(teams) ? teams : [];
       const activeTeamObj = currentTeams.find(t => t.id === activeTeamId);
-      const activeTeamName = activeTeamObj?.name || 'My Squad';
+
+      // Attempt to read local cache as fallback for offline or unpopulated documents
+      let cachedLocalData: any = null;
+      let cachedLocalPlayers: Player[] = [];
+      try {
+        const cacheObj = localStorage.getItem(`iiq_team_data_${activeTeamId}`);
+        if (cacheObj) {
+          cachedLocalData = JSON.parse(cacheObj);
+          if (Array.isArray(cachedLocalData.players) && cachedLocalData.players.length > 0) {
+            cachedLocalPlayers = normalizePlayers(cachedLocalData.players);
+          }
+        }
+        if (cachedLocalPlayers.length === 0) {
+          const legacyPlayers = localStorage.getItem('iiq_players');
+          if (legacyPlayers) {
+            const parsed = JSON.parse(legacyPlayers);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              cachedLocalPlayers = normalizePlayers(parsed);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Failed reading local cache for players:", e);
+      }
 
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -874,28 +986,36 @@ export default function App() {
         isSyncingFromServerRef.current = true;
         setIsSyncingFromServer(true);
 
+        const remoteTeamName = data.name || data.gameInfo?.team;
+        const bestTeamName = (remoteTeamName && !['Unnamed Squad', 'New Team'].includes(remoteTeamName))
+          ? remoteTeamName
+          : (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name) ? activeTeamObj.name : 'My Squad');
+
         const activePlayers = (data.players && Array.isArray(data.players) && data.players.length > 0)
-          ? data.players
-          : createFreshSquadForTeam(activeTeamId);
-        const activeLineup = (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) ? data.lineup : {};
+          ? normalizePlayers(data.players)
+          : (cachedLocalPlayers.length > 0
+              ? cachedLocalPlayers
+              : (players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS)));
+
+        const activeLineup = (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) ? data.lineup : (cachedLocalData?.lineup || {});
         const defaultScore: Score = {
           quarter: 1,
           home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
           away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
         };
-        const activeScore = (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) ? data.score : defaultScore;
+        const activeScore = (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) ? data.score : (cachedLocalData?.score || defaultScore);
         const activeGameInfo = (data.gameInfo && typeof data.gameInfo === 'object' && !Array.isArray(data.gameInfo))
-          ? { ...data.gameInfo, team: activeTeamName }
-          : { team: activeTeamName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' };
-        const activeRotations = (data.rotations && Array.isArray(data.rotations)) ? data.rotations : [];
-        const activePlans = (data.plans && Array.isArray(data.plans)) ? data.plans : [{ id: 'plan1', name: 'Q1 Rotation' }];
+          ? { ...data.gameInfo, team: data.gameInfo.team || bestTeamName }
+          : (cachedLocalData?.gameInfo || { team: bestTeamName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' });
+        const activeRotations = (data.rotations && Array.isArray(data.rotations)) ? data.rotations : (cachedLocalData?.rotations || []);
+        const activePlans = (data.plans && Array.isArray(data.plans)) ? data.plans : (cachedLocalData?.plans || [{ id: 'plan1', name: 'Q1 Rotation' }]);
         const activePlanIdsLoaded = (data.activePlanIds && Array.isArray(data.activePlanIds) && data.activePlanIds.some((id: string) => activePlans.some(p => p.id === id)))
           ? data.activePlanIds
-          : activePlans.map(p => p.id);
-        const activeHistory = (data.history && Array.isArray(data.history)) ? data.history : [];
-        const activeSavedLineups = (data.savedLineups && Array.isArray(data.savedLineups)) ? data.savedLineups : [];
-        const activeDrills = (data.drills && Array.isArray(data.drills)) ? parseDrillList(data.drills) : [];
-        const activeGrowthRecords = (data.growthRecords && Array.isArray(data.growthRecords)) ? data.growthRecords : [];
+          : activePlans.map((p: any) => p.id);
+        const activeHistory = (data.history && Array.isArray(data.history)) ? data.history : (cachedLocalData?.history || []);
+        const activeSavedLineups = (data.savedLineups && Array.isArray(data.savedLineups)) ? data.savedLineups : (cachedLocalData?.savedLineups || []);
+        const activeDrills = (data.drills && Array.isArray(data.drills)) ? parseDrillList(data.drills) : (cachedLocalData?.drills || []);
+        const activeGrowthRecords = (data.growthRecords && Array.isArray(data.growthRecords)) ? data.growthRecords : (cachedLocalData?.growthRecords || []);
         const defaultTrainingState: TrainingState = {
           view: 'library',
           filter: 'All',
@@ -907,11 +1027,11 @@ export default function App() {
         };
         const activeTrainingState = (data.trainingState && typeof data.trainingState === 'object' && !Array.isArray(data.trainingState))
           ? data.trainingState
-          : defaultTrainingState;
+          : (cachedLocalData?.trainingState || defaultTrainingState);
 
         const incomingDataToSync = {
           id: activeTeamId,
-          name: activeTeamName,
+          name: bestTeamName,
           players: activePlayers,
           lineup: activeLineup,
           score: activeScore,
@@ -938,7 +1058,7 @@ export default function App() {
         setHistory(activeHistory);
         setSavedLineups(activeSavedLineups);
         setDrills(activeDrills);
-        if (data.growthRecords) setGrowthRecords(activeGrowthRecords);
+        if (data.growthRecords || cachedLocalData?.growthRecords) setGrowthRecords(activeGrowthRecords);
         setTrainingState(activeTrainingState);
 
         setLastSyncedAt(data.updatedAt || Date.now());
@@ -953,24 +1073,30 @@ export default function App() {
           setIsSyncingFromServer(false);
         }, 800);
       } else {
-        // Document does not exist in Firestore yet (new team). We create a fresh isolated squad & team dataset!
+        // Document does not exist in Firestore yet (new team). Check local cache or use defaults!
         setCloudConnected(true);
         setLastSyncedAt(Date.now());
-        const freshPlayers = createFreshSquadForTeam(activeTeamId);
-        const freshScore: Score = {
+
+        const bestTeamName = (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name)) ? activeTeamObj.name : 'My Squad';
+
+        const freshPlayers: Player[] = (cachedLocalPlayers.length > 0)
+          ? cachedLocalPlayers
+          : (players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS));
+
+        const freshScore: Score = cachedLocalData?.score || {
           quarter: 1,
           home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
           away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
         };
-        const freshGameInfo: GameInfo = {
-          team: activeTeamName,
+        const freshGameInfo: GameInfo = cachedLocalData?.gameInfo || {
+          team: bestTeamName,
           round: 'Round 1',
           date: new Date().toISOString().slice(0, 10),
           opponent: '',
         };
-        const freshPlans = [{ id: 'plan1', name: 'Q1 Rotation' }];
-        const freshActivePlanIds = ['plan1'];
-        const freshTrainingState: TrainingState = {
+        const freshPlans = cachedLocalData?.plans || [{ id: 'plan1', name: 'Q1 Rotation' }];
+        const freshActivePlanIds = cachedLocalData?.activePlanIds || ['plan1'];
+        const freshTrainingState: TrainingState = cachedLocalData?.trainingState || {
           view: 'library',
           filter: 'All',
           activeId: 'one-v-one-kick-tennis',
@@ -982,30 +1108,30 @@ export default function App() {
 
         const initialDataToSync = {
           id: activeTeamId,
-          name: activeTeamName,
+          name: bestTeamName,
           players: freshPlayers,
-          lineup: {},
+          lineup: cachedLocalData?.lineup || {},
           score: freshScore,
           gameInfo: freshGameInfo,
-          rotations: [],
+          rotations: cachedLocalData?.rotations || [],
           plans: freshPlans,
           activePlanIds: freshActivePlanIds,
-          history: [],
-          savedLineups: [],
+          history: cachedLocalData?.history || [],
+          savedLineups: cachedLocalData?.savedLineups || [],
           drills: sanitizeDrillList(drills),
-          growthRecords,
+          growthRecords: cachedLocalData?.growthRecords || growthRecords,
           trainingState: freshTrainingState,
         };
 
         lastPublishedSerializedRef.current = JSON.stringify(initialDataToSync);
 
         setPlayers(freshPlayers);
-        setLineup({});
+        setLineup(cachedLocalData?.lineup || {});
         setScore(freshScore);
         setGameInfo(freshGameInfo);
-        setSavedLineups([]);
-        setHistory([]);
-        setRotations([]);
+        setSavedLineups(cachedLocalData?.savedLineups || []);
+        setHistory(cachedLocalData?.history || []);
+        setRotations(cachedLocalData?.rotations || []);
         setPlans(freshPlans);
         setActivePlanIds(freshActivePlanIds);
         setTrainingState(freshTrainingState);
