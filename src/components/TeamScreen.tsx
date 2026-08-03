@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, LineupTemplate, GameHistory } from '../types';
-import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS } from '../constants';
+import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS, normalizePosition } from '../constants';
 import { 
   Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, 
   Check, X, Flame, Sparkles, Clock, Activity, RotateCcw, Landmark, 
@@ -104,7 +104,7 @@ export default function TeamScreen({
     setFormNick(p.nick);
     setFormNumber(p.number);
     setFormPrimaryZone(p.primaryZone);
-    setFormPositions(p.positions || []);
+    setFormPositions((p.positions || []).map(normalizePosition));
     setFormStatus(p.status);
     setFormNote(p.note);
     setFormError('');
@@ -491,7 +491,8 @@ export default function TeamScreen({
           <div className="max-h-[720px] overflow-y-auto divide-y divide-gray-100">
             {filtered.map((p) => {
               const isActive = activeId === p.id;
-              const fldPos = Object.keys(lineup).find((k) => lineup[k] === p.id);
+              const rawFldPos = Object.keys(lineup).find((k) => lineup[k] === p.id);
+              const fldPos = rawFldPos ? normalizePosition(rawFldPos) : undefined;
 
               return (
                 <div
@@ -658,14 +659,17 @@ export default function TeamScreen({
                     </span>
                     <div className="flex flex-wrap gap-1">
                       {activePlayer.positions && activePlayer.positions.length > 0 ? (
-                        activePlayer.positions.map((pos) => (
-                          <span
-                            key={pos}
-                            className="px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-md text-[10px] font-bold"
-                          >
-                            {pos}
-                          </span>
-                        ))
+                        activePlayer.positions.map((pos) => {
+                          const normPos = normalizePosition(pos);
+                          return (
+                            <span
+                              key={pos}
+                              className="px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-md text-[10px] font-bold"
+                            >
+                              {normPos}
+                            </span>
+                          );
+                        })
                       ) : (
                         <span className="text-xs text-gray-400 font-semibold italic">None configured</span>
                       )}

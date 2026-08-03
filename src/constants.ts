@@ -76,6 +76,37 @@ export const POSITION_FULL_NAMES: Record<string, string> = {
   M3: 'Ruck Rover',
 };
 
+export function normalizePosition(pos: string): string {
+  if (pos === 'M1') return 'C';
+  if (pos === 'M2') return 'ROV';
+  if (pos === 'M3') return 'RR';
+  return pos;
+}
+
+export function normalizeLineup(lineupObj: Record<string, string>): Record<string, string> {
+  if (!lineupObj) return {};
+  const newObj: Record<string, string> = {};
+  for (const [key, val] of Object.entries(lineupObj)) {
+    const normKey = normalizePosition(key);
+    newObj[normKey] = val;
+  }
+  return newObj;
+}
+
+export function normalizePlayers<T extends { positions?: string[] }>(playersList: T[]): T[] {
+  if (!Array.isArray(playersList)) return [];
+  return playersList.map((p) => {
+    if (!p.positions || !Array.isArray(p.positions)) return p;
+    let changed = false;
+    const normPositions = p.positions.map((pos) => {
+      const n = normalizePosition(pos);
+      if (n !== pos) changed = true;
+      return n;
+    });
+    return changed ? { ...p, positions: normPositions } : p;
+  });
+}
+
 export const DEFAULT_PLAYERS: Player[] = [
   { id: 'p1', name: 'Alex Morgan', nick: '', number: '7', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1980, bench: 720, note: '', slotTimes: { 'C': 1200, 'ROV': 480, 'RR': 300 } },
   { id: 'p2', name: 'Bella Hart', nick: '', number: '12', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1620, bench: 1080, note: '', slotTimes: { 'FF': 1020, 'FP-L': 600 } },

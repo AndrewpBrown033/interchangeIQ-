@@ -3,7 +3,7 @@ import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
   Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment
 } from './types';
-import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION } from './constants';
+import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers } from './constants';
 
 // Firebase Integrations
 import { auth, db, signInAnonymously, onAuthStateChanged, User } from './lib/firebase';
@@ -87,18 +87,18 @@ export default function App() {
     try {
       const saved = localStorage.getItem('iiq_players');
       const parsed = saved ? JSON.parse(saved) : null;
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) return normalizePlayers(parsed);
     } catch (e) {
       console.warn("Failed to parse players:", e);
     }
-    return DEFAULT_PLAYERS;
+    return normalizePlayers(DEFAULT_PLAYERS);
   });
 
   const [lineup, setLineup] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('iiq_lineup');
       const parsed = saved ? JSON.parse(saved) : null;
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return normalizeLineup(parsed);
     } catch (e) {
       console.warn("Failed to parse lineup:", e);
     }
