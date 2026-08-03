@@ -553,6 +553,27 @@ export default function AdminScreen({
     onUpdateUsers(updated);
   };
 
+  const handleToggleRoleFeature = (role: string, featureKey: string) => {
+    const updated = users.map((u) => {
+      if (u.role === role) {
+        const currentFeatures = u.allowedFeatures ?? (
+          u.role === 'Admin' || u.role === 'Coach'
+            ? ['training', 'growth', 'jarvis']
+            : u.role === 'Assistant Coach'
+            ? ['training', 'growth']
+            : []
+        );
+        const isAllowed = currentFeatures.includes(featureKey);
+        const newFeatures = isAllowed
+          ? currentFeatures.filter((f) => f !== featureKey)
+          : [...currentFeatures, featureKey];
+        return { ...u, allowedFeatures: newFeatures };
+      }
+      return u;
+    });
+    onUpdateUsers(updated);
+  };
+
   const isElevatedRole = currentUserRole === 'Admin' || currentUserRole === 'Coach';
 
   const handleExportCSV = () => {
@@ -691,7 +712,7 @@ export default function AdminScreen({
               <div>
                 <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
                   <Zap className="w-4 h-4 text-purple-600" />
-                  <span>Elevated Access & Feature Visibility ({teams.find(t => t.id === activeTeamId)?.name || 'Active Team'})</span>
+                  <span>Enabled Feature Access ({teams.find(t => t.id === activeTeamId)?.name || 'Active Team'})</span>
                 </h3>
                 <p className="text-xs text-gray-500 font-semibold mt-0.5">
                   Choose which features are enabled for this active team. Feature permissions for specific coaches and roles can be configured per user in the Coaches & Roles section below.
@@ -978,6 +999,69 @@ export default function AdminScreen({
               {/* Active Members Sub-view */}
               {activeUserSubTab === 'active' && (
                 <div className="space-y-3">
+                  {/* Quick Role Feature Access Matrix */}
+                  <div className="p-3 bg-gray-50 border border-gray-200/80 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                        Turn On / Off Features by Role Group
+                      </span>
+                      <span className="text-[9px] text-gray-400 font-semibold">Batch toggle feature access for all coaches in a role</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[
+                        { role: 'Coach', label: 'Coaches' },
+                        { role: 'Assistant Coach', label: 'Assistant Coaches' },
+                        { role: 'Manager', label: 'Managers' },
+                      ].map((roleGroup) => (
+                        <div key={`role-group-${roleGroup.role}`} className="p-2 bg-white rounded-lg border border-gray-200 space-y-1">
+                          <span className="text-[10px] font-black text-gray-800 uppercase block">{roleGroup.label}</span>
+                          <div className="flex gap-1">
+                            {[
+                              { key: 'training', label: 'Train', icon: <BookOpen className="w-2.5 h-2.5 text-indigo-600" /> },
+                              { key: 'growth', label: 'Growth', icon: <TrendingUp className="w-2.5 h-2.5 text-emerald-600" /> },
+                              { key: 'jarvis', label: 'JARVIS', icon: <Bot className="w-2.5 h-2.5 text-purple-600" /> },
+                            ].map((feat) => {
+                              const usersInRole = users.filter((u) => u.role === roleGroup.role);
+                              const enabledCount = usersInRole.filter((u) => {
+                                const current = u.allowedFeatures ?? (
+                                  u.role === 'Coach' ? ['training', 'growth', 'jarvis'] : u.role === 'Assistant Coach' ? ['training', 'growth'] : []
+                                );
+                                return current.includes(feat.key);
+                              }).length;
+                              const isAllEnabled = usersInRole.length > 0 && enabledCount === usersInRole.length;
+                              
+                              return (
+                                <button
+                                  key={`role-feat-${roleGroup.role}-${feat.key}`}
+                                  type="button"
+                                  onClick={() => handleToggleRoleFeature(roleGroup.role, feat.key)}
+                                  className={`flex-1 px-1.5 py-1 rounded text-[9px] font-bold border transition flex items-center justify-between cursor-pointer ${
+                                    isAllEnabled
+                                      ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                      : enabledCount > 0
+                                      ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                      : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+                                  }`}
+                                  title={`Toggle ${feat.label} for all ${roleGroup.label}`}
+                                >
+                                  <div className="flex items-center gap-0.5">
+                                    {feat.icon}
+                                    <span>{feat.label}</span>
+                                  </div>
+                                  <span className={`text-[8px] font-black px-1 rounded ${
+                                    isAllEnabled ? 'bg-emerald-200 text-emerald-900' : enabledCount > 0 ? 'bg-amber-200 text-amber-900' : 'bg-gray-200 text-gray-500'
+                                  }`}>
+                                    {isAllEnabled ? 'ON' : enabledCount > 0 ? `${enabledCount}` : 'OFF'}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {activeCoaches.map((u, idx) => (
                     <div
                       key={`active-coach-${u.uid || 'coach'}-${idx}`}
@@ -1036,8 +1120,8 @@ export default function AdminScreen({
                       {/* Feature Permissions for this user */}
                       <div className="pt-2 border-t border-dashed border-gray-100">
                         <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-                          <span className="text-[10px] font-black uppercase text-gray-400">
-                            Feature Access Permissions
+                          <span className="text-[10px] font-black uppercase text-gray-500">
+                            Turn On / Off Features for {u.name}
                           </span>
                           {u.role === 'Admin' ? (
                             <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
@@ -1045,15 +1129,15 @@ export default function AdminScreen({
                             </span>
                           ) : (
                             <span className="text-[9px] text-gray-400 font-bold">
-                              Select permitted modules
+                              Click feature to enable or disable
                             </span>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {[
-                            { key: 'training', label: 'Training', icon: <BookOpen className="w-3 h-3 text-indigo-600" /> },
-                            { key: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-3 h-3 text-emerald-600" /> },
-                            { key: 'jarvis', label: 'JARVIS AI', icon: <Bot className="w-3 h-3 text-purple-600" /> },
+                            { key: 'training', label: 'Training Module', icon: <BookOpen className="w-3.5 h-3.5 text-indigo-600" /> },
+                            { key: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> },
+                            { key: 'jarvis', label: 'JARVIS AI', icon: <Bot className="w-3.5 h-3.5 text-purple-600" /> },
                           ].map((feat) => {
                             const isAllowed = u.role === 'Admin' || (
                               u.allowedFeatures
@@ -1066,16 +1150,20 @@ export default function AdminScreen({
                                 key={`user-feat-${u.uid}-${feat.key}`}
                                 disabled={u.role === 'Admin'}
                                 onClick={() => handleToggleUserFeature(u.uid, feat.key)}
-                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed ${
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
                                   isAllowed
-                                    ? 'bg-blue-50/90 text-blue-900 border-blue-200 shadow-2xs'
-                                    : 'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'
+                                    ? 'bg-emerald-50 text-emerald-950 border-emerald-300 shadow-2xs'
+                                    : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600'
                                 }`}
-                                title={u.role === 'Admin' ? 'Admins have full access' : `Toggle ${feat.label} access for ${u.name}`}
+                                title={u.role === 'Admin' ? 'Admins have full access' : `Turn ${feat.label} ${isAllowed ? 'OFF' : 'ON'} for ${u.name}`}
                               >
                                 {feat.icon}
                                 <span>{feat.label}</span>
-                                <span className={`w-1.5 h-1.5 rounded-full ${isAllowed ? 'bg-blue-600' : 'bg-gray-300'}`} />
+                                <span className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded ${
+                                  isAllowed ? 'bg-emerald-200 text-emerald-900' : 'bg-gray-200 text-gray-500'
+                                }`}>
+                                  {isAllowed ? 'ENABLED' : 'DISABLED'}
+                                </span>
                               </button>
                             );
                           })}
