@@ -455,8 +455,8 @@ export default function App() {
         localStorage.setItem('iiq_teams', JSON.stringify(merged));
         return merged;
       });
-    }, (error) => {
-      console.warn("Teams collection listener notice:", error.message);
+    }, (_error) => {
+      // Quiet fallback to local teams cache when offline or initializing
     });
 
     return () => unsubscribe();
@@ -754,9 +754,9 @@ export default function App() {
               name: userName || 'Coach Andrew',
               role: 'Admin',
               teamIds: [activeTeamId || 'team1']
-            }).catch(e => console.warn("Error setting user profile in Firestore:", e.message));
+            }).catch(() => {});
           }
-        }).catch(e => console.warn("Error getting user profile from Firestore:", e.message));
+        }).catch(() => {});
       }
     };
 
@@ -769,8 +769,7 @@ export default function App() {
           .then((cred) => {
             if (active) console.log('Firebase Anonymous Session Active:', cred.user.uid);
           })
-          .catch((err) => {
-            console.warn('Anonymous auth unavailable, attempting guest account sign-in:', err.message);
+          .catch(() => {
             signInWithEmailAndPassword(auth, 'guest.coach@interchangeiq.app', 'InterchangeIQ2026!')
               .then((cred) => {
                 if (active) console.log('Firebase Guest Session Active:', cred.user.uid);
@@ -781,8 +780,7 @@ export default function App() {
                     if (active) console.log('Firebase Created Guest Session:', cred.user.uid);
                   });
               })
-              .catch((emailErr) => {
-                console.warn('Firebase Auth fallback to local mode:', emailErr.message);
+              .catch(() => {
                 const fallbackUid = localStorage.getItem('iiq_fallback_uid') || `local_${Math.random().toString(36).substr(2, 9)}`;
                 localStorage.setItem('iiq_fallback_uid', fallbackUid);
                 
@@ -854,8 +852,8 @@ export default function App() {
         localStorage.setItem('iiq_users', JSON.stringify(merged));
         return merged;
       });
-    }, (error) => {
-      console.warn("Error subscribing to users collection:", error.message);
+    }, (_error) => {
+      // Quiet fallback when offline or initializing
     });
 
     return () => unsubscribe();
@@ -1169,8 +1167,7 @@ export default function App() {
           setIsSyncingFromServer(false);
         }, 800);
       }
-    }, (error) => {
-      console.warn("Firestore onSnapshot notice:", error.message);
+    }, (_error) => {
       setCloudConnected(false);
       setTimeout(() => {
         isSyncingFromServerRef.current = false;
