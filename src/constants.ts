@@ -14,7 +14,7 @@ export const POSITIONS: [string, string, number, number][] = [
   ['RHF', 'RHF', 76, 26],
 
   // Midfield 1 (Center Top)
-  ['M1', 'M1', 38, 39],
+  ['C', 'C', 38, 39],
   ['R', 'R', 62, 39],
 
   // Wings
@@ -22,8 +22,8 @@ export const POSITIONS: [string, string, number, number][] = [
   ['RW', 'RW', 80, 50],
 
   // Midfield 2 (Center Bottom)
-  ['M3', 'M3', 38, 61],
-  ['M2', 'M2', 62, 61],
+  ['RR', 'RR', 38, 61],
+  ['ROV', 'ROV', 62, 61],
 
   // Half Back Line
   ['LBF', 'LBF', 24, 74],
@@ -38,7 +38,7 @@ export const POSITIONS: [string, string, number, number][] = [
 
 export const POSITION_GROUPS: Record<string, string[]> = {
   FWD: ['LFP', 'FF', 'RFP', 'LHF', 'CHF', 'RHF'],
-  MID: ['LW', 'M1', 'RW', 'M2', 'M3'],
+  MID: ['LW', 'C', 'RW', 'ROV', 'RR'],
   DEF: ['LBF', 'CHB', 'RBF', 'LBP', 'FB', 'RBP'],
   RUCK: ['R'],
 };
@@ -50,9 +50,9 @@ export const POSITION_FULL_NAMES: Record<string, string> = {
   LHF: 'Left Half Forward',
   CHF: 'Centre Half Forward',
   RHF: 'Right Half Forward',
-  M1: 'Center',
-  M2: 'Rover',
-  M3: 'Ruck Rover',
+  C: 'Centre',
+  ROV: 'Rover',
+  RR: 'Ruck Rover',
   R: 'Ruck',
   LW: 'Left Wing',
   RW: 'Right Wing',
@@ -71,7 +71,9 @@ export const POSITION_FULL_NAMES: Record<string, string> = {
   'HB-R': 'Half Back Right',
   'BP-L': 'Back Pocket Left',
   'BP-R': 'Back Pocket Right',
-  C: 'Centre',
+  M1: 'Centre',
+  M2: 'Rover',
+  M3: 'Ruck Rover',
 };
 
 export const DEFAULT_PLAYERS: Player[] = [

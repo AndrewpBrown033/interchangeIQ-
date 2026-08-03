@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, GameInfo, TeamProfile } from '../types';
-import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, RefreshCw, CheckCircle2, Landmark, Check } from 'lucide-react';
+import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, RefreshCw, CheckCircle2, Landmark, Check, BookOpen, Bot } from 'lucide-react';
 
 interface SummaryScreenProps {
   players: Player[];
@@ -18,6 +18,9 @@ interface SummaryScreenProps {
   teams?: TeamProfile[];
   activeTeamId?: string | null;
   onSelectTeam?: (teamId: string) => void;
+  isTrainingEnabled?: boolean;
+  isGrowthEnabled?: boolean;
+  isJarvisEnabled?: boolean;
 }
 
 export default function SummaryScreen({
@@ -36,6 +39,9 @@ export default function SummaryScreen({
   teams = [],
   activeTeamId = null,
   onSelectTeam,
+  isTrainingEnabled = true,
+  isGrowthEnabled = true,
+  isJarvisEnabled = true,
 }: SummaryScreenProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -167,8 +173,8 @@ export default function SummaryScreen({
         </div>
       </div>
 
-      {/* Main Grid: Game Details & History */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Main Grid: Game Details, Modules & History */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Current Match */}
         <div
           onClick={() => onNavigate('lineup')}
@@ -210,35 +216,101 @@ export default function SummaryScreen({
           </button>
         </div>
 
-        {/* Player Growth & Progression */}
-        <div
-          onClick={() => onNavigate('growth')}
-          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-emerald-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
-        >
-          <div className="space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-100 transition">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-black text-[var(--navy)] group-hover:text-emerald-950 transition">Player Growth & Skill Testing</h3>
-            </div>
-            <p className="text-sm text-emerald-900 font-extrabold">
-              AFL Girls Year-on-Year Progression
-            </p>
-            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-              Record 2km time trials, aerobic fitness ratings, dominant kick distance, and non-preferred foot mastery.
-            </p>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onNavigate('growth');
-            }}
-            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+        {/* Training Module */}
+        {isTrainingEnabled && (
+          <div
+            onClick={() => onNavigate('training')}
+            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-indigo-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
           >
-            View Player Growth & Assessments
-          </button>
-        </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-100 transition">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-black text-[var(--navy)] group-hover:text-indigo-950 transition">Training & Tactical Drills</h3>
+              </div>
+              <p className="text-sm text-indigo-950 font-extrabold">
+                Drill Library & Session Builder
+              </p>
+              <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+                Build tactical training plans, manage drill drills catalog, create practice sessions, and share field exercises.
+              </p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigate('training');
+              }}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+            >
+              Open Training Module
+            </button>
+          </div>
+        )}
+
+        {/* Player Growth & Progression */}
+        {isGrowthEnabled && (
+          <div
+            onClick={() => onNavigate('growth')}
+            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-emerald-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-100 transition">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-black text-[var(--navy)] group-hover:text-emerald-950 transition">Player Growth & Skill Testing</h3>
+              </div>
+              <p className="text-sm text-emerald-900 font-extrabold">
+                AFL Girls Year-on-Year Progression
+              </p>
+              <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+                Record 2km time trials, aerobic fitness ratings, dominant kick distance, and non-preferred foot mastery.
+              </p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigate('growth');
+              }}
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+            >
+              View Player Growth & Assessments
+            </button>
+          </div>
+        )}
+
+        {/* JARVIS AI Assistant */}
+        {isJarvisEnabled && (
+          <div
+            onClick={() => onNavigate('jarvis')}
+            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-purple-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-xl group-hover:bg-purple-100 transition">
+                  <Bot className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-black text-[var(--navy)] group-hover:text-purple-950 transition">JARVIS AI Assistant</h3>
+              </div>
+              <p className="text-sm text-purple-950 font-extrabold">
+                Tactical AI Recommendations
+              </p>
+              <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+                AI-driven rotation strategies, player workload balance analysis, match recommendations, and session generation.
+              </p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigate('jarvis');
+              }}
+              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+            >
+              Launch JARVIS AI
+            </button>
+          </div>
+        )}
 
         {/* Saved Game History */}
         <div

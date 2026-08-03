@@ -1578,6 +1578,9 @@ export default function App() {
             teams={teams}
             activeTeamId={activeTeamId}
             onSelectTeam={handleSwitchTeam}
+            isTrainingEnabled={isTrainingEnabled}
+            isGrowthEnabled={isGrowthEnabled}
+            isJarvisEnabled={isJarvisEnabled}
           />
         )}
         {activeTab === 'lineup' && (
