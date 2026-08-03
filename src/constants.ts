@@ -1,6 +1,6 @@
 import { Player, Drill, SkillAssessment } from './types';
 
-export const APP_VERSION = 'v1.5.0';
+export const APP_VERSION = 'v1.5.1';
 
 export const POSITIONS: [string, string, number, number][] = [
   // Full Forward Line (Top End - Attacking Goal)
