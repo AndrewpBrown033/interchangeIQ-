@@ -1042,7 +1042,8 @@ export default function App() {
 
     const timer = setTimeout(() => {
       lastPublishedSerializedRef.current = currentSerialized;
-      setDoc(docRef, { ...dataToSync, updatedAt: Date.now() })
+      const cleanPayload = JSON.parse(JSON.stringify({ ...dataToSync, updatedAt: Date.now() }));
+      setDoc(docRef, cleanPayload)
         .then(() => {
           setLastSyncedAt(Date.now());
           setCloudConnected(true);

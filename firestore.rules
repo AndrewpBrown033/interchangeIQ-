@@ -1,70 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Global Safety Net
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Common Helpers
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(uid) {
-      return isSignedIn() && request.auth.uid == uid;
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    // Validation for UserProfile
-    function isValidUserProfile(data) {
-      return data.uid is string && data.uid.size() <= 128
-        && data.email is string && data.email.size() <= 256
-        && data.name is string && data.name.size() <= 256
-        && data.role is string && (data.role == 'Coach' || data.role == 'Manager' || data.role == 'Admin')
-        && data.teamIds is list && data.teamIds.size() <= 100;
-    }
-
-    // Validation for TeamState
-    function isValidTeam(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.name is string && data.name.size() <= 256
-        && data.players is list && data.players.size() <= 100
-        && data.lineup is map
-        && data.score is map
-        && data.gameInfo is map
-        && data.rotations is list && data.rotations.size() <= 1000
-        && data.plans is list && data.plans.size() <= 50
-        && data.history is list && data.history.size() <= 200
-        && data.savedLineups is list && data.savedLineups.size() <= 100
-        && data.drills is list && data.drills.size() <= 100
-        && data.updatedAt is number;
-    }
-
-    // Match Rules for User Profiles
     match /users/{uid} {
-      allow get, list: if true;
-      allow create: if isValidUserProfile(request.resource.data);
-      allow update: if isValidUserProfile(request.resource.data);
-      allow delete: if true;
+      allow read, write: if true;
     }
 
-    // Match Rules for Teams
     match /teams/{teamId} {
-      allow get, list: if true;
-      allow create: if isValidId(teamId) && isValidTeam(request.resource.data);
-      allow update: if isValidId(teamId) && isValidTeam(request.resource.data);
-      allow delete: if true;
+      allow read, write: if true;
     }
 
-    // Match Rules for Passkeys
     match /passkeys/{keyId} {
-      allow get, list: if true;
-      allow create, update: if true;
-      allow delete: if true;
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
