@@ -147,8 +147,12 @@ export default function PlanModeView({
       type: isBenchSwap ? 'bench' : 'onfield',
       outId: pOut.id,
       inId: pIn.id,
-      out: `${from.slot || 'Bench'} #${pOut.number} ${pOut.name}`,
-      inn: `${to.slot || 'Bench'} #${pIn.number} ${pIn.name}`,
+      out: isBenchSwap
+        ? `OFF (${from.slot || 'Bench'}) #${pOut.number} ${pOut.name}`
+        : `FROM (${from.slot || 'Field'}) #${pOut.number} ${pOut.name}`,
+      inn: isBenchSwap
+        ? `ON (${to.slot || 'Bench'}) #${pIn.number} ${pIn.name}`
+        : `TO (${to.slot || 'Field'}) #${pIn.number} ${pIn.name}`,
       note: isBenchSwap ? 'Bench Interchange' : 'On-Field Position Swap',
       applied: false,
       status: 'scheduled',
@@ -545,28 +549,45 @@ export default function PlanModeView({
                   {qRotations.map((rot) => {
                     const pOut = players.find((p) => p.id === rot.outId);
                     const pIn = players.find((p) => p.id === rot.inId);
+                    const isBench = rot.type === 'bench' ||
+                                    rot.out.toUpperCase().startsWith('OFF') ||
+                                    rot.inn.toUpperCase().startsWith('ON') ||
+                                    rot.out.toLowerCase().includes('bench') ||
+                                    rot.inn.toLowerCase().includes('bench');
+
+                    const getCleanPosLabel = (str: string) => {
+                      return str.replace(/^(OFF|ON|FROM|TO|Pos A|Pos B)\s*/i, '').replace(/^\(([^\)]+)\)/, '$1').trim().split(' ')[0] || 'Field';
+                    };
 
                     return (
                       <div
                         key={rot.id}
                         className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-50 transition flex items-center justify-between gap-2 text-xs"
                       >
-                        <div className="space-y-1 min-w-0 flex-1">
+                        <div className="space-y-1.5 min-w-0 flex-1">
                           {pOut && (
                             <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
-                              <ArrowLeft className="w-3.5 h-3.5 text-red-500 shrink-0 stroke-[2.5]" />
-                              <span className="text-[11px] text-red-600 font-black">#{pOut.number}</span>
+                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                                isBench ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-100 text-blue-700 border border-blue-200'
+                              }`}>
+                                {isBench ? 'OFF' : 'FROM'}
+                              </span>
+                              <span className={`text-[11px] font-black ${isBench ? 'text-red-600' : 'text-blue-600'}`}>#{pOut.number}</span>
                               <span className="truncate">{pOut.name}</span>
-                              <span className="text-[9px] text-slate-500 font-semibold uppercase">({rot.out.split(' ')[0]})</span>
+                              <span className="text-[9px] text-slate-500 font-semibold uppercase">({getCleanPosLabel(rot.out)})</span>
                             </div>
                           )}
 
                           {pIn && (
                             <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
-                              <ArrowRight className="w-3.5 h-3.5 text-emerald-500 shrink-0 stroke-[2.5]" />
-                              <span className="text-[11px] text-emerald-600 font-black">#{pIn.number}</span>
+                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                                isBench ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-purple-100 text-purple-700 border border-purple-200'
+                              }`}>
+                                {isBench ? 'ON' : 'TO'}
+                              </span>
+                              <span className={`text-[11px] font-black ${isBench ? 'text-emerald-600' : 'text-purple-600'}`}>#{pIn.number}</span>
                               <span className="truncate">{pIn.name}</span>
-                              <span className="text-[9px] text-slate-500 font-semibold uppercase">({rot.inn.split(' ')[0]})</span>
+                              <span className="text-[9px] text-slate-500 font-semibold uppercase">({getCleanPosLabel(rot.inn)})</span>
                             </div>
                           )}
                         </div>

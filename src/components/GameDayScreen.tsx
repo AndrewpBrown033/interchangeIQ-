@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Score, Rotation, Plan, GameInfo } from '../types';
-import { POSITIONS, POSITION_GROUPS } from '../constants';
-import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp } from 'lucide-react';
+import { POSITIONS, POSITION_GROUPS, normalizePosition, getZoneForPosition } from '../constants';
+import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp, Sparkles } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 
 const POSITION_DESCRIPTIONS: Record<string, string> = {
@@ -486,7 +486,19 @@ export default function GameDayScreen({
   };
 
   // Coaching Insights calculator
-  const coachingInsights = () => {
+  const coachingInsights = (): {
+    needRest: Player[];
+    fresh: Player[];
+    outPlayer?: Player;
+    inPlayer?: Player;
+    midPlayer?: Player;
+    outSlot?: string;
+    midSlot?: string;
+    type: 'direct' | 'threeway' | 'none';
+    suggestion: string;
+    reason?: string;
+    priorityLabel?: string;
+  } => {
     const onGroundIds = new Set(Object.values(lineup));
     const plannedOutIds = new Set(plannedRotations.map((r) => r.outId));
     const plannedInIds = new Set(plannedRotations.map((r) => r.inId));
@@ -499,22 +511,149 @@ export default function GameDayScreen({
     );
 
     const needRest = onGroundUnplanned
-      .filter((p) => p.active >= 6 * 60) // 6 mins of active play
+      .filter((p) => p.active >= 5 * 60) // 5+ mins active play
       .sort((a, b) => b.active - a.active);
 
     const fresh = onBenchUnplanned
-      .filter((p) => p.bench >= 2 * 60) // 2 mins of bench wait
+      .filter((p) => p.bench >= 1 * 60) // 1+ min bench rest
       .sort((a, b) => b.bench - a.bench);
 
-    const outPlayer = needRest[0] || onGroundUnplanned.sort((a, b) => b.active - a.active)[0];
-    const inPlayer = fresh[0] || onBenchUnplanned.sort((a, b) => b.bench - a.bench)[0];
-
-    let suggestion = 'No immediate rotation needed';
-    if (outPlayer && inPlayer) {
-      suggestion = `Swap OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} ➔ IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name}`;
+    if (onGroundUnplanned.length === 0 || onBenchUnplanned.length === 0) {
+      return {
+        needRest: [],
+        fresh: [],
+        type: 'none',
+        suggestion: 'No available players for rotation',
+      };
     }
 
-    return { needRest, fresh, outPlayer, inPlayer, suggestion };
+    // Identify player needing rest most
+    const outPlayer = needRest[0] || onGroundUnplanned.sort((a, b) => b.active - a.active)[0];
+    const outSlot = Object.keys(lineup).find((k) => lineup[k] === outPlayer.id);
+    const outZone = outSlot ? getZoneForPosition(outSlot) : (outPlayer.primaryZone || 'MID');
+
+    const getNormPositions = (p: Player) => (p.positions || []).map(normalizePosition);
+
+    // 1. Direct Swap - Primary Zone Match on Bench
+    const primaryZoneBenchCandidates = onBenchUnplanned.filter(
+      (p) => p.primaryZone === outZone
+    ).sort((a, b) => b.bench - a.bench);
+
+    if (primaryZoneBenchCandidates.length > 0) {
+      const inPlayer = primaryZoneBenchCandidates[0];
+      return {
+        needRest,
+        fresh,
+        outPlayer,
+        inPlayer,
+        outSlot,
+        type: 'direct',
+        priorityLabel: 'Primary Zone Match',
+        reason: `#${inPlayer.number} ${inPlayer.name} primary zone is ${outZone}`,
+        suggestion: `Direct Swap: OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || outZone}) ➔ IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name} (Primary Zone: ${outZone})`,
+      };
+    }
+
+    // 2. Direct Swap - Preferred Position Match on Bench
+    const prefPosBenchCandidates = onBenchUnplanned.filter((p) => {
+      const normPos = getNormPositions(p);
+      return (outSlot && normPos.includes(normalizePosition(outSlot))) || normPos.some((pos) => getZoneForPosition(pos) === outZone);
+    }).sort((a, b) => b.bench - a.bench);
+
+    if (prefPosBenchCandidates.length > 0) {
+      const inPlayer = prefPosBenchCandidates[0];
+      return {
+        needRest,
+        fresh,
+        outPlayer,
+        inPlayer,
+        outSlot,
+        type: 'direct',
+        priorityLabel: 'Preferred Position Match',
+        reason: `#${inPlayer.number} ${inPlayer.name} prefers ${outSlot || outZone} (${getNormPositions(inPlayer).join('/')})`,
+        suggestion: `Direct Swap: OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || outZone}) ➔ IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name} (Preferred Pos: ${getNormPositions(inPlayer).join('/')})`,
+      };
+    }
+
+    // 3. 3-Way Chain Swap (Move player on field to free up bench player)
+    for (const mPlayer of onGroundUnplanned) {
+      if (mPlayer.id === outPlayer.id) continue;
+      const midSlot = Object.keys(lineup).find((k) => lineup[k] === mPlayer.id);
+      if (!midSlot) continue;
+      const midZone = getZoneForPosition(midSlot);
+
+      // Check if mPlayer can move to outSlot / outZone
+      const mNormPos = getNormPositions(mPlayer);
+      const mMatchesOut = mPlayer.primaryZone === outZone || (outSlot && mNormPos.includes(normalizePosition(outSlot))) || mNormPos.some((p) => getZoneForPosition(p) === outZone);
+
+      if (mMatchesOut) {
+        // Look for bench player B who can take midSlot / midZone
+        const benchForMid = onBenchUnplanned.filter((b) => {
+          const bNormPos = getNormPositions(b);
+          return b.primaryZone === midZone || bNormPos.includes(normalizePosition(midSlot)) || bNormPos.some((p) => getZoneForPosition(p) === midZone);
+        }).sort((a, b) => b.bench - a.bench);
+
+        if (benchForMid.length > 0) {
+          const inPlayer = benchForMid[0];
+          return {
+            needRest,
+            fresh,
+            outPlayer,
+            inPlayer,
+            midPlayer: mPlayer,
+            outSlot,
+            midSlot,
+            type: 'threeway',
+            priorityLabel: '3-Way Chain Swap',
+            reason: `Shift on-field #${mPlayer.number} ${mPlayer.name} (${midSlot} ➔ ${outSlot}) to free up ${midSlot} for bench player #${inPlayer.number} ${inPlayer.name}`,
+            suggestion: `3-Way Swap: #${mPlayer.number} ${mPlayer.nick || mPlayer.name} shifts (${midSlot} ➔ ${outSlot}). OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} ➔ Bench. IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name} ➔ ${midSlot}.`,
+          };
+        }
+      }
+    }
+
+    // 4. Heatmap % / Historic Time-in-Position Fallback (When not on bench matching primary/pref)
+    const benchWithHeatmap = [...onBenchUnplanned].map((p) => {
+      const slotSecs = (outSlot && p.slotTimes?.[outSlot]) || 0;
+      let zoneSecs = 0;
+      if (p.slotTimes) {
+        Object.entries(p.slotTimes).forEach(([posKey, secs]) => {
+          if (getZoneForPosition(posKey) === outZone) {
+            zoneSecs += secs || 0;
+          }
+        });
+      }
+      return { player: p, score: slotSecs * 2 + zoneSecs };
+    }).sort((a, b) => b.score - a.score || b.player.bench - a.player.bench);
+
+    if (benchWithHeatmap.length > 0 && benchWithHeatmap[0].score > 0) {
+      const inPlayer = benchWithHeatmap[0].player;
+      return {
+        needRest,
+        fresh,
+        outPlayer,
+        inPlayer,
+        outSlot,
+        type: 'direct',
+        priorityLabel: 'Heatmap Experience Option',
+        reason: `#${inPlayer.number} ${inPlayer.name} has prior historic heatmap experience in ${outSlot || outZone}`,
+        suggestion: `Direct Swap (Heatmap Fallback): OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || outZone}) ➔ IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name} (Heatmap experience: ${outZone})`,
+      };
+    }
+
+    // 5. Default Fresh Legs Swap
+    const defaultInPlayer = fresh[0] || onBenchUnplanned.sort((a, b) => b.bench - a.bench)[0];
+    return {
+      needRest,
+      fresh,
+      outPlayer,
+      inPlayer: defaultInPlayer,
+      outSlot,
+      type: 'direct',
+      priorityLabel: 'Fresh Legs Swap',
+      reason: 'General rest rotation based on longest bench rest',
+      suggestion: `Swap OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || 'Field'}) ➔ IN #${defaultInPlayer.number} ${defaultInPlayer.nick || defaultInPlayer.name}`,
+    };
   };
 
   const insights = coachingInsights();
@@ -746,13 +885,18 @@ export default function GameDayScreen({
 
   // Suggestion Apply
   const handleApplySuggestion = () => {
-    const { outPlayer, inPlayer } = insights;
-    if (outPlayer && inPlayer) {
+    const { type, outPlayer, inPlayer, midPlayer, outSlot, midSlot } = insights;
+    if (type === 'direct' && outPlayer && inPlayer) {
       const nextLineup = { ...lineup };
-      const outSlot = Object.keys(lineup).find((k) => lineup[k] === outPlayer.id);
-      if (outSlot) {
-        nextLineup[outSlot] = inPlayer.id;
+      const slot = outSlot || Object.keys(lineup).find((k) => lineup[k] === outPlayer.id);
+      if (slot) {
+        nextLineup[slot] = inPlayer.id;
       }
+      onUpdateLineup(nextLineup);
+    } else if (type === 'threeway' && outPlayer && inPlayer && midPlayer && outSlot && midSlot) {
+      const nextLineup = { ...lineup };
+      nextLineup[outSlot] = midPlayer.id; // On-field player shifts to vacated outSlot
+      nextLineup[midSlot] = inPlayer.id;  // Bench player takes midSlot
       onUpdateLineup(nextLineup);
     }
   };
@@ -1222,18 +1366,44 @@ export default function GameDayScreen({
 
             {/* Smart Suggestion */}
             <div className="border-t border-gray-100 pt-3">
-              <span className="text-[10px] font-black text-[var(--muted)] uppercase tracking-wider block mb-1">
-                AI Rotation Suggestion
-              </span>
-              <p className="text-sm font-bold text-gray-800 leading-relaxed mb-3">
+              <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
+                  <span>AI Rotation Suggestion</span>
+                </span>
+                {insights.priorityLabel && (
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                    insights.type === 'threeway'
+                      ? 'bg-purple-100 text-purple-800 border-purple-200'
+                      : insights.priorityLabel === 'Primary Zone Match'
+                      ? 'bg-blue-100 text-blue-800 border-blue-200'
+                      : insights.priorityLabel === 'Preferred Position Match'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                      : 'bg-amber-100 text-amber-800 border-amber-200'
+                  }`}>
+                    {insights.priorityLabel}
+                  </span>
+                )}
+              </div>
+              
+              <p className="text-sm font-extrabold text-gray-800 leading-relaxed mb-1">
                 {insights.suggestion}
               </p>
+              
+              {insights.reason && (
+                <p className="text-xs text-gray-500 font-medium mb-3 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                  <span>{insights.reason}</span>
+                </p>
+              )}
+
               {insights.outPlayer && insights.inPlayer && (
                 <button
                   onClick={handleApplySuggestion}
-                  className="px-3.5 py-1.5 bg-[#EEF2FF] hover:bg-blue-50 text-[var(--blue)] font-bold text-xs rounded-lg transition border border-blue-100"
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer mt-2"
                 >
-                  Apply Suggested Swap
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Apply Suggested {insights.type === 'threeway' ? '3-Way Chain Swap' : 'Swap'}</span>
                 </button>
               )}
             </div>
@@ -1576,9 +1746,9 @@ export default function GameDayScreen({
                         }`}>
                           {/* RookieMe Interchange Active Badges */}
                           {isSelected && (
-                            <div className="absolute top-0.5 right-0.5 z-20 bg-red-600 text-white font-black text-[7px] px-1 py-0.5 rounded shadow-sm flex items-center gap-0.5 animate-pulse">
-                              <span>OFF</span>
-                              <span>↓</span>
+                            <div className="absolute top-0.5 right-0.5 z-20 bg-blue-600 text-white font-black text-[7px] px-1 py-0.5 rounded shadow-sm flex items-center gap-0.5 animate-pulse">
+                              <span>SWAP</span>
+                              <span>⇄</span>
                             </div>
                           )}
 
@@ -1881,7 +2051,7 @@ export default function GameDayScreen({
                   </div>
                   <div className="truncate">
                     <span className="text-[9px] font-black uppercase tracking-wider text-red-300 block">
-                      {srcPosLabel} • COMING OFF
+                      {srcPosLabel} • {srcSlot ? 'FIELD SWAP FROM' : 'COMING OFF'}
                     </span>
                     <b className="text-xs font-black text-white truncate block">
                       {srcPlayer?.nick || srcPlayer?.name}
@@ -1889,8 +2059,8 @@ export default function GameDayScreen({
                   </div>
                 </div>
                 <div className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5 shrink-0 shadow-xs">
-                  <span>OFF</span>
-                  <span>↓</span>
+                  <span>{srcSlot ? 'FROM' : 'OFF'}</span>
+                  <span>{srcSlot ? '📍' : '↓'}</span>
                 </div>
               </div>
 

@@ -83,6 +83,20 @@ export function normalizePosition(pos: string): string {
   return pos;
 }
 
+export function getZoneForPosition(pos: string): 'FWD' | 'MID' | 'DEF' | 'RUCK' {
+  const norm = normalizePosition(pos);
+  for (const [zone, posList] of Object.entries(POSITION_GROUPS)) {
+    if (posList.includes(norm) || posList.includes(pos)) {
+      return zone as 'FWD' | 'MID' | 'DEF' | 'RUCK';
+    }
+  }
+  if (['FF', 'FP', 'FP-L', 'FP-R', 'CHF', 'HF', 'HF-L', 'HF-R', 'LFP', 'RFP', 'LHF', 'RHF'].includes(norm)) return 'FWD';
+  if (['C', 'ROV', 'RR', 'W', 'W-L', 'W-R', 'LW', 'RW', 'M1', 'M2', 'M3'].includes(norm)) return 'MID';
+  if (['FB', 'BP', 'BP-L', 'BP-R', 'CHB', 'HB', 'HB-L', 'HB-R', 'LBP', 'RBP', 'LBF', 'RBF'].includes(norm)) return 'DEF';
+  if (['R', 'RUCK'].includes(norm)) return 'RUCK';
+  return 'MID';
+}
+
 export function normalizeLineup(lineupObj: Record<string, string>): Record<string, string> {
   if (!lineupObj) return {};
   const newObj: Record<string, string> = {};

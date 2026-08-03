@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, LineupTemplate, GameHistory } from '../types';
-import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS, normalizePosition } from '../constants';
+import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS, normalizePosition, getZoneForPosition, POSITION_FULL_NAMES } from '../constants';
 import { 
   Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, 
   Check, X, Flame, Sparkles, Clock, Activity, RotateCcw, Landmark, 
@@ -119,12 +119,21 @@ export default function TeamScreen({
       return;
     }
 
+    const normPositions = formPositions.map(normalizePosition);
+    let finalPrimaryZone = formPrimaryZone;
+    if (normPositions.length > 0) {
+      const derivedZone = getZoneForPosition(normPositions[0]);
+      if (derivedZone) {
+        finalPrimaryZone = derivedZone;
+      }
+    }
+
     const data: Partial<Player> = {
       name: formName.trim(),
       nick: formNick.trim(),
       number: formNumber.trim(),
-      primaryZone: formPrimaryZone,
-      positions: formPositions,
+      primaryZone: finalPrimaryZone,
+      positions: normPositions,
       status: formStatus,
       note: formNote.trim(),
     };
@@ -150,8 +159,8 @@ export default function TeamScreen({
         name: formName.trim(),
         nick: formNick.trim(),
         number: formNumber.trim(),
-        primaryZone: formPrimaryZone,
-        positions: formPositions,
+        primaryZone: finalPrimaryZone,
+        positions: normPositions,
         status: formStatus,
         note: formNote.trim(),
       };
@@ -261,11 +270,32 @@ export default function TeamScreen({
   };
 
   const toggleFormPosition = (pos: string) => {
-    if (formPositions.includes(pos)) {
-      setFormPositions(formPositions.filter((p) => p !== pos));
+    const norm = normalizePosition(pos);
+    let next: string[];
+    if (formPositions.includes(norm)) {
+      next = formPositions.filter((p) => p !== norm);
     } else {
-      setFormPositions([...formPositions, pos]);
+      next = [...formPositions, norm];
     }
+    setFormPositions(next);
+
+    // Auto-align primary zone if selecting positions
+    if (next.length > 0) {
+      const derived = getZoneForPosition(next[0]);
+      if (derived) {
+        setFormPrimaryZone(derived);
+      }
+    }
+  };
+
+  const handleSelectZonePreset = (zoneKey: string) => {
+    const zonePositions = POSITION_GROUPS[zoneKey] || [];
+    setFormPositions(zonePositions.map(normalizePosition));
+    setFormPrimaryZone(zoneKey);
+  };
+
+  const handleClearPositions = () => {
+    setFormPositions([]);
   };
 
   const handleRestoreDefaultSquad = () => {
@@ -522,9 +552,27 @@ export default function TeamScreen({
                       <b className="text-sm text-[var(--ink)] block">
                         {p.nick ? `${p.nick} (${p.name})` : p.name}
                       </b>
-                      <span className="text-[10px] font-extrabold text-[var(--muted)] uppercase">
-                        {p.primaryZone} {fldPos ? `• ${fldPos}` : ''}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span className={`px-1.5 py-0.2 text-[9px] font-black rounded uppercase ${
+                          p.primaryZone === 'FWD' ? 'bg-red-50 text-red-700 border border-red-200' :
+                          p.primaryZone === 'DEF' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                          p.primaryZone === 'RUCK' ? 'bg-purple-50 text-purple-800 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'
+                        }`}>
+                          {p.primaryZone}
+                        </span>
+                        {p.positions && p.positions.length > 0 ? (
+                          <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                            Pref: {p.positions.map(normalizePosition).join(', ')}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-gray-400 font-semibold italic">No pref pos</span>
+                        )}
+                        {fldPos && (
+                          <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Field: {fldPos}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -661,25 +709,40 @@ export default function TeamScreen({
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block mb-1">
-                      Preferred Positions
-                    </span>
-                    <div className="flex flex-wrap gap-1">
+                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                        Preferred Positions
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditPlayer(activePlayer)}
+                        className="text-[10px] font-extrabold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit Profile</span>
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
                       {activePlayer.positions && activePlayer.positions.length > 0 ? (
                         activePlayer.positions.map((pos) => {
                           const normPos = normalizePosition(pos);
+                          const fullName = POSITION_FULL_NAMES[normPos] || normPos;
                           return (
                             <span
                               key={pos}
-                              className="px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-md text-[10px] font-bold"
+                              title={fullName}
+                              className="px-2.5 py-1 bg-white border border-blue-200 text-blue-900 rounded-lg text-xs font-black shadow-2xs flex items-center gap-1"
                             >
-                              {normPos}
+                              <span>{normPos}</span>
+                              {fullName !== normPos && (
+                                <span className="text-[9px] font-medium text-blue-500">({fullName})</span>
+                              )}
                             </span>
                           );
                         })
                       ) : (
-                        <span className="text-xs text-gray-400 font-semibold italic">None configured</span>
+                        <span className="text-xs text-gray-400 font-semibold italic">No preferred positions selected. Click Edit Profile to set positions.</span>
                       )}
                     </div>
                   </div>
@@ -995,29 +1058,98 @@ export default function TeamScreen({
               </div>
 
               {/* Preferred Positions Builder */}
-              <div>
-                <label className="block mb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
-                  Select Preferred Positions
-                </label>
-                <div className="space-y-2 max-h-36 overflow-y-auto border border-gray-100 p-2 rounded-xl bg-gray-50/50">
+              <div className="space-y-2 bg-slate-50 border border-slate-200 p-3.5 rounded-2xl">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Select Preferred Positions
+                    </label>
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      Select all positions this player is preferred or trained to play. Primary zone aligns automatically.
+                    </p>
+                  </div>
+                  {formPositions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearPositions}
+                      className="text-[10px] font-bold text-red-600 hover:text-red-800 bg-red-50 px-2 py-0.5 rounded border border-red-200 cursor-pointer"
+                    >
+                      Clear All ({formPositions.length})
+                    </button>
+                  )}
+                </div>
+
+                {/* Currently selected summary pills */}
+                {formPositions.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 bg-white p-2 rounded-xl border border-blue-100 shadow-2xs">
+                    <span className="text-[9px] font-black uppercase text-blue-600 mr-1">Selected ({formPositions.length}):</span>
+                    {formPositions.map((pos) => {
+                      const norm = normalizePosition(pos);
+                      return (
+                        <span
+                          key={`selected-${norm}`}
+                          className="px-2 py-0.5 bg-blue-600 text-white font-black text-[10px] rounded-md flex items-center gap-1"
+                        >
+                          <span>{norm}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleFormPosition(norm)}
+                            className="hover:text-red-200 cursor-pointer ml-0.5 font-bold"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Preset buttons */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  <span className="text-[9px] font-black uppercase text-gray-400">Quick Presets:</span>
+                  {Object.keys(POSITION_GROUPS).map((groupName) => (
+                    <button
+                      key={`preset-${groupName}`}
+                      type="button"
+                      onClick={() => handleSelectZonePreset(groupName)}
+                      className="px-2 py-0.5 text-[9px] font-bold bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-800 rounded-md border border-slate-200 transition cursor-pointer"
+                    >
+                      + All {groupName}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Grouped Position Pickers */}
+                <div className="space-y-3 max-h-52 overflow-y-auto border border-slate-200/80 p-2.5 rounded-xl bg-white mt-1">
                   {Object.keys(POSITION_GROUPS).map((groupName) => (
                     <div key={groupName} className="space-y-1">
-                      <b className="text-[10px] font-black uppercase text-gray-400 block mt-1">{groupName}</b>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-0.5">
+                        <b className="text-[10px] font-black uppercase text-slate-500">{groupName} Zone</b>
+                        <span className="text-[9px] text-gray-400 font-semibold">{POSITION_GROUPS[groupName].length} positions</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
                         {POSITION_GROUPS[groupName].map((pos) => {
-                          const isSel = formPositions.includes(pos);
+                          const norm = normalizePosition(pos);
+                          const isSel = formPositions.includes(norm);
+                          const fullName = POSITION_FULL_NAMES[norm] || norm;
                           return (
                             <button
                               key={pos}
                               type="button"
                               onClick={() => toggleFormPosition(pos)}
-                              className={`px-2 py-1 text-[10px] font-black rounded-lg border transition ${
+                              className={`p-1.5 rounded-lg border text-left transition flex flex-col justify-between cursor-pointer ${
                                 isSel
-                                  ? 'bg-[#EEF0FF] text-[var(--blue)] border-blue-200'
-                                  : 'bg-white text-gray-500 border-gray-200 hover:text-gray-700'
+                                  ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                               }`}
                             >
-                              {pos}
+                              <div className="flex items-center justify-between">
+                                <span className="font-black text-xs">{norm}</span>
+                                {isSel && <Check className="w-3 h-3 stroke-[3] text-white" />}
+                              </div>
+                              <span className={`text-[9px] truncate font-medium ${isSel ? 'text-blue-100' : 'text-slate-500'}`}>
+                                {fullName}
+                              </span>
                             </button>
                           );
                         })}

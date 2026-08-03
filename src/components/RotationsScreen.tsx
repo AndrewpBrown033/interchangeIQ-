@@ -341,8 +341,8 @@ export default function RotationsScreen({
     const outPosTag = outPos.slotKey ? ` [${outPos.slotKey}]` : '';
     const inPosTag = inPos.slotKey ? ` [${inPos.slotKey}]` : '';
 
-    const outText = formType === 'bench' ? `OFF${outPosTag} #${outPlayer.number} ${outPlayer.name}` : `Pos A${outPosTag} #${outPlayer.number} ${outPlayer.name}`;
-    const inText = formType === 'bench' ? `ON${inPosTag} #${inPlayer.number} ${inPlayer.name}` : `Pos B${inPosTag} #${inPlayer.number} ${inPlayer.name}`;
+    const outText = formType === 'bench' ? `OFF${outPosTag} #${outPlayer.number} ${outPlayer.name}` : `FROM${outPosTag} #${outPlayer.number} ${outPlayer.name}`;
+    const inText = formType === 'bench' ? `ON${inPosTag} #${inPlayer.number} ${inPlayer.name}` : `TO${inPosTag} #${inPlayer.number} ${inPlayer.name}`;
 
     if (editingRotation) {
       const firstQ = selectedQuarters[0];
@@ -781,21 +781,33 @@ export default function RotationsScreen({
                             </div>
 
                             <div className="space-y-1.5">
-                              {/* Dual OFF / ON High-Contrast Interchange Badges */}
+                              {/* Dual OFF / ON or FROM / TO High-Contrast Interchange Badges */}
                               <div className="flex flex-wrap items-center gap-2">
-                                {/* OFF Badge */}
-                                <span className="px-2.5 py-1 rounded-lg bg-red-950/80 border border-red-600/80 text-red-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
-                                  <span className="bg-red-600 text-white w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↓</span>
-                                  <span>OFF: {r.out}</span>
+                                {/* OFF or FROM Badge */}
+                                <span className={`px-2.5 py-1 rounded-lg border text-xs font-black flex items-center gap-1.5 shadow-xs ${
+                                  r.type === 'onfield'
+                                    ? 'bg-blue-950/80 border-blue-600/80 text-blue-100'
+                                    : 'bg-red-950/80 border-red-600/80 text-red-100'
+                                }`}>
+                                  <span className={`${r.type === 'onfield' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'} w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-black`}>
+                                    {r.type === 'onfield' ? '📍' : '↓'}
+                                  </span>
+                                  <span>{r.type === 'onfield' ? 'FROM' : 'OFF'}: {r.out.replace(/^(OFF|FROM|Pos A)\s*/i, '')}</span>
                                 </span>
 
                                 {/* Interchange Arrow */}
                                 <span className="text-slate-400 font-black text-xs">⇄</span>
 
-                                {/* ON Badge */}
-                                <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/80 text-emerald-100 text-xs font-black flex items-center gap-1.5 shadow-xs">
-                                  <span className="bg-emerald-500 text-black w-4 h-4 rounded-full text-[9px] flex items-center justify-center">↑</span>
-                                  <span>ON: {r.inn}</span>
+                                {/* ON or TO Badge */}
+                                <span className={`px-2.5 py-1 rounded-lg border text-xs font-black flex items-center gap-1.5 shadow-xs ${
+                                  r.type === 'onfield'
+                                    ? 'bg-purple-950/80 border-purple-600/80 text-purple-100'
+                                    : 'bg-emerald-950/80 border-emerald-500/80 text-emerald-100'
+                                }`}>
+                                  <span className={`${r.type === 'onfield' ? 'bg-purple-600 text-white' : 'bg-emerald-500 text-black'} w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-black`}>
+                                    {r.type === 'onfield' ? '📍' : '↑'}
+                                  </span>
+                                  <span>{r.type === 'onfield' ? 'TO' : 'ON'}: {r.inn.replace(/^(ON|TO|Pos B)\s*/i, '')}</span>
                                 </span>
 
                                 {/* 3rd Player Badge */}
@@ -1118,13 +1130,17 @@ export default function RotationsScreen({
 
                     <div className="grid grid-cols-3 gap-2 text-[11px]">
                       <div className="p-2 bg-slate-800 rounded-lg border border-slate-700">
-                        <div className="text-[9px] uppercase font-bold text-red-400">1. Player OFF</div>
+                        <div className="text-[9px] uppercase font-bold text-red-400">
+                          {formType === 'bench' ? '1. Player OFF' : '1. Player FROM'}
+                        </div>
                         <div className="font-black text-white truncate">
                           {p1 ? `#${p1.number} ${p1.name}` : 'Select Player'}
                         </div>
                       </div>
                       <div className="p-2 bg-slate-800 rounded-lg border border-slate-700">
-                        <div className="text-[9px] uppercase font-bold text-emerald-400">2. Player ON</div>
+                        <div className="text-[9px] uppercase font-bold text-emerald-400">
+                          {formType === 'bench' ? '2. Player ON' : '2. Player TO'}
+                        </div>
                         <div className="font-black text-white truncate">
                           {p2 ? `#${p2.number} ${p2.name}` : 'Select Player'}
                         </div>
