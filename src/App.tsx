@@ -1648,6 +1648,7 @@ export default function App() {
             savedLineups={savedLineups}
             history={history}
             teamName={teams.find(t => t.id === activeTeamId)?.name}
+            isInactive={teams.find(t => t.id === activeTeamId)?.isInactive}
             onNavigateTab={handleSelectTab}
           />
         )}

@@ -419,11 +419,17 @@ export default function AdminScreen({
     onUpdateTeams(teams.filter((t) => t.id !== teamId));
   };
 
-  const handleOpenInviteModal = () => {
+  const handleOpenInviteModal = (teamId?: string) => {
     setInviteEmail('');
     setInviteName('');
     setInviteRole('Coach');
-    setInviteSelectedTeams(activeTeamId ? [activeTeamId] : []);
+    if (teamId) {
+      setInviteSelectedTeams([teamId]);
+    } else if (activeTeamId) {
+      setInviteSelectedTeams([activeTeamId]);
+    } else {
+      setInviteSelectedTeams([]);
+    }
     setShowInviteModal(true);
   };
 
@@ -551,6 +557,16 @@ export default function AdminScreen({
     onUpdateTeams(updated);
   };
 
+  const handleToggleTeamInactive = (teamId: string) => {
+    const updated = teams.map((t) => {
+      if (t.id === teamId) {
+        return { ...t, isInactive: !t.isInactive };
+      }
+      return t;
+    });
+    onUpdateTeams(updated);
+  };
+
   const activeCoaches = users.filter((u) => u.status !== 'Pending' && u.email !== 'anonymous@interchangeiq.com');
   const pendingInvites = users.filter((u) => u.status === 'Pending');
 
@@ -625,7 +641,7 @@ export default function AdminScreen({
                 <span>New Team</span>
               </button>
               <button
-                onClick={handleOpenInviteModal}
+                onClick={() => handleOpenInviteModal()}
                 className="px-3.5 py-2 text-xs font-bold bg-[var(--blue)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <UserPlus className="w-4 h-4" />
@@ -793,28 +809,40 @@ export default function AdminScreen({
               <div className="space-y-2 pt-1">
                 {teams.map((t, index) => {
                   const isActive = activeTeamId === t.id;
+                  const isInactive = !!t.isInactive;
                   return (
                     <div
                       key={`team-profile-${t.id || 'new'}-${index}`}
                       className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
-                        isActive ? 'border-[var(--green)] bg-green-50/50' : 'border-gray-100 bg-white hover:bg-gray-50'
+                        isInactive
+                          ? 'border-amber-200 bg-amber-50/30'
+                          : isActive
+                          ? 'border-[var(--green)] bg-green-50/50'
+                          : 'border-gray-100 bg-white hover:bg-gray-50'
                       }`}
                     >
                       <div className="space-y-1">
-                        <b className="text-sm font-extrabold text-[var(--ink)] block">{t.name}</b>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <b className={`text-sm font-extrabold block ${isInactive ? 'text-gray-600 line-through decoration-amber-500/60' : 'text-[var(--ink)]'}`}>{t.name}</b>
+                          {isInactive && (
+                            <span className="px-2 py-0.5 text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200 rounded-md">
+                              Inactive • Season Finished
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
                           <span>ID: {t.id}</span>
-                          {isActive && <span className="text-emerald-600 font-extrabold">• Active Roster</span>}
+                          {isActive && <span className="text-emerald-600 font-extrabold">• Active Selection</span>}
                         </div>
                       </div>
 
-                      <div className="flex gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <button
                           onClick={() => {
                             onSelectTeam(t.id);
                             if (onNavigateTab) onNavigateTab('team');
                           }}
-                          className={`px-3.5 py-1.5 text-[11px] font-extrabold rounded-lg border transition cursor-pointer flex items-center gap-1 ${
+                          className={`px-3 py-1.5 text-[11px] font-extrabold rounded-lg border transition cursor-pointer flex items-center gap-1 ${
                             isActive
                               ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
                               : 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-2xs'
@@ -822,6 +850,25 @@ export default function AdminScreen({
                           title="Select team and view Team View page"
                         >
                           <span>{isActive ? 'View Team View →' : 'Open →'}</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenInviteModal(t.id)}
+                          className="px-2.5 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg cursor-pointer transition flex items-center gap-1"
+                          title={`Invite a coach for ${t.name}`}
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          <span>Invite Coach</span>
+                        </button>
+                        <button
+                          onClick={() => handleToggleTeamInactive(t.id)}
+                          className={`px-2.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition border ${
+                            isInactive
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                          }`}
+                          title={isInactive ? "Reactivate team for new season" : "Mark team as inactive when season finishes"}
+                        >
+                          {isInactive ? 'Reactivate' : 'End Season'}
                         </button>
                         <button
                           onClick={() => handleRenameTeam(t.id)}
@@ -850,30 +897,39 @@ export default function AdminScreen({
                   <span>Coaches & Roles</span>
                 </h3>
                 
-                {/* Inner Sub-tab Switcher */}
-                <div className="flex bg-gray-100 p-1 rounded-xl">
+                {/* Inner Sub-tab Switcher & Invite Coach Button */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex bg-gray-100 p-1 rounded-xl">
+                    <button
+                      onClick={() => setActiveUserSubTab('active')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        activeUserSubTab === 'active'
+                          ? 'bg-white text-[var(--navy)] shadow-xs'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Active ({activeCoaches.length})
+                    </button>
+                    <button
+                      onClick={() => setActiveUserSubTab('pending')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                        activeUserSubTab === 'pending'
+                          ? 'bg-white text-[var(--navy)] shadow-xs'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Invited ({pendingInvites.length})
+                      {pendingInvites.length > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-[var(--blue)] animate-pulse" />
+                      )}
+                    </button>
+                  </div>
                   <button
-                    onClick={() => setActiveUserSubTab('active')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      activeUserSubTab === 'active'
-                        ? 'bg-white text-[var(--navy)] shadow-xs'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                    onClick={() => handleOpenInviteModal()}
+                    className="px-3 py-1.5 text-xs font-bold bg-[var(--blue)] text-white hover:opacity-95 rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   >
-                    Active ({activeCoaches.length})
-                  </button>
-                  <button
-                    onClick={() => setActiveUserSubTab('pending')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeUserSubTab === 'pending'
-                        ? 'bg-white text-[var(--navy)] shadow-xs'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    Invited ({pendingInvites.length})
-                    {pendingInvites.length > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-[var(--blue)] animate-pulse" />
-                    )}
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Invite Coach</span>
                   </button>
                 </div>
               </div>

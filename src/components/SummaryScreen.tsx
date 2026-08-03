@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, GameInfo, TeamProfile } from '../types';
-import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, RefreshCw, CheckCircle2, Landmark, Check, BookOpen, Bot } from 'lucide-react';
+import { ShieldCheck, UserX, Users, Trophy, History, Settings, CloudLightning, TrendingUp, RefreshCw, CheckCircle2, Landmark, Check, BookOpen, Bot, AlertTriangle } from 'lucide-react';
 
 interface SummaryScreenProps {
   players: Player[];
@@ -98,6 +98,7 @@ export default function SummaryScreen({
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             {teams.map((t) => {
               const isActive = t.id === activeTeamId;
+              const isInactive = !!t.isInactive;
               return (
                 <button
                   key={`summary-team-tab-${t.id}`}
@@ -105,15 +106,37 @@ export default function SummaryScreen({
                   className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer shrink-0 flex items-center gap-2 border ${
                     isActive
                       ? 'bg-blue-900 hover:bg-blue-950 text-white border-blue-950 shadow-sm scale-[1.01]'
+                      : isInactive
+                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
                       : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                   }`}
                 >
                   {isActive && <Check className="w-3.5 h-3.5 stroke-[3] text-blue-300" />}
                   <span>{t.name}</span>
+                  {isInactive && (
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                      isActive ? 'bg-blue-800 text-amber-200' : 'bg-amber-100 text-amber-800 border border-amber-200/80'
+                    }`}>
+                      Inactive
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
+
+          {/* Alert banner if currently selected squad is inactive */}
+          {teams.find(t => t.id === activeTeamId)?.isInactive && (
+            <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center justify-between gap-2 text-xs font-bold text-amber-900 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Season Finished: <strong>{teams.find(t => t.id === activeTeamId)?.name}</strong> is currently flagged as Inactive.</span>
+              </div>
+              <span className="text-[10px] font-black uppercase bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md shrink-0">
+                Season Ended
+              </span>
+            </div>
+          )}
         </div>
       )}
 

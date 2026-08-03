@@ -18,6 +18,7 @@ interface TeamScreenProps {
   savedLineups?: LineupTemplate[];
   history?: GameHistory[];
   teamName?: string;
+  isInactive?: boolean;
   onNavigateTab?: (tab: string) => void;
 }
 
@@ -31,6 +32,7 @@ export default function TeamScreen({
   savedLineups = [],
   history = [],
   teamName,
+  isInactive,
   onNavigateTab,
 }: TeamScreenProps) {
   const [filterZone, setFilterZone] = useState<string>('All');
@@ -313,9 +315,15 @@ export default function TeamScreen({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-black text-white tracking-tight">{teamName || 'Active Team View'}</h2>
-                <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full uppercase tracking-wider">
-                  Live Dataset View
-                </span>
+                {isInactive ? (
+                  <span className="px-2 py-0.5 text-[10px] font-black bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-full uppercase tracking-wider">
+                    Inactive • Season Finished
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full uppercase tracking-wider">
+                    Live Dataset View
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 font-semibold">Squad Summary & Performance Metrics</p>
             </div>
