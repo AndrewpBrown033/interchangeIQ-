@@ -26,7 +26,7 @@ import LoginScreen from './components/LoginScreen';
 // Lucide Icons
 import {
   LayoutDashboard, Play, RefreshCw, Users, History, BarChart3,
-  BookOpen, Shield, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot, Landmark
+  BookOpen, Shield, ShieldCheck, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot, Landmark
 } from 'lucide-react';
 
 // Helper functions to serialize/deserialize Drill steps to avoid nested arrays in Firestore
@@ -322,12 +322,27 @@ export default function App() {
 
   // Firebase integration states
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [cloudConnected, setCloudConnected] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [cloudConnected, setCloudConnected] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? navigator.onLine !== false : true;
+  });
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => {
+    const stored = localStorage.getItem('iiq_last_synced_at');
+    return stored ? Number(stored) : Date.now();
+  });
   const [isSyncingFromServer, setIsSyncingFromServer] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
   const isSyncingFromServerRef = useRef(false);
   const currentTeamSyncedIdRef = useRef<string | null>(null);
   const lastPublishedSerializedRef = useRef<string>('');
+
+  const formatSyncTime = (timestamp: number | null) => {
+    if (!timestamp) return 'Just now';
+    const diff = Math.floor((Date.now() - timestamp) / 1000);
+    if (diff < 10) return 'Just now';
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   // Helper to generate a fresh, team-isolated squad (populated with default AFL squad template)
   const createFreshSquadForTeam = (_teamId: string): Player[] => {
@@ -661,6 +676,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('iiq_users', JSON.stringify(users)); }, [users]);
   useEffect(() => { if (activeTeamId) localStorage.setItem('iiq_active_team_id', activeTeamId); }, [activeTeamId]);
   useEffect(() => { localStorage.setItem('iiq_saved_lineups', JSON.stringify(savedLineups)); }, [savedLineups]);
+  useEffect(() => { if (lastSyncedAt) localStorage.setItem('iiq_last_synced_at', String(lastSyncedAt)); }, [lastSyncedAt]);
 
   // Auto-persist per-team isolated cache whenever active team state changes
   useEffect(() => {
@@ -1578,14 +1594,33 @@ export default function App() {
       <header className="flex lg:hidden items-center justify-between px-4 py-3 bg-white border-b border-[var(--line)] sticky top-0 z-50 ios-header">
         <button
           onClick={() => setActiveTab('summary')}
-          className="flex items-center gap-2 cursor-pointer focus:outline-none text-left"
+          className="flex items-center gap-2 cursor-pointer focus:outline-none text-left min-w-0"
         >
           <div className="w-8 h-8 rounded-lg bg-white border border-gray-150 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
             <TrendingUp className="w-5 h-5" strokeWidth={2.5} />
           </div>
-          <span className="font-black text-sm tracking-tight text-[var(--navy)]">InterchangeIQ</span>
+          <span className="font-black text-sm tracking-tight text-[var(--navy)] truncate max-w-[110px]">
+            {activeTeamProfile?.name || 'InterchangeIQ'}
+          </span>
         </button>
-        <div className="flex items-center gap-1.5">
+
+        <div className="flex items-center gap-2">
+          {/* Mobile sync status pill */}
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition ${
+            isSyncingFromServer
+              ? 'bg-blue-50 text-blue-700 border-blue-200'
+              : cloudConnected
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-amber-50 text-amber-700 border-amber-200'
+          }`}>
+            {isSyncingFromServer ? (
+              <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+            ) : (
+              <span className={`w-1.5 h-1.5 rounded-full ${cloudConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            )}
+            <span>{isSyncingFromServer ? 'Syncing...' : cloudConnected ? 'Synced' : 'Local'}</span>
+          </div>
+
           <button
             onClick={() => {
               localStorage.removeItem('iiq_authenticated');
@@ -1593,13 +1628,13 @@ export default function App() {
               logAudit('Logged out manually via mobile header.');
             }}
             title="Log Out"
-            className="p-2 text-gray-400 hover:text-red-600 transition shrink-0 cursor-pointer"
+            className="p-1.5 text-gray-400 hover:text-red-600 transition shrink-0 cursor-pointer"
           >
             <LogOut className="w-5 h-5" />
           </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-gray-500 hover:text-gray-700 cursor-pointer"
+            className="p-1.5 text-gray-500 hover:text-gray-700 cursor-pointer"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -1726,6 +1761,74 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6 ios-main pb-24 lg:pb-6">
+        
+        {/* Global Squad & Real-Time Sync Status Bar */}
+        <div className="bg-white border border-[var(--line)] rounded-2xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+          {/* Squad Switcher */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8.5 h-8.5 rounded-xl bg-blue-50 border border-blue-100 text-[var(--blue)] flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+              <ShieldCheck className="w-4.5 h-4.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-extrabold text-[var(--muted)] uppercase tracking-wider block leading-tight">
+                Active Squad
+              </span>
+              <select
+                value={activeTeamId}
+                onChange={(e) => handleSwitchTeam(e.target.value)}
+                className="bg-transparent font-black text-sm text-[var(--navy)] focus:outline-none cursor-pointer truncate max-w-[170px] sm:max-w-[260px] py-0.5"
+              >
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name || 'Unnamed Squad'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Sync Status Badge & Manual Trigger */}
+          <div className="flex items-center gap-2 ml-auto">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
+              isSyncingFromServer
+                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                : cloudConnected
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                : 'bg-amber-50 text-amber-800 border border-amber-200'
+            }`}>
+              {isSyncingFromServer ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+                  <span>Syncing Cloud...</span>
+                </>
+              ) : cloudConnected ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span>Cloud Synced <span className="text-[10px] opacity-80 font-normal">({formatSyncTime(lastSyncedAt)})</span></span>
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  <span>Local Cache <span className="text-[10px] opacity-80 font-normal">({formatSyncTime(lastSyncedAt)})</span></span>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={async () => {
+                setIsManualSyncing(true);
+                await handleForceSync();
+                setTimeout(() => setIsManualSyncing(false), 600);
+              }}
+              disabled={isManualSyncing || isSyncingFromServer}
+              title="Force instant sync with Cloud database"
+              className="px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-blue-50 hover:text-blue-600 text-gray-700 font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer border border-gray-200 shadow-2xs hover:border-blue-200 active:scale-95"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-spin text-blue-600' : ''}`} />
+              <span className="hidden sm:inline">{isManualSyncing ? 'Syncing...' : 'Sync Now'}</span>
+            </button>
+          </div>
+        </div>
         {activeTab === 'summary' && (
           <SummaryScreen
             players={players}
