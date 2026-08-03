@@ -634,6 +634,13 @@ export default function App() {
     }
 
     try {
+      if (!auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (authErr) {
+          console.warn("Anonymous auth pre-check notice:", authErr);
+        }
+      }
       const docRef = doc(db, 'teams', activeTeamId);
       await setDoc(docRef, cleanData);
       setLastSyncedAt(Date.now());
@@ -642,6 +649,7 @@ export default function App() {
     } catch (err: any) {
       console.warn("Manual force sync cloud notice (Local storage active):", err);
       setLastSyncedAt(Date.now());
+      // If error occurs, set offline mode indicator
       setCloudConnected(false);
       return true;
     }

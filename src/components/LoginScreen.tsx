@@ -11,7 +11,7 @@ import {
   Info,
   UserPlus
 } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { auth, db, signInAnonymously } from '../lib/firebase';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 interface LoginScreenProps {
@@ -59,11 +59,24 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
     }
 
     try {
-      // 1. Check if user already exists in Firestore 'passkeys' collection
-      const q = query(collection(db, 'passkeys'), where('email', '==', trimmedEmail));
-      const querySnapshot = await getDocs(q);
+      if (!auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (aErr) {
+          console.warn("Auth pre-check notice during enrollment:", aErr);
+        }
+      }
 
-      if (!querySnapshot.empty) {
+      // 1. Check if user already exists in Firestore 'passkeys' collection
+      let querySnapshot: any = null;
+      try {
+        const q = query(collection(db, 'passkeys'), where('email', '==', trimmedEmail));
+        querySnapshot = await getDocs(q);
+      } catch (qErr) {
+        console.warn("Firestore passkeys query notice:", qErr);
+      }
+
+      if (querySnapshot && !querySnapshot.empty) {
         setErrorMessage('An account with this Email/User ID already exists.');
         setIsLoading(false);
         return;
@@ -78,8 +91,12 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
         password: trimmedPassword
       };
 
-      // 3. Save to Firestore
-      await setDoc(doc(db, 'passkeys', record.id), record);
+      // 3. Save to Firestore gracefully
+      try {
+        await setDoc(doc(db, 'passkeys', record.id), record);
+      } catch (fsErr) {
+        console.warn("Firestore passkey sync notice:", fsErr);
+      }
 
       // 4. Save to local storage for quick offline access
       const saved = localStorage.getItem('iiq_registered_passkeys');
@@ -122,6 +139,15 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
       return;
     }
 
+    // Ensure Auth session
+    if (!auth.currentUser) {
+      try {
+        await signInAnonymously(auth);
+      } catch (aErr) {
+        console.warn("Auth pre-check notice during login:", aErr);
+      }
+    }
+
     // Special Admin Auto-Login & Enrollment (e.g. for andrewpbrown@me.com and andrewpbrown33@gmail.com)
     const isAdminEmail = enteredEmail === 'andrewpbrown@me.com' || enteredEmail === 'andrewpbrown33@gmail.com';
     if (isAdminEmail) {
@@ -143,7 +169,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
       try {
         await setDoc(doc(db, 'passkeys', record.id), record);
       } catch (fsErr) {
-        console.warn("Could not save admin credentials to Firestore:", fsErr);
+        console.warn("Passkeys record sync notice:", fsErr);
       }
 
       setIsLoading(false);
@@ -153,10 +179,15 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName }: LoginSc
 
     try {
       // 2. Query Firestore 'passkeys' collection
-      const q = query(collection(db, 'passkeys'), where('email', '==', enteredEmail));
-      const querySnapshot = await getDocs(q);
+      let querySnapshot: any = null;
+      try {
+        const q = query(collection(db, 'passkeys'), where('email', '==', enteredEmail));
+        querySnapshot = await getDocs(q);
+      } catch (qErr) {
+        console.warn("Firestore passkeys lookup notice:", qErr);
+      }
 
-      if (!querySnapshot.empty) {
+      if (querySnapshot && !querySnapshot.empty) {
         const docData = querySnapshot.docs[0].data();
         if (docData.password === enteredPassword) {
           // Save to local storage for quick access
