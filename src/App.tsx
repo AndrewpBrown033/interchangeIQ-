@@ -185,6 +185,10 @@ export default function App() {
     return localStorage.getItem('iiq_username') || 'Coach Andrew';
   });
 
+  const [userEmail, setUserEmail] = useState<string>(() => {
+    return localStorage.getItem('iiq_user_email') || '';
+  });
+
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
     try {
       const saved = localStorage.getItem('iiq_audit_logs');
@@ -689,6 +693,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('iiq_active_plan_ids', JSON.stringify(activePlanIds)); }, [activePlanIds]);
   useEffect(() => { localStorage.setItem('iiq_history', JSON.stringify(history)); }, [history]);
   useEffect(() => { localStorage.setItem('iiq_username', userName); }, [userName]);
+  useEffect(() => { if (userEmail) localStorage.setItem('iiq_user_email', userEmail); }, [userEmail]);
   useEffect(() => { localStorage.setItem('iiq_audit_logs', JSON.stringify(auditLogs)); }, [auditLogs]);
   useEffect(() => { localStorage.setItem('iiq_drills', JSON.stringify(drills)); }, [drills]);
   useEffect(() => { localStorage.setItem('iiq_growth_records', JSON.stringify(growthRecords)); }, [growthRecords]);
@@ -1245,6 +1250,14 @@ export default function App() {
     setAuditLogs((prev) => [entry, ...prev].slice(0, 200));
   };
 
+  const handleLogout = (reason: string) => {
+    localStorage.removeItem('iiq_authenticated');
+    localStorage.removeItem('iiq_user_email');
+    setUserEmail('');
+    setIsAuthenticated(false);
+    logAudit(reason);
+  };
+
   // Inactivity timeout handling (10 minutes)
   useEffect(() => {
     if (!isAuthenticated || isTimedOut) return;
@@ -1579,14 +1592,24 @@ export default function App() {
         isDebugEnabled={isDebugEnabled}
         onLoginSuccess={(name, email) => {
           setUserName(name);
+          setUserEmail(email);
           localStorage.setItem('iiq_username', name);
+          if (email) {
+            localStorage.setItem('iiq_user_email', email);
+          }
           localStorage.setItem('iiq_authenticated', 'true');
           setIsAuthenticated(true);
           
+          if (email) {
+            ensureFirebaseAuthSession(email).catch((err) => {
+              console.warn('Firebase Auth sync error on login:', err);
+            });
+          }
+
           const entry = {
             ts: Date.now(),
-            user: name || 'Admin',
-            action: `Logged in with device passkey as Coach: ${name}`
+            user: name || email || 'Admin',
+            action: `Logged in with passkey as Coach: ${name} (${email || 'guest'})`
           };
           setAuditLogs((prev) => [entry, ...prev].slice(0, 200));
         }}
@@ -1629,11 +1652,7 @@ export default function App() {
           </div>
 
           <button
-            onClick={() => {
-              localStorage.removeItem('iiq_authenticated');
-              setIsAuthenticated(false);
-              logAudit('Logged out manually via mobile header.');
-            }}
+            onClick={() => handleLogout('Logged out manually via mobile header.')}
             title="Log Out"
             className="p-1.5 text-gray-400 hover:text-red-600 transition shrink-0 cursor-pointer"
           >
@@ -1719,11 +1738,7 @@ export default function App() {
               {userName ? userName.slice(0, 2).toUpperCase() : 'CO'}
             </div>
             <button
-              onClick={() => {
-                localStorage.removeItem('iiq_authenticated');
-                setIsAuthenticated(false);
-                logAudit('Logged out manually via collapsed sidebar.');
-              }}
+              onClick={() => handleLogout('Logged out manually via collapsed sidebar.')}
               title="Log Out"
               className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition cursor-pointer"
             >
@@ -1734,28 +1749,21 @@ export default function App() {
           <div className="p-4 border-t border-[var(--line)] bg-gray-50/50 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <b className="text-xs text-[var(--ink)] font-black block truncate">{userName}</b>
+              {userEmail && <span className="text-[10px] text-blue-600 font-semibold block truncate">{userEmail}</span>}
               <span className="text-[10px] text-[var(--muted)] font-bold uppercase block tracking-wider mt-0.5">
                 Coach Administrator
               </span>
             </div>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => {
-                  localStorage.removeItem('iiq_authenticated');
-                  setIsAuthenticated(false);
-                  logAudit('Locked screen manually via sidebar.');
-                }}
+                onClick={() => handleLogout('Locked screen manually via sidebar.')}
                 title="Lock Screen"
                 className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition shrink-0 cursor-pointer"
               >
                 <Lock className="w-4 h-4" />
               </button>
               <button
-                onClick={() => {
-                  localStorage.removeItem('iiq_authenticated');
-                  setIsAuthenticated(false);
-                  logAudit('Logged out manually via sidebar.');
-                }}
+                onClick={() => handleLogout('Logged out manually via sidebar.')}
                 title="Log Out"
                 className="p-1.5 hover:bg-red-50 rounded-lg text-gray-500 hover:text-red-600 transition shrink-0 cursor-pointer"
               >
@@ -1997,9 +2005,7 @@ export default function App() {
             auditLogs={auditLogs}
             onClearLogs={() => setAuditLogs([])}
             onLockSystem={() => {
-              localStorage.removeItem('iiq_authenticated');
-              setIsAuthenticated(false);
-              logAudit('Locked screen manually and logged out of session.');
+              handleLogout('Locked screen manually and logged out of session.');
             }}
             onSimulateTimeout={() => {
               localStorage.removeItem('iiq_authenticated');

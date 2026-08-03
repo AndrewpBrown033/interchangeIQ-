@@ -102,6 +102,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       const parsed = saved ? JSON.parse(saved) : [];
       const next = [...parsed.filter((k: any) => k.email.toLowerCase() !== trimmedEmail), record];
       localStorage.setItem('iiq_registered_passkeys', JSON.stringify(next));
+      localStorage.setItem('iiq_user_email', trimmedEmail);
 
       setSuccessMessage('Account enrolled successfully!');
       setTimeout(() => {
@@ -133,6 +134,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
 
     // 1. Default fallback demo credentials
     if (enteredEmail === 'coach@interchangeiq.com' && enteredPassword === 'coach123') {
+      localStorage.setItem('iiq_user_email', 'coach@interchangeiq.com');
       setIsLoading(false);
       onLoginSuccess('Coach', 'coach@interchangeiq.com');
       return;
@@ -158,6 +160,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       const parsed = saved ? JSON.parse(saved) : [];
       const next = [...parsed.filter((k: any) => k.email.toLowerCase() !== enteredEmail), record];
       localStorage.setItem('iiq_registered_passkeys', JSON.stringify(next));
+      localStorage.setItem('iiq_user_email', enteredEmail);
 
       try {
         await setDoc(doc(db, 'passkeys', record.id), record);
@@ -190,9 +193,10 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
             const next = [...parsed, docData];
             localStorage.setItem('iiq_registered_passkeys', JSON.stringify(next));
           }
+          localStorage.setItem('iiq_user_email', docData.email || enteredEmail);
 
           setIsLoading(false);
-          onLoginSuccess(docData.userName, docData.email);
+          onLoginSuccess(docData.userName, docData.email || enteredEmail);
           return;
         } else {
           setErrorMessage('Incorrect password. Please try again.');
@@ -207,8 +211,9 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       const found = parsed.find((k: any) => k.email.toLowerCase() === enteredEmail);
       if (found) {
         if (found.password === enteredPassword) {
+          localStorage.setItem('iiq_user_email', found.email || enteredEmail);
           setIsLoading(false);
-          onLoginSuccess(found.userName, found.email);
+          onLoginSuccess(found.userName, found.email || enteredEmail);
           return;
         } else {
           setErrorMessage('Incorrect password. Please try again.');
@@ -226,8 +231,9 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       const parsed = saved ? JSON.parse(saved) : [];
       const found = parsed.find((k: any) => k.email.toLowerCase() === enteredEmail);
       if (found && found.password === enteredPassword) {
+        localStorage.setItem('iiq_user_email', found.email || enteredEmail);
         setIsLoading(false);
-        onLoginSuccess(found.userName, found.email);
+        onLoginSuccess(found.userName, found.email || enteredEmail);
         return;
       }
       setErrorMessage(`Login failed: ${err.message || err.toString()}`);
