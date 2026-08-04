@@ -15,7 +15,8 @@ import {
   History,
   Edit3,
   Check,
-  Search
+  Search,
+  Cpu
 } from 'lucide-react';
 
 interface Message {
@@ -99,6 +100,24 @@ export default function JarvisScreen({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [addedPlanNotice, setAddedPlanNotice] = useState<string | null>(null);
+
+  // AI provider selection - shared with the "Import with AI" feature in Training
+  const [aiProvider, setAiProvider] = useState<'claude' | 'gemini'>(() => {
+    try {
+      const saved = localStorage.getItem('iiq_ai_provider');
+      return saved === 'gemini' ? 'gemini' : 'claude';
+    } catch (_e) {
+      return 'claude';
+    }
+  });
+
+  const handleSetAiProvider = (p: 'claude' | 'gemini') => {
+    setAiProvider(p);
+    try {
+      localStorage.setItem('iiq_ai_provider', p);
+    } catch (_e) {}
+  };
+
 
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitleText, setEditingTitleText] = useState('');
@@ -246,6 +265,7 @@ export default function JarvisScreen({
           squad: players,
           drills: drills,
           growthRecords: growthRecords,
+          provider: aiProvider,
           history: newMessages.slice(-6).map((m) => ({
             role: m.role,
             content: m.content,
@@ -412,6 +432,31 @@ export default function JarvisScreen({
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 font-black">
                   {threads.length}
                 </span>
+              </button>
+            </div>
+
+            <div className="flex bg-white/10 backdrop-blur-md p-1 rounded-2xl border border-white/15" title="Choose which AI provider powers Jarvis">
+              <button
+                onClick={() => handleSetAiProvider('claude')}
+                className={`px-3 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  aiProvider === 'claude'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-indigo-200 hover:text-white'
+                }`}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                <span>Claude</span>
+              </button>
+              <button
+                onClick={() => handleSetAiProvider('gemini')}
+                className={`px-3 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  aiProvider === 'gemini'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-indigo-200 hover:text-white'
+                }`}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                <span>Gemini</span>
               </button>
             </div>
 

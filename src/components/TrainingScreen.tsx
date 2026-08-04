@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Drill, TrainingState, DiagramSpec } from '../types';
-import { Play, Pause, Library, FolderHeart, Plus, Trash, ArrowLeft, ArrowRight, Eye, Edit3, Check, X, FileEdit, Bot, Sparkles, Loader2 } from 'lucide-react';
+import { Play, Pause, Library, FolderHeart, Plus, Trash, ArrowLeft, ArrowRight, Eye, Edit3, Check, X, FileEdit, Bot, Sparkles, Loader2, Cpu } from 'lucide-react';
 
 interface TrainingScreenProps {
   drills: Drill[];
@@ -33,6 +33,23 @@ export default function TrainingScreen({
   const [importRawText, setImportRawText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState('');
+
+  // AI provider selection - shared with Jarvis via the same localStorage key
+  const [aiProvider, setAiProvider] = useState<'claude' | 'gemini'>(() => {
+    try {
+      const saved = localStorage.getItem('iiq_ai_provider');
+      return saved === 'gemini' ? 'gemini' : 'claude';
+    } catch (_e) {
+      return 'claude';
+    }
+  });
+
+  const handleSetAiProvider = (p: 'claude' | 'gemini') => {
+    setAiProvider(p);
+    try {
+      localStorage.setItem('iiq_ai_provider', p);
+    } catch (_e) {}
+  };
 
   const activeDrill = drills.find((d) => d.id === trainingState.activeId) || drills[0] || null;
 
@@ -299,7 +316,7 @@ export default function TrainingScreen({
       const res = await fetch('/api/import-drill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText: importRawText }),
+        body: JSON.stringify({ rawText: importRawText, provider: aiProvider }),
       });
       const data = await res.json().catch(() => ({}));
 
@@ -1023,13 +1040,35 @@ export default function TrainingScreen({
 
             {/* AI-Powered Paste / Import Section */}
             <div className="mb-4 p-3 bg-indigo-50/80 border border-indigo-100 rounded-2xl">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <span className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Import with AI</span>
                 </span>
-                <span className="text-[10px] text-indigo-600 font-semibold">Paste drill notes from anywhere and let AI fill the form</span>
+                <div className="flex bg-white p-0.5 rounded-lg border border-indigo-200" title="Choose which AI provider extracts the drill">
+                  <button
+                    type="button"
+                    onClick={() => handleSetAiProvider('claude')}
+                    className={`px-2 py-1 rounded-md text-[10px] font-black transition flex items-center gap-1 cursor-pointer ${
+                      aiProvider === 'claude' ? 'bg-indigo-600 text-white' : 'text-indigo-500 hover:text-indigo-700'
+                    }`}
+                  >
+                    <Cpu className="w-3 h-3" />
+                    <span>Claude</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetAiProvider('gemini')}
+                    className={`px-2 py-1 rounded-md text-[10px] font-black transition flex items-center gap-1 cursor-pointer ${
+                      aiProvider === 'gemini' ? 'bg-indigo-600 text-white' : 'text-indigo-500 hover:text-indigo-700'
+                    }`}
+                  >
+                    <Cpu className="w-3 h-3" />
+                    <span>Gemini</span>
+                  </button>
+                </div>
               </div>
+              <p className="text-[10px] text-indigo-600 font-semibold mb-2">Paste drill notes from anywhere and let AI fill the form</p>
               <textarea
                 value={importRawText}
                 onChange={(e) => setImportRawText(e.target.value)}

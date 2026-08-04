@@ -83,6 +83,16 @@ export interface GameHistory {
   }[];
 }
 
+export interface DiagramSpec {
+  surface?: 'aussie' | 'soccer';
+  zones?: { x: number; y: number; width: number; height: number; label?: string }[];
+  contestCircle?: { x: number; y: number; r: number; color?: string; label?: string };
+  cones?: { x: number; y: number }[];
+  players?: { label: string; x: number; y: number; kind?: 'own' | 'opp' | 'coach' }[];
+  arrows?: { path: string; color: string; dash?: string }[];
+  ballPositions: { x: number; y: number }[];
+}
+
 export interface Drill {
   id: string;
   title: string;
@@ -91,6 +101,7 @@ export interface Drill {
   players: string;
   overview: string;
   steps: [string, string][]; // [stepTitle, stepContent]
+  diagram?: DiagramSpec;
 }
 
 export interface TrainingState {

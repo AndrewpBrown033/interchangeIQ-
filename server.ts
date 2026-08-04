@@ -12,22 +12,24 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Initialize Gemini API client on the server side
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
+// Lazy initializer for Gemini API client to prevent startup errors if key is empty
+function getGemAIClient() {
+  return new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY || "",
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
     },
-  },
-});
+  });
+}
 
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", service: "InterchangeIQ API" });
 });
 
-// Jarvis AI Assistant endpoint
+// Jarvis AI Assistant endpoint (uses Gemini Flash)
 app.post("/api/jarvis", async (req, res) => {
   try {
     const { message, history, squad, drills, growthRecords } = req.body;
@@ -105,47 +107,38 @@ ${squadSummary}
 CURRENT DRILL LIBRARY IN SYSTEM:
 ${drillsSummary}`;
 
-    // Format chat contents for Gemini API
-    const formattedContents: any[] = [];
+    if (!process.env.GEMINI_API_KEY) {
+      return res.json({
+        reply: `G'day Coach! I'm **Jarvis**, your agentic AFL Coaching & Performance Agent.\n\n*Note: GEMINI_API_KEY is currently not configured in your environment.* \n\nI have scanned your squad data (${Array.isArray(squad) ? squad.length : 0} players) and drill library (${Array.isArray(drills) ? drills.length : 0} drills).\n\nHere are top recommended drills for your session:\n\n` +
+          (Array.isArray(drills) ? drills.slice(0, 3).map((d: any) => `• **${d.title}** (${d.mins} mins) - ${d.overview}`).join('\n\n') : 'No drills found.')
+      });
+    }
 
-    // Add previous history if provided
+    const ai = getGemAIClient();
+    const geminiContents: any[] = [];
     if (Array.isArray(history) && history.length > 0) {
       for (const item of history.slice(-6)) {
         if (item.role === 'user' || item.role === 'model' || item.role === 'assistant') {
-          formattedContents.push({
+          geminiContents.push({
             role: item.role === 'assistant' ? 'model' : item.role,
             parts: [{ text: item.content || item.text || '' }]
           });
         }
       }
     }
+    geminiContents.push({ role: 'user', parts: [{ text: message }] });
 
-    // Add the current user prompt
-    formattedContents.push({
-      role: 'user',
-      parts: [{ text: message }]
-    });
-
-    // Check if API key is present
-    if (!process.env.GEMINI_API_KEY) {
-      return res.json({
-        reply: `G'day Coach! I'm **Jarvis**, your agentic AFL Coaching & Performance Agent.\n\n*Note: To enable live Gemini AI generation, please ensure your GEMINI_API_KEY is configured in your platform Secrets panel.* \n\nI have scanned your squad data (${Array.isArray(squad) ? squad.length : 0} players) and drill library (${Array.isArray(drills) ? drills.length : 0} drills).\n\nHere are top recommended drills for your session:\n\n` +
-          (Array.isArray(drills) ? drills.slice(0, 3).map((d: any) => `• **${d.title}** (${d.mins} mins) - ${d.overview}`).join('\n\n') : 'No drills found.')
-      });
-    }
-
-    const response = await ai.models.generateContent({
+    const geminiResponse = await ai.models.generateContent({
       model: "gemini-3.6-flash",
-      contents: formattedContents,
+      contents: geminiContents,
       config: {
         systemInstruction,
         temperature: 0.7,
       }
     });
 
-    const replyText = response.text || "I was unable to generate a response. Please try again.";
-
-    return res.json({ reply: replyText });
+    const replyText = geminiResponse.text || "I was unable to generate a response. Please try again.";
+    return res.json({ reply: replyText, provider: "gemini" });
   } catch (err: any) {
     console.error("Jarvis API error:", err);
     return res.status(500).json({
@@ -271,9 +264,11 @@ Rules:
 - Base every field ONLY on the provided notes - do not invent details that aren't implied by the text.
 - Fold any "coaching points", "coaching cues", or "progressions" sections into the relevant step's instruction text, or into the overview - do not add new JSON fields for them.
 - Keep step titles short (2-4 words). Keep step instructions concise but complete.
-- If the notes describe multiple drills, extract only the FIRST one.`;
+- If the notes describe multiple drills, extract only the FIRST one.
+- Return ONLY the JSON object - no markdown code fences, no preamble, no explanation.`;
 
-    const response = await ai.models.generateContent({
+    const ai = getGemAIClient();
+    const geminiResponse = await ai.models.generateContent({
       model: "gemini-3.6-flash",
       contents: [{ role: "user", parts: [{ text: String(rawText) }] }],
       config: {
@@ -283,7 +278,7 @@ Rules:
       },
     });
 
-    const raw = response.text || "";
+    const raw = geminiResponse.text || "";
     const cleaned = raw.replace(/```json|```/g, "").trim();
 
     let parsed: any;
@@ -304,7 +299,7 @@ Rules:
       });
     }
 
-    return res.json({ drill: parsed });
+    return res.json({ drill: parsed, provider: "gemini" });
   } catch (err: any) {
     console.error("Import drill error:", err);
     return res.status(500).json({
