@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory, ApiKeySettings } from '../types';
 import { DEFAULT_PLAYERS } from '../constants';
 import {
@@ -201,8 +201,6 @@ export default function AdminScreen({
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [teamSyncMsg, setTeamSyncMsg] = useState<string | null>(null);
 
-  const [selectedCoachUid, setSelectedCoachUid] = useState<string | null>(null);
-
   // Jarvis Settings > API Keys panel state
   const [anthropicInput, setAnthropicInput] = useState('');
   const [geminiInput, setGeminiInput] = useState('');
@@ -321,6 +319,18 @@ export default function AdminScreen({
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [activeUserSubTab, setActiveUserSubTab] = useState<'active' | 'pending'>('active');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Coach <-> Team assignment widget state (scales to 10s of coaches / 10s of teams)
+  const [assignScope, setAssignScope] = useState<'coach' | 'team'>('coach');
+  const [assignRosterSearch, setAssignRosterSearch] = useState('');
+  const [selectedAssignCoachId, setSelectedAssignCoachId] = useState<string | null>(null);
+  const [selectedAssignTeamId, setSelectedAssignTeamId] = useState<string | null>(null);
+  const [bulkAssignMode, setBulkAssignMode] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
+  const [bulkTargetId, setBulkTargetId] = useState('');
+  const [coachListSearch, setCoachListSearch] = useState('');
+  const [teamListSearch, setTeamListSearch] = useState('');
+  const assignPanelRef = useRef<HTMLDivElement>(null);
 
   // Save prompts to localStorage
   useEffect(() => {
@@ -539,18 +549,6 @@ export default function AdminScreen({
     const trimmedEmail = inviteEmail.trim().toLowerCase();
     const trimmedName = inviteName.trim();
 
-    // Enforce 1-account-per-email rule
-    const existingUser = users.find((u) => u.email.trim().toLowerCase() === trimmedEmail);
-    if (existingUser) {
-      alert(
-        `An account or invitation already exists for "${trimmedEmail}" (${
-          existingUser.status === 'Pending' ? 'Pending Invitation' : 'Active Account'
-        }). Duplicate registrations for the same email address are not allowed.`
-      );
-      setIsSendingInvite(false);
-      return;
-    }
-
     const newUser: UserProfile = {
       uid: `invite-${code}`,
       email: trimmedEmail,
@@ -656,6 +654,25 @@ export default function AdminScreen({
     onUpdateUsers(updated);
   };
 
+  const handleBulkAssignTeamToCoaches = (coachUids: string[], teamId: string) => {
+    if (!teamId || coachUids.length === 0) return;
+    const updated = users.map((u) => {
+      if (!coachUids.includes(u.uid)) return u;
+      const ids = u.teamIds.includes(teamId) ? u.teamIds : [...u.teamIds, teamId];
+      return { ...u, teamIds: ids };
+    });
+    onUpdateUsers(updated);
+    setBulkSelectedIds([]);
+    setBulkTargetId('');
+    setBulkAssignMode(false);
+  };
+
+  const handleOpenAssignPanelForCoach = (uid: string) => {
+    setAssignScope('coach');
+    setSelectedAssignCoachId(uid);
+    setTimeout(() => assignPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+
   const handleChangeUserRole = (uid: string, newRole: string) => {
     const updated = users.map((u) => {
       if (u.uid === uid) {
@@ -758,8 +775,40 @@ export default function AdminScreen({
   };
 
   const activeCoaches = users.filter((u) => u.status !== 'Pending' && u.email !== 'anonymous@interchangeiq.com');
-  const selectedCoach = activeCoaches.find((u) => u.uid === selectedCoachUid) || activeCoaches[0] || null;
   const pendingInvites = users.filter((u) => u.status === 'Pending');
+
+  // Only non-Admins get explicit team assignments — Admins already have universal access
+  const assignableCoaches = useMemo(
+    () => activeCoaches.filter((u) => u.role !== 'Admin'),
+    [activeCoaches]
+  );
+
+  const filteredAssignRoster = useMemo(() => {
+    const q = assignRosterSearch.trim().toLowerCase();
+    if (assignScope === 'coach') {
+      return assignableCoaches.filter(
+        (u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+      );
+    }
+    return teams.filter((t) => !q || t.name.toLowerCase().includes(q));
+  }, [assignScope, assignRosterSearch, assignableCoaches, teams]);
+
+  const effectiveSelectedCoach =
+    assignableCoaches.find((u) => u.uid === selectedAssignCoachId) || assignableCoaches[0] || null;
+  const effectiveSelectedTeam =
+    teams.find((t) => t.id === selectedAssignTeamId) || teams[0] || null;
+
+  const filteredCoachListForCards = useMemo(() => {
+    const q = coachListSearch.trim().toLowerCase();
+    return activeCoaches.filter(
+      (u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    );
+  }, [activeCoaches, coachListSearch]);
+
+  const filteredTeamsForCards = useMemo(() => {
+    const q = teamListSearch.trim().toLowerCase();
+    return teams.filter((t) => !q || t.name.toLowerCase().includes(q));
+  }, [teams, teamListSearch]);
 
   return (
     <div className="space-y-6">
@@ -996,6 +1045,257 @@ export default function AdminScreen({
             </div>
           </div>
 
+          {/* Coach <-> Team Assignments — scales to 10s of coaches and 10s of teams */}
+          <div ref={assignPanelRef} className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[var(--blue)]" />
+                  <span>Coach & Team Assignments</span>
+                </h3>
+                <p className="text-xs text-gray-500 font-semibold mt-0.5">
+                  Search a coach or a team, then add or remove access. Admins aren't listed here — they already have access to every team.
+                </p>
+              </div>
+              <div className="flex bg-gray-100 p-1 rounded-xl">
+                <button
+                  onClick={() => { setAssignScope('coach'); setBulkAssignMode(false); setBulkSelectedIds([]); }}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    assignScope === 'coach' ? 'bg-white text-[var(--navy)] shadow-xs' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  By coach
+                </button>
+                <button
+                  onClick={() => { setAssignScope('team'); setBulkAssignMode(false); setBulkSelectedIds([]); }}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    assignScope === 'team' ? 'bg-white text-[var(--navy)] shadow-xs' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  By team
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr] gap-0 border border-gray-100 rounded-2xl overflow-hidden">
+              {/* Roster panel */}
+              <div className="border-b sm:border-b-0 sm:border-r border-gray-100 bg-gray-50/50">
+                <div className="p-2.5 border-b border-gray-100 flex items-center gap-2">
+                  {assignScope === 'coach' ? (
+                    <>
+                      <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <input
+                        type="text"
+                        value={assignRosterSearch}
+                        onChange={(e) => setAssignRosterSearch(e.target.value)}
+                        placeholder="Search coaches..."
+                        className="w-full bg-transparent text-xs font-semibold focus:outline-none"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <input
+                        type="text"
+                        value={assignRosterSearch}
+                        onChange={(e) => setAssignRosterSearch(e.target.value)}
+                        placeholder="Search teams..."
+                        className="w-full bg-transparent text-xs font-semibold focus:outline-none"
+                      />
+                    </>
+                  )}
+                </div>
+
+                {assignScope === 'coach' && (
+                  <div className="px-2.5 py-1.5 border-b border-gray-100 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => { setBulkAssignMode((v) => !v); setBulkSelectedIds([]); }}
+                      className={`text-[10px] font-black uppercase tracking-wider cursor-pointer ${
+                        bulkAssignMode ? 'text-[var(--blue)]' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      {bulkAssignMode ? 'Cancel bulk select' : 'Bulk select'}
+                    </button>
+                    {bulkAssignMode && (
+                      <span className="text-[10px] font-bold text-gray-400">{bulkSelectedIds.length} selected</span>
+                    )}
+                  </div>
+                )}
+
+                <div className="max-h-80 overflow-y-auto">
+                  {filteredAssignRoster.length === 0 && (
+                    <p className="text-[11px] text-gray-400 font-semibold text-center py-6 px-2">
+                      No {assignScope === 'coach' ? 'coaches' : 'teams'} match "{assignRosterSearch}".
+                    </p>
+                  )}
+                  {assignScope === 'coach' && (filteredAssignRoster as UserProfile[]).map((u) => {
+                    const isSelected = effectiveSelectedCoach?.uid === u.uid;
+                    const isChecked = bulkSelectedIds.includes(u.uid);
+                    return (
+                      <div
+                        key={`assign-roster-coach-${u.uid}`}
+                        onClick={() => (bulkAssignMode
+                          ? setBulkSelectedIds((prev) => prev.includes(u.uid) ? prev.filter((id) => id !== u.uid) : [...prev, u.uid])
+                          : setSelectedAssignCoachId(u.uid))}
+                        className={`px-3 py-2 flex items-center justify-between gap-2 cursor-pointer border-b border-gray-100/80 last:border-b-0 transition ${
+                          isSelected && !bulkAssignMode ? 'bg-blue-50' : 'hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {bulkAssignMode && (
+                            <input type="checkbox" readOnly checked={isChecked} className="shrink-0" />
+                          )}
+                          <span className={`text-xs font-bold truncate ${isSelected && !bulkAssignMode ? 'text-[var(--blue)]' : 'text-gray-700'}`}>
+                            {u.name}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-black text-gray-400 shrink-0">{u.teamIds.length}</span>
+                      </div>
+                    );
+                  })}
+                  {assignScope === 'team' && (filteredAssignRoster as TeamProfile[]).map((t) => {
+                    const isSelected = effectiveSelectedTeam?.id === t.id;
+                    const coachCount = assignableCoaches.filter((u) => u.teamIds.includes(t.id)).length;
+                    return (
+                      <div
+                        key={`assign-roster-team-${t.id}`}
+                        onClick={() => setSelectedAssignTeamId(t.id)}
+                        className={`px-3 py-2 flex items-center justify-between gap-2 cursor-pointer border-b border-gray-100/80 last:border-b-0 transition ${
+                          isSelected ? 'bg-blue-50' : 'hover:bg-white'
+                        }`}
+                      >
+                        <span className={`text-xs font-bold truncate ${isSelected ? 'text-[var(--blue)]' : 'text-gray-700'}`}>
+                          {t.name}
+                        </span>
+                        <span className="text-[10px] font-black text-gray-400 shrink-0">{coachCount}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Detail panel */}
+              <div className="p-4">
+                {bulkAssignMode && assignScope === 'coach' ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-gray-700">
+                      Assign {bulkSelectedIds.length || 0} selected coach{bulkSelectedIds.length === 1 ? '' : 'es'} to a team
+                    </p>
+                    <div className="flex gap-2">
+                      <select
+                        value={bulkTargetId}
+                        onChange={(e) => setBulkTargetId(e.target.value)}
+                        className="flex-1 px-2.5 py-2 text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none"
+                      >
+                        <option value="">Choose a team...</option>
+                        {teams.map((t) => (
+                          <option key={`bulk-team-opt-${t.id}`} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        disabled={!bulkTargetId || bulkSelectedIds.length === 0}
+                        onClick={() => handleBulkAssignTeamToCoaches(bulkSelectedIds, bulkTargetId)}
+                        className="px-3 py-2 text-xs font-bold bg-[var(--blue)] text-white rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Assign
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-semibold">
+                      Tick coaches on the left, pick a team, then apply. This adds the team without removing any of their existing teams.
+                    </p>
+                  </div>
+                ) : assignScope === 'coach' ? (
+                  effectiveSelectedCoach ? (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-extrabold text-[var(--ink)]">{effectiveSelectedCoach.name}</p>
+                        <p className="text-xs text-gray-500 font-semibold">{effectiveSelectedCoach.email} • {effectiveSelectedCoach.role}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {effectiveSelectedCoach.teamIds.length === 0 && (
+                          <span className="text-[11px] text-gray-400 font-semibold">No teams assigned yet.</span>
+                        )}
+                        {effectiveSelectedCoach.teamIds.map((tid) => {
+                          const t = teams.find((tm) => tm.id === tid);
+                          return (
+                            <span
+                              key={`coach-chip-${effectiveSelectedCoach.uid}-${tid}`}
+                              className="pl-2.5 pr-1.5 py-1 bg-blue-50 text-[var(--blue)] border border-blue-200 rounded-lg text-[11px] font-bold flex items-center gap-1"
+                            >
+                              {t?.name || tid}
+                              <button
+                                onClick={() => handleAssignTeamToUser(effectiveSelectedCoach.uid, tid)}
+                                className="hover:bg-blue-100 rounded p-0.5 cursor-pointer"
+                                title={`Remove ${t?.name || tid}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <select
+                          value=""
+                          onChange={(e) => e.target.value && handleAssignTeamToUser(effectiveSelectedCoach.uid, e.target.value)}
+                          className="flex-1 px-2.5 py-2 text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none"
+                        >
+                          <option value="">Add a team...</option>
+                          {teams.filter((t) => !effectiveSelectedCoach.teamIds.includes(t.id)).map((t) => (
+                            <option key={`add-team-opt-${t.id}`} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 font-semibold text-center py-8">No coaches to assign yet.</p>
+                  )
+                ) : (
+                  effectiveSelectedTeam ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-extrabold text-[var(--ink)]">{effectiveSelectedTeam.name}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {assignableCoaches.filter((u) => u.teamIds.includes(effectiveSelectedTeam.id)).length === 0 && (
+                          <span className="text-[11px] text-gray-400 font-semibold">No coaches assigned yet.</span>
+                        )}
+                        {assignableCoaches.filter((u) => u.teamIds.includes(effectiveSelectedTeam.id)).map((u) => (
+                          <span
+                            key={`team-chip-${effectiveSelectedTeam.id}-${u.uid}`}
+                            className="pl-2.5 pr-1.5 py-1 bg-blue-50 text-[var(--blue)] border border-blue-200 rounded-lg text-[11px] font-bold flex items-center gap-1"
+                          >
+                            {u.name}
+                            <button
+                              onClick={() => handleAssignTeamToUser(u.uid, effectiveSelectedTeam.id)}
+                              className="hover:bg-blue-100 rounded p-0.5 cursor-pointer"
+                              title={`Remove ${u.name}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <select
+                          value=""
+                          onChange={(e) => e.target.value && handleAssignTeamToUser(e.target.value, effectiveSelectedTeam.id)}
+                          className="flex-1 px-2.5 py-2 text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none"
+                        >
+                          <option value="">Add a coach...</option>
+                          {assignableCoaches.filter((u) => !u.teamIds.includes(effectiveSelectedTeam.id)).map((u) => (
+                            <option key={`add-coach-opt-${u.uid}`} value={u.uid}>{u.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 font-semibold text-center py-8">No teams to assign yet.</p>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Teams Management */}
             <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
@@ -1004,18 +1304,58 @@ export default function AdminScreen({
                   <Landmark className="w-4 h-4 text-[var(--blue)]" />
                   <span>Teams & Clubs ({teams.length})</span>
                 </h3>
+                {onForceSyncTeams && (
+                  <button
+                    disabled={isSyncingTeams}
+                    onClick={async () => {
+                      setIsSyncingTeams(true);
+                      setTeamSyncMsg(null);
+                      const res = await onForceSyncTeams();
+                      setIsSyncingTeams(false);
+                      setTeamSyncMsg(res.message);
+                      setTimeout(() => setTeamSyncMsg(null), 8000);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                    title="Push all local team profiles to Cloud Firestore and sync remote team roster data"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isSyncingTeams ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingTeams ? 'Syncing...' : 'Sync Teams to Cloud'}</span>
+                  </button>
+                )}
               </div>
               <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
                 Manage your registered sports clubs. Active coaches can be assigned directly to individual team datasets.
               </p>
 
-              <div className="space-y-2 pt-1">
-                {teams.map((t, index) => {
+              {teamSyncMsg && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-950 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-2xs">
+                  <span>{teamSyncMsg}</span>
+                  <button onClick={() => setTeamSyncMsg(null)} className="text-indigo-600 hover:text-indigo-800 p-0.5 rounded cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {teams.length > 6 && (
+                <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg">
+                  <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={teamListSearch}
+                    onChange={(e) => setTeamListSearch(e.target.value)}
+                    placeholder="Search teams..."
+                    className="w-full bg-transparent text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2 pt-1 max-h-[28rem] overflow-y-auto pr-0.5">
+                {filteredTeamsForCards.length === 0 && (
+                  <p className="text-xs text-gray-400 font-semibold text-center py-6">No teams match "{teamListSearch}".</p>
+                )}
+                {filteredTeamsForCards.map((t, index) => {
                   const isActive = activeTeamId === t.id;
                   const isInactive = !!t.isInactive;
-                  const assignedCoachesForTeam = users.filter((u) => u.teamIds?.includes(t.id) || u.role === 'Admin');
-                  const isLinkedToSelectedCoach = selectedCoach && (selectedCoach.teamIds?.includes(t.id) || selectedCoach.role === 'Admin');
-
                   return (
                     <div
                       key={`team-profile-${t.id || 'new'}-${index}`}
@@ -1024,12 +1364,10 @@ export default function AdminScreen({
                           ? 'border-amber-200 bg-amber-50/30'
                           : isActive
                           ? 'border-[var(--green)] bg-green-50/50'
-                          : isLinkedToSelectedCoach
-                          ? 'border-blue-300 bg-blue-50/20'
                           : 'border-gray-100 bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div className="space-y-1 min-w-0">
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <b className={`text-sm font-extrabold block ${isInactive ? 'text-gray-600 line-through decoration-amber-500/60' : 'text-[var(--ink)]'}`}>{t.name}</b>
                           {isInactive && (
@@ -1037,42 +1375,10 @@ export default function AdminScreen({
                               Inactive • Season Finished
                             </span>
                           )}
-                          {isLinkedToSelectedCoach && selectedCoach && (
-                            <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200 rounded-md flex items-center gap-1">
-                              <UserCheck className="w-3 h-3 text-blue-600" />
-                              <span>Linked to {selectedCoach.name}</span>
-                            </span>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 flex-wrap">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
                           <span>ID: {t.id}</span>
                           {isActive && <span className="text-emerald-600 font-extrabold">• Active Selection</span>}
-                        </div>
-                        {/* Assigned Coaches List for this Team */}
-                        <div className="flex items-center gap-1 flex-wrap pt-0.5 text-[10px]">
-                          <span className="font-bold text-gray-400">Coaches:</span>
-                          {assignedCoachesForTeam.length > 0 ? (
-                            assignedCoachesForTeam.map((c) => {
-                              const isThisSelected = selectedCoach && selectedCoach.uid === c.uid;
-                              return (
-                                <button
-                                  key={`team-coach-tag-${t.id}-${c.uid}`}
-                                  type="button"
-                                  onClick={() => setSelectedCoachUid(c.uid)}
-                                  className={`px-1.5 py-0.5 rounded font-extrabold transition cursor-pointer ${
-                                    isThisSelected
-                                      ? 'bg-blue-600 text-white shadow-2xs'
-                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                  }`}
-                                  title={`Click to select ${c.name}`}
-                                >
-                                  {c.name}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <span className="text-gray-400 italic font-medium">Unassigned</span>
-                          )}
                         </div>
                       </div>
 
@@ -1182,170 +1488,19 @@ export default function AdminScreen({
 
               {/* Active Members Sub-view */}
               {activeUserSubTab === 'active' && (
-                <div className="space-y-4">
-                  {/* Coach Selection Toolbar */}
-                  {activeCoaches.length > 0 && (
-                    <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <span className="text-[10px] font-black uppercase text-blue-900 tracking-wider flex items-center gap-1.5">
-                          <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Select Coach to View Assigned / Linked Teams</span>
-                        </span>
-                        {selectedCoach && (
-                          <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full border border-blue-200">
-                            Active Coach: {selectedCoach.name} ({selectedCoach.role === 'Admin' ? 'All Teams' : `${selectedCoach.teamIds?.length || 0} Teams Linked`})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {activeCoaches.map((c) => {
-                          const isSelected = selectedCoach?.uid === c.uid;
-                          const linkedCount = c.teamIds?.length || 0;
-                          return (
-                            <button
-                              key={`coach-pill-${c.uid}`}
-                              type="button"
-                              onClick={() => setSelectedCoachUid(c.uid)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-                                isSelected
-                                  ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-400'
-                                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
-                              }`}
-                            >
-                              <span>{c.name}</span>
-                              <span
-                                className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
-                                  isSelected ? 'bg-blue-800 text-white' : 'bg-gray-100 text-gray-600'
-                                }`}
-                              >
-                                {c.role === 'Admin' ? 'All' : `${linkedCount} teams`}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                <div className="space-y-3">
+                  {activeCoaches.length > 6 && (
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg">
+                      <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <input
+                        type="text"
+                        value={coachListSearch}
+                        onChange={(e) => setCoachListSearch(e.target.value)}
+                        placeholder="Search coaches by name or email..."
+                        className="w-full bg-transparent text-xs font-semibold focus:outline-none"
+                      />
                     </div>
                   )}
-
-                  {/* Direct Coach & Linked Teams Alignment Panel */}
-                  {selectedCoach && (
-                    <div className="p-4 bg-gradient-to-br from-indigo-50/80 via-blue-50/40 to-white border-2 border-blue-200 rounded-2xl space-y-3 shadow-xs">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-100 pb-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-2xs">
-                            {selectedCoach.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <b className="text-sm font-black text-[var(--navy)]">{selectedCoach.name}</b>
-                              <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-blue-100 text-blue-800 border border-blue-200">
-                                {selectedCoach.role}
-                              </span>
-                              {selectedCoach.role === 'Admin' && (
-                                <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-red-100 text-red-800 border border-red-200">
-                                  Full System Admin
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500 font-semibold">{selectedCoach.email}</span>
-                          </div>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="text-[10px] font-black uppercase text-gray-400 block">Coach &amp; Squad Alignment</span>
-                          <span className="text-xs font-black text-blue-700">
-                            {selectedCoach.role === 'Admin'
-                              ? 'Authorized across all teams'
-                              : `${selectedCoach.teamIds?.length || 0} / ${teams.length} Teams Linked`}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Teams Alignment Matrix */}
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider block">
-                          Teams &amp; Clubs Assigned to {selectedCoach.name}:
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {teams.map((t) => {
-                            const isLinked = selectedCoach.role === 'Admin' || selectedCoach.teamIds?.includes(t.id);
-                            const isCurrentActiveTeam = activeTeamId === t.id;
-                            return (
-                              <div
-                                key={`aligned-team-${selectedCoach.uid}-${t.id}`}
-                                className={`p-3 rounded-xl border flex items-center justify-between gap-2 transition ${
-                                  isLinked
-                                    ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-2xs'
-                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                                }`}
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <b className="text-xs font-extrabold truncate">{t.name}</b>
-                                    {isLinked && (
-                                      <span className="px-1.5 py-0.2 text-[8px] font-black uppercase bg-emerald-200 text-emerald-900 rounded">
-                                        Assigned / Linked
-                                      </span>
-                                    )}
-                                    {isCurrentActiveTeam && (
-                                      <span className="px-1.5 py-0.2 text-[8px] font-black uppercase bg-blue-100 text-blue-800 rounded border border-blue-200">
-                                        Active View
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[9px] text-gray-400 font-bold block truncate">Squad ID: {t.id}</span>
-                                </div>
-
-                                <div className="flex items-center gap-1 shrink-0">
-                                  {isLinked ? (
-                                    <>
-                                      {!isCurrentActiveTeam && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            onSelectTeam(t.id);
-                                            if (onNavigateTab) onNavigateTab('team');
-                                          }}
-                                          className="px-2.5 py-1 text-[10px] font-extrabold bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition shadow-2xs"
-                                          title="Switch active squad view to this team"
-                                        >
-                                          Switch View →
-                                        </button>
-                                      )}
-                                      {selectedCoach.role !== 'Admin' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleAssignTeamToUser(selectedCoach.uid, t.id)}
-                                          className="px-2 py-1 text-[10px] font-bold bg-emerald-200 hover:bg-emerald-300 text-emerald-900 rounded-lg cursor-pointer transition"
-                                          title="Unlink team from this coach"
-                                        >
-                                          Unlink
-                                        </button>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAssignTeamToUser(selectedCoach.uid, t.id)}
-                                      className="px-2.5 py-1 text-[10px] font-extrabold bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg cursor-pointer transition"
-                                      title={`Link ${t.name} to ${selectedCoach.name}`}
-                                    >
-                                      + Link Team
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {teams.length === 0 && (
-                            <p className="text-xs text-gray-400 font-semibold italic col-span-2">No registered teams found in system.</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Quick Role Feature Access Matrix */}
                   <div className="p-3 bg-gray-50 border border-gray-200/80 rounded-xl space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-1">
@@ -1409,69 +1564,69 @@ export default function AdminScreen({
                     </div>
                   </div>
 
-                  {activeCoaches.map((u, idx) => {
-                    const isSelectedCoach = selectedCoach?.uid === u.uid;
-                    return (
-                      <div
-                        key={`active-coach-${u.uid || 'coach'}-${idx}`}
-                        onClick={() => setSelectedCoachUid(u.uid)}
-                        className={`p-4 border rounded-xl space-y-3 shadow-xs transition cursor-pointer ${
-                          isSelectedCoach
-                            ? 'border-blue-400 bg-blue-50/20 ring-2 ring-blue-400/80'
-                            : 'border-gray-100 bg-white hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div>
-                            <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
-                              {u.name}
-                              {u.role === 'Admin' && <Shield className="w-3.5 h-3.5 text-red-500" />}
-                              {isSelectedCoach && (
-                                <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-blue-600 text-white rounded-md shadow-2xs">
-                                  Selected Alignment
-                                </span>
-                              )}
-                            </b>
-                            <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
-                          </div>
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <label className="text-[10px] font-black uppercase text-gray-400">Role:</label>
-                            <select
-                              value={u.role}
-                              onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
-                              className="px-2.5 py-1 text-xs font-extrabold bg-gray-50 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                            >
-                              <option value="Coach">Coach</option>
-                              <option value="Assistant Coach">Assistant Coach</option>
-                              <option value="Manager">Manager</option>
-                              <option value="Admin">Admin</option>
-                            </select>
-                          </div>
+                  {coachListSearch.trim() && filteredCoachListForCards.length === 0 && (
+                    <p className="text-xs text-gray-400 font-semibold text-center py-6">No coaches match "{coachListSearch}".</p>
+                  )}
+                  <div className="space-y-3 max-h-[36rem] overflow-y-auto pr-0.5">
+                  {filteredCoachListForCards.map((u, idx) => (
+                    <div
+                      key={`active-coach-${u.uid || 'coach'}-${idx}`}
+                      className="p-4 border border-gray-100 bg-white rounded-xl space-y-3 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
+                            {u.name}
+                            {u.role === 'Admin' && <Shield className="w-3.5 h-3.5 text-red-500" />}
+                          </b>
+                          <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-black uppercase text-gray-400">Role:</label>
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
+                            className="px-2.5 py-1 text-xs font-extrabold bg-gray-50 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="Coach">Coach</option>
+                            <option value="Assistant Coach">Assistant Coach</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Admin">Admin</option>
+                          </select>
+                        </div>
+                      </div>
 
-                      {/* Team assignments */}
+                      {/* Team assignments — compact preview, edit via the searchable widget above */}
                       {u.role !== 'Admin' && (
                         <div className="pt-2 border-t border-dashed border-gray-100">
-                          <span className="text-[10px] font-black uppercase text-gray-400 block mb-1.5">
-                            Assign Team Access
-                          </span>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-black uppercase text-gray-400">
+                              Team Access ({u.teamIds.length})
+                            </span>
+                            <button
+                              onClick={() => handleOpenAssignPanelForCoach(u.uid)}
+                              className="text-[10px] font-black uppercase text-[var(--blue)] hover:underline cursor-pointer"
+                            >
+                              Manage →
+                            </button>
+                          </div>
                           <div className="flex flex-wrap gap-1">
-                            {teams.map((t, tIdx) => {
-                              const isAssigned = u.teamIds.includes(t.id);
-                              return (
-                                <button
-                                  key={`assign-team-${u.uid || 'user'}-${t.id || 'team'}-${tIdx}`}
-                                  onClick={() => handleAssignTeamToUser(u.uid, t.id)}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
-                                    isAssigned
-                                      ? 'bg-green-50 text-[#0E7A48] border-green-200'
-                                      : 'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'
-                                  }`}
-                                >
-                                  {t.name}
-                                </button>
-                              );
-                            })}
+                            {u.teamIds.length === 0 && (
+                              <span className="text-[10px] text-gray-400 font-bold">No teams assigned</span>
+                            )}
+                            {u.teamIds.slice(0, 3).map((tid, tIdx) => (
+                              <span
+                                key={`assign-preview-${u.uid || 'user'}-${tid || 'team'}-${tIdx}`}
+                                className="px-2 py-0.5 rounded text-[10px] font-bold border bg-green-50 text-[#0E7A48] border-green-200"
+                              >
+                                {teams.find((t) => t.id === tid)?.name || tid}
+                              </span>
+                            ))}
+                            {u.teamIds.length > 3 && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">
+                                +{u.teamIds.length - 3} more
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1538,8 +1693,7 @@ export default function AdminScreen({
                         </button>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
 
                   {activeCoaches.length === 0 && (
                     <div className="text-center py-8 border border-dashed border-gray-100 rounded-xl">
@@ -1547,6 +1701,7 @@ export default function AdminScreen({
                       <p className="text-xs font-bold text-gray-400">No active coaches configured.</p>
                     </div>
                   )}
+                  </div>
                 </div>
               )}
 

@@ -209,7 +209,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   name: string;
-  role: 'Coach' | 'Assistant Coach' | 'Manager' | 'Admin' | string;
+  role: 'Provisional' | 'Coach' | 'Assistant Coach' | 'Manager' | 'Admin' | string;
   teamIds: string[];
   status?: 'Pending' | 'Active';
   invitedBy?: string;

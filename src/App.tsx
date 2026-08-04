@@ -909,13 +909,14 @@ export default function App() {
                   }
                 }).catch(() => {});
               } else {
-                // Create fresh profile if none exists
+                // Create fresh profile for new users with Provisional role, no teams assigned, and minimal features
                 setDoc(userRef, {
                   uid: user.uid,
                   email: normEmail,
-                  name: user.displayName || userName || 'Coach Andrew',
-                  role: 'Coach',
-                  teamIds: [activeTeamId || 'team1'],
+                  name: user.displayName || userName || 'New User',
+                  role: 'Provisional',
+                  teamIds: [],
+                  allowedFeatures: [],
                   status: 'Active',
                 }).catch(() => {});
               }
