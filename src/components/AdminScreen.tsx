@@ -539,6 +539,18 @@ export default function AdminScreen({
     const trimmedEmail = inviteEmail.trim().toLowerCase();
     const trimmedName = inviteName.trim();
 
+    // Enforce 1-account-per-email rule
+    const existingUser = users.find((u) => u.email.trim().toLowerCase() === trimmedEmail);
+    if (existingUser) {
+      alert(
+        `An account or invitation already exists for "${trimmedEmail}" (${
+          existingUser.status === 'Pending' ? 'Pending Invitation' : 'Active Account'
+        }). Duplicate registrations for the same email address are not allowed.`
+      );
+      setIsSendingInvite(false);
+      return;
+    }
+
     const newUser: UserProfile = {
       uid: `invite-${code}`,
       email: trimmedEmail,

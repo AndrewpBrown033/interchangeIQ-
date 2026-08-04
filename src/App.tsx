@@ -807,6 +807,65 @@ export default function App() {
   useEffect(() => { localStorage.setItem('iiq_haptic_enabled', String(hapticEnabled)); }, [hapticEnabled]);
   useEffect(() => { localStorage.setItem('iiq_haptic_pattern', hapticPattern); }, [hapticPattern]);
 
+  // Helper to enforce 1-account-per-email rule by deduplicating UserProfile records
+  const deduplicateUserProfiles = (userList: UserProfile[]): UserProfile[] => {
+    if (!Array.isArray(userList)) return [];
+    const emailMap = new Map<string, UserProfile>();
+    const noEmailList: UserProfile[] = [];
+
+    for (const u of userList) {
+      if (!u || !u.uid) continue;
+      const normEmail = (u.email || '').trim().toLowerCase();
+
+      if (!normEmail) {
+        noEmailList.push(u);
+        continue;
+      }
+
+      if (!emailMap.has(normEmail)) {
+        emailMap.set(normEmail, { ...u, email: normEmail });
+      } else {
+        const existing = emailMap.get(normEmail)!;
+        const existingIsActive = existing.status === 'Active' || !existing.status;
+        const currentIsActive = u.status === 'Active' || !u.status;
+        const existingIsInvite = existing.uid.startsWith('invite-');
+        const currentIsInvite = u.uid.startsWith('invite-');
+
+        let primary: UserProfile;
+        let secondary: UserProfile;
+
+        if (existingIsActive && !currentIsActive) {
+          primary = existing;
+          secondary = u;
+        } else if (!existingIsActive && currentIsActive) {
+          primary = u;
+          secondary = existing;
+        } else if (!existingIsInvite && currentIsInvite) {
+          primary = existing;
+          secondary = u;
+        } else if (existingIsInvite && !currentIsInvite) {
+          primary = u;
+          secondary = existing;
+        } else {
+          primary = existing;
+          secondary = u;
+        }
+
+        const mergedTeamIds = Array.from(new Set([...(primary.teamIds || []), ...(secondary.teamIds || [])]));
+        const mergedAllowed = Array.from(new Set([...(primary.allowedFeatures || []), ...(secondary.allowedFeatures || [])]));
+
+        emailMap.set(normEmail, {
+          ...primary,
+          email: normEmail,
+          teamIds: mergedTeamIds,
+          allowedFeatures: mergedAllowed.length > 0 ? mergedAllowed : primary.allowedFeatures,
+        });
+      }
+    }
+
+    return [...Array.from(emailMap.values()), ...noEmailList];
+  };
+
   // Firebase auth, profile sync, and session initialization
   useEffect(() => {
     let active = true;
@@ -816,18 +875,50 @@ export default function App() {
       setCurrentUser(user);
       
       // ONLY write user profile records to Firestore for registered non-anonymous users with emails.
-      // Guest / anonymous sessions must NOT create dummy 'anonymous@interchangeiq.com' documents in Firestore.
       if (user.email && !user.isAnonymous) {
+        const normEmail = user.email.trim().toLowerCase();
         const userRef = doc(db, 'users', user.uid);
+
         getDoc(userRef).then((snap) => {
           if (!active) return;
           if (!snap.exists()) {
-            setDoc(userRef, {
-              uid: user.uid,
-              email: user.email,
-              name: userName || 'Coach Andrew',
-              role: 'Admin',
-              teamIds: [activeTeamId || 'team1']
+            // Check if there is an existing pending invite or profile doc with the same email to merge
+            getDocs(collection(db, 'users')).then((querySnap) => {
+              let duplicateDocId: string | null = null;
+              let existingData: any = null;
+
+              querySnap.forEach((docSnap) => {
+                const data = docSnap.data();
+                if (data && data.email && data.email.trim().toLowerCase() === normEmail && docSnap.id !== user.uid) {
+                  duplicateDocId = docSnap.id;
+                  existingData = data;
+                }
+              });
+
+              if (duplicateDocId && existingData) {
+                // Transfer existing account/invite data into the active authenticated UID
+                setDoc(userRef, {
+                  ...existingData,
+                  uid: user.uid,
+                  email: normEmail,
+                  name: user.displayName || existingData.name || userName || 'Coach Andrew',
+                  status: 'Active',
+                }).then(() => {
+                  if (duplicateDocId) {
+                    deleteDoc(doc(db, 'users', duplicateDocId)).catch(() => {});
+                  }
+                }).catch(() => {});
+              } else {
+                // Create fresh profile if none exists
+                setDoc(userRef, {
+                  uid: user.uid,
+                  email: normEmail,
+                  name: user.displayName || userName || 'Coach Andrew',
+                  role: 'Coach',
+                  teamIds: [activeTeamId || 'team1'],
+                  status: 'Active',
+                }).catch(() => {});
+              }
             }).catch(() => {});
           }
         }).catch(() => {});
@@ -903,7 +994,9 @@ export default function App() {
         (Array.isArray(cachedLocalUsers) ? cachedLocalUsers : []).forEach(u => userMap.set(u.uid, u));
         remoteUsers.forEach(u => userMap.set(u.uid, u));
 
-        const merged = Array.from(userMap.values());
+        const mergedRaw = Array.from(userMap.values());
+        const merged = deduplicateUserProfiles(mergedRaw);
+
         if (merged.length === 0) {
           merged.push({ uid: 'u1', email: 'coach@example.com', name: userName || 'Coach Andrew', role: 'Admin', teamIds: ['team1'] });
         }
@@ -948,7 +1041,7 @@ export default function App() {
       // Write new active user profile to Firestore (associated with active authenticated uid)
       await setDoc(doc(db, 'users', uid), {
         uid,
-        email: pendingInviteToAccept.email,
+        email: pendingInviteToAccept.email.trim().toLowerCase(),
         name: acceptingInviteName.trim(),
         role: pendingInviteToAccept.role,
         teamIds: pendingInviteToAccept.teamIds || [],
@@ -995,8 +1088,10 @@ export default function App() {
 
   const handleUpdateUsers = async (newUsers: UserProfile[]) => {
     if (!Array.isArray(newUsers)) return;
+    const cleanUsers = deduplicateUserProfiles(newUsers);
+
     // Sync updates and deletions directly to Firestore
-    const currentUids = new Set(newUsers.map(u => u.uid));
+    const currentUids = new Set(cleanUsers.map(u => u.uid));
     const currentUsers = Array.isArray(users) ? users : [];
     const deletedUsers = currentUsers.filter(u => !currentUids.has(u.uid));
 
@@ -1004,7 +1099,7 @@ export default function App() {
       await deleteDoc(doc(db, 'users', u.uid)).catch(e => console.warn("Error deleting user from Firestore:", e));
     }
 
-    for (const u of newUsers) {
+    for (const u of cleanUsers) {
       const oldU = currentUsers.find(old => old.uid === u.uid);
       if (!oldU || JSON.stringify(oldU) !== JSON.stringify(u)) {
         await setDoc(doc(db, 'users', u.uid), {
@@ -1021,7 +1116,7 @@ export default function App() {
       }
     }
 
-    setUsers(newUsers);
+    setUsers(cleanUsers);
   };
 
   // Real-time Firestore document subscriber (Downstream sync)
