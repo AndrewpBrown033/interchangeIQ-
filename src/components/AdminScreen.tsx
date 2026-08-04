@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory } from '../types';
+import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory, ApiKeySettings } from '../types';
 import { DEFAULT_PLAYERS } from '../constants';
 import {
   Plus,
@@ -35,7 +35,11 @@ import {
   FileText,
   Download,
   TrendingUp,
-  Terminal
+  Terminal,
+  Loader2,
+  Key,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface AdminScreenProps {
@@ -56,6 +60,8 @@ interface AdminScreenProps {
   isDebugEnabled?: boolean;
   onToggleDebug?: (enabled: boolean) => void;
   onOpenDebugModal?: () => void;
+  apiKeys?: ApiKeySettings;
+  onUpdateApiKeys?: (keys: ApiKeySettings) => void;
 }
 
 export const DEFAULT_TACTICAL_PROMPTS: TacticalPrompt[] = [
@@ -187,10 +193,69 @@ export default function AdminScreen({
   isDebugEnabled = false,
   onToggleDebug,
   onOpenDebugModal,
+  apiKeys,
+  onUpdateApiKeys,
 }: AdminScreenProps) {
   const [adminSection, setAdminSection] = useState<'access' | 'prompts'>('access');
+  const [jarvisSubTab, setJarvisSubTab] = useState<'keys' | 'prompts'>('keys');
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [teamSyncMsg, setTeamSyncMsg] = useState<string | null>(null);
+
+  // Jarvis Settings > API Keys panel state
+  const [anthropicInput, setAnthropicInput] = useState('');
+  const [geminiInput, setGeminiInput] = useState('');
+  const [showAnthropicInput, setShowAnthropicInput] = useState(false);
+  const [showGeminiInput, setShowGeminiInput] = useState(false);
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
+  const [keysSavedNotice, setKeysSavedNotice] = useState('');
+
+  const maskKey = (key?: string) => {
+    if (!key) return '';
+    if (key.length <= 10) return '•'.repeat(key.length);
+    return `${key.slice(0, 6)}${'•'.repeat(8)}${key.slice(-4)}`;
+  };
+
+  const handleSaveApiKeys = async () => {
+    if (!onUpdateApiKeys) return;
+    const updates: ApiKeySettings = {};
+    if (anthropicInput.trim()) updates.anthropicApiKey = anthropicInput.trim();
+    if (geminiInput.trim()) updates.geminiApiKey = geminiInput.trim();
+
+    if (Object.keys(updates).length === 0) {
+      setKeysSavedNotice('Enter at least one key to save.');
+      setTimeout(() => setKeysSavedNotice(''), 3000);
+      return;
+    }
+
+    setIsSavingKeys(true);
+    try {
+      await onUpdateApiKeys(updates);
+      setAnthropicInput('');
+      setGeminiInput('');
+      setShowAnthropicInput(false);
+      setShowGeminiInput(false);
+      setKeysSavedNotice('Saved! These keys are now available to every coach on your team.');
+    } catch (err: any) {
+      setKeysSavedNotice(`Save failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSavingKeys(false);
+      setTimeout(() => setKeysSavedNotice(''), 5000);
+    }
+  };
+
+  const handleRemoveApiKey = async (provider: 'anthropic' | 'gemini') => {
+    if (!onUpdateApiKeys) return;
+    const confirmed = window.confirm(`Remove the saved ${provider === 'anthropic' ? 'Claude' : 'Gemini'} API key? Jarvis will fall back to the server's default key (if any) for this provider.`);
+    if (!confirmed) return;
+    setIsSavingKeys(true);
+    try {
+      await onUpdateApiKeys(provider === 'anthropic' ? { anthropicApiKey: '' } : { geminiApiKey: '' });
+      setKeysSavedNotice('Key removed.');
+    } finally {
+      setIsSavingKeys(false);
+      setTimeout(() => setKeysSavedNotice(''), 3000);
+    }
+  };
 
   // Squad summary metrics calculations
   const squadCount = players.length;
@@ -251,6 +316,7 @@ export default function AdminScreen({
   const [inviteRole, setInviteRole] = useState<'Coach' | 'Assistant Coach' | 'Manager' | 'Admin'>('Coach');
   const [inviteAllowedFeatures, setInviteAllowedFeatures] = useState<string[]>(['training', 'growth', 'jarvis']);
   const [inviteSelectedTeams, setInviteSelectedTeams] = useState<string[]>(activeTeamId ? [activeTeamId] : []);
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [activeUserSubTab, setActiveUserSubTab] = useState<'active' | 'pending'>('active');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -453,7 +519,7 @@ export default function AdminScreen({
     }
   };
 
-  const handleSendInvite = (e: React.FormEvent) => {
+  const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail.trim()) {
       alert('Please enter an email address.');
@@ -464,13 +530,17 @@ export default function AdminScreen({
       return;
     }
 
+    setIsSendingInvite(true);
+
     // Generate unique invitation code
     const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const trimmedEmail = inviteEmail.trim().toLowerCase();
+    const trimmedName = inviteName.trim();
 
     const newUser: UserProfile = {
       uid: `invite-${code}`,
-      email: inviteEmail.trim().toLowerCase(),
-      name: inviteName.trim(),
+      email: trimmedEmail,
+      name: trimmedName,
       role: inviteRole,
       teamIds: inviteSelectedTeams,
       allowedFeatures: inviteAllowedFeatures,
@@ -480,9 +550,52 @@ export default function AdminScreen({
       inviteCode: code,
     };
 
+    // Persist the pending invite first so it's not lost even if the email fails to send.
     onUpdateUsers([...users, newUser]);
-    setShowInviteModal(false);
-    setActiveUserSubTab('pending');
+
+    const inviteLink = `${window.location.origin}/?invite=${code}`;
+    const teamName = inviteSelectedTeams.length > 0
+      ? teams.find((t) => t.id === inviteSelectedTeams[0])?.name
+      : undefined;
+
+    try {
+      const res = await fetch('/api/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toEmail: trimmedEmail,
+          toName: trimmedName,
+          inviterName: 'Administrator',
+          role: inviteRole,
+          inviteLink,
+          teamName,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        console.warn('Invite email did not send:', data);
+        alert(
+          `${trimmedName} was added to Pending Invites, but the invite email could not be sent ` +
+          `(${data.details || data.error || 'email provider not configured'}).\n\n` +
+          `Use "Copy Invite Link" on their pending invite row to share it manually.`
+        );
+      } else {
+        alert(`Invitation email sent to ${trimmedEmail}.`);
+      }
+    } catch (err: any) {
+      console.error('Invite email request failed:', err);
+      alert(
+        `${trimmedName} was added to Pending Invites, but the invite email request failed ` +
+        `(${err.message || 'network error'}).\n\n` +
+        `Use "Copy Invite Link" on their pending invite row to share it manually.`
+      );
+    } finally {
+      setIsSendingInvite(false);
+      setShowInviteModal(false);
+      setActiveUserSubTab('pending');
+    }
   };
 
   const handleToggleTeamSelection = (teamId: string) => {
@@ -640,7 +753,7 @@ export default function AdminScreen({
         <div>
           <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Admin Dashboard</h2>
           <p className="text-xs text-[var(--muted)] font-semibold mt-1">
-            Configure squads, coach credentials, and custom Jarvis tactical prompts
+            Configure squads, coach credentials, Jarvis AI provider keys, and tactical prompts
           </p>
         </div>
         
@@ -666,7 +779,7 @@ export default function AdminScreen({
             }`}
           >
             <Bot className="w-4 h-4 text-indigo-300" />
-            <span>Jarvis Tactical Prompts</span>
+            <span>Jarvis Settings</span>
             <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
               adminSection === 'prompts' ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-700'
             }`}>
@@ -1392,6 +1505,208 @@ export default function AdminScreen({
       {/* SECTION 2: Jarvis Tactical Prompts Builder */}
       {adminSection === 'prompts' && (
         <div className="space-y-6">
+
+          {/* Jarvis Settings Sub-Tab Switcher */}
+          <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-200/80 w-fit">
+            <button
+              onClick={() => setJarvisSubTab('keys')}
+              className={`py-2 px-4 rounded-xl font-black text-xs transition flex items-center gap-2 cursor-pointer ${
+                jarvisSubTab === 'keys'
+                  ? 'bg-white text-[var(--navy)] shadow-xs'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5 text-amber-500" />
+              <span>API Keys</span>
+            </button>
+            <button
+              onClick={() => setJarvisSubTab('prompts')}
+              className={`py-2 px-4 rounded-xl font-black text-xs transition flex items-center gap-2 cursor-pointer ${
+                jarvisSubTab === 'prompts'
+                  ? 'bg-white text-[var(--navy)] shadow-xs'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <Bot className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Tactical Prompts</span>
+            </button>
+          </div>
+
+          {/* SUB-SECTION: API Keys */}
+          {jarvisSubTab === 'keys' && (
+            <div className="space-y-5">
+              <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-6 rounded-3xl border border-indigo-800/40 shadow-xl relative overflow-hidden">
+                <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="flex items-start gap-4 relative z-10">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 p-0.5 shadow-lg shrink-0">
+                    <div className="w-full h-full bg-indigo-950 rounded-[14px] flex items-center justify-center text-amber-300">
+                      <Key className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black text-white tracking-tight">Jarvis AI Provider API Keys</h3>
+                    <p className="text-xs text-indigo-200/80 font-medium mt-1 leading-relaxed max-w-2xl">
+                      Add or update the API keys Jarvis uses for Claude and Gemini. Saved keys sync to your whole team via Firestore, so any coach on any device can use them once saved here - no redeploy needed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                  <strong>Security note:</strong> keys entered here are stored in Firestore and sent from the browser with each Jarvis/Import request. Anyone who can read your Firestore database or inspect network traffic from a signed-in coach's device could see them. For production use, tightening <code className="bg-amber-100 px-1 py-0.5 rounded">firestore.rules</code> is strongly recommended - this panel is a convenience for quickly adding/rotating keys, not a substitute for a proper secrets manager.
+                </p>
+              </div>
+
+              {keysSavedNotice && (
+                <div className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+                  {keysSavedNotice}
+                </div>
+              )}
+
+              {/* Claude / Anthropic Key */}
+              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-gray-900">Claude (Anthropic)</h4>
+                      <p className="text-[11px] text-gray-400 font-semibold">Used when the AI provider toggle is set to Claude</p>
+                    </div>
+                  </div>
+                  {apiKeys?.anthropicApiKey && (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      Configured
+                    </span>
+                  )}
+                </div>
+
+                {apiKeys?.anthropicApiKey && (
+                  <div className="flex items-center justify-between gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                    <span className="font-mono text-xs text-gray-600 truncate">{maskKey(apiKeys.anthropicApiKey)}</span>
+                    <button
+                      onClick={() => handleRemoveApiKey('anthropic')}
+                      disabled={isSavingKeys}
+                      className="text-[11px] font-bold text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-stretch gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type={showAnthropicInput ? 'text' : 'password'}
+                      value={anthropicInput}
+                      onChange={(e) => setAnthropicInput(e.target.value)}
+                      placeholder={apiKeys?.anthropicApiKey ? 'Enter a new key to replace it...' : 'sk-ant-...'}
+                      className="w-full p-2.5 pr-10 text-xs border border-gray-200 bg-white rounded-xl text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAnthropicInput((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    >
+                      {showAnthropicInput ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 font-semibold">
+                  Create a key at <span className="font-mono">console.anthropic.com</span>
+                </p>
+              </div>
+
+              {/* Gemini Key */}
+              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-gray-900">Gemini (Google)</h4>
+                      <p className="text-[11px] text-gray-400 font-semibold">Used when the AI provider toggle is set to Gemini, and for Import with AI</p>
+                    </div>
+                  </div>
+                  {apiKeys?.geminiApiKey && (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      Configured
+                    </span>
+                  )}
+                </div>
+
+                {apiKeys?.geminiApiKey && (
+                  <div className="flex items-center justify-between gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                    <span className="font-mono text-xs text-gray-600 truncate">{maskKey(apiKeys.geminiApiKey)}</span>
+                    <button
+                      onClick={() => handleRemoveApiKey('gemini')}
+                      disabled={isSavingKeys}
+                      className="text-[11px] font-bold text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-stretch gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type={showGeminiInput ? 'text' : 'password'}
+                      value={geminiInput}
+                      onChange={(e) => setGeminiInput(e.target.value)}
+                      placeholder={apiKeys?.geminiApiKey ? 'Enter a new key to replace it...' : 'AIza...'}
+                      className="w-full p-2.5 pr-10 text-xs border border-gray-200 bg-white rounded-xl text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowGeminiInput((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    >
+                      {showGeminiInput ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 font-semibold">
+                  Create a key at <span className="font-mono">aistudio.google.com/app/apikey</span>
+                </p>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSaveApiKeys}
+                  disabled={isSavingKeys || (!anthropicInput.trim() && !geminiInput.trim())}
+                  className="px-5 py-2.5 bg-[var(--navy)] hover:opacity-90 text-white font-black text-xs rounded-xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingKeys ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save API Keys</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {apiKeys?.updatedAt && (
+                <p className="text-[10px] text-gray-400 font-semibold text-right">
+                  Last updated {new Date(apiKeys.updatedAt).toLocaleString()}
+                  {apiKeys.updatedBy ? ` by ${apiKeys.updatedBy}` : ''}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* SUB-SECTION: Tactical Prompts (existing builder) */}
+          {jarvisSubTab === 'prompts' && (
+        <>
           {/* Top Prompts Header Banner */}
           <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-6 rounded-3xl border border-indigo-800/40 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -1590,6 +1905,8 @@ export default function AdminScreen({
               </div>
             )}
           </div>
+        </>
+          )}
         </div>
       )}
 
@@ -1799,10 +2116,20 @@ export default function AdminScreen({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold bg-[var(--blue)] hover:opacity-90 text-white rounded-xl cursor-pointer flex items-center gap-1.5"
+                  disabled={isSendingInvite}
+                  className="px-4 py-2 text-xs font-bold bg-[var(--blue)] hover:opacity-90 text-white rounded-xl cursor-pointer flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Generate & Send Invite</span>
+                  {isSendingInvite ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Generate & Send Invite</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

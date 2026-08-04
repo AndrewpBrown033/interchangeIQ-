@@ -83,14 +83,60 @@ export interface GameHistory {
   }[];
 }
 
+// Data-driven training-diagram schema. Each drill supplies its own spec so the
+// diagram accurately reflects that drill's actual setup instead of being
+// guessed from the title.
+export interface DiagramCone {
+  x: number;
+  y: number;
+}
+
+export interface DiagramPlayer {
+  label: string;
+  x: number;
+  y: number;
+  kind?: 'own' | 'opp' | 'coach'; // default 'own'
+}
+
+export interface DiagramArrow {
+  path: string; // SVG path, drawn in the 900x520 field viewBox
+  color: string;
+  dash?: string; // strokeDasharray override
+}
+
+export interface DiagramZone {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string;
+}
+
+export interface DiagramContestCircle {
+  x: number;
+  y: number;
+  r: number;
+  color?: string;
+  label?: string;
+}
+
 export interface DiagramSpec {
-  surface?: 'aussie' | 'soccer';
-  zones?: { x: number; y: number; width: number; height: number; label?: string }[];
-  contestCircle?: { x: number; y: number; r: number; color?: string; label?: string };
-  cones?: { x: number; y: number }[];
-  players?: { label: string; x: number; y: number; kind?: 'own' | 'opp' | 'coach' }[];
-  arrows?: { path: string; color: string; dash?: string }[];
+  surface?: 'aussie' | 'soccer'; // which base playing surface to draw; default 'aussie'
+  cones?: DiagramCone[];
+  players?: DiagramPlayer[];
+  arrows?: DiagramArrow[];
+  zones?: DiagramZone[];
+  contestCircle?: DiagramContestCircle;
+  // Ball position for each step of the drill (cycled with stepIndex % length).
+  // Should have one entry per entry in `steps`, in order.
   ballPositions: { x: number; y: number }[];
+}
+
+export interface ApiKeySettings {
+  anthropicApiKey?: string;
+  geminiApiKey?: string;
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 export interface Drill {
@@ -101,7 +147,7 @@ export interface Drill {
   players: string;
   overview: string;
   steps: [string, string][]; // [stepTitle, stepContent]
-  diagram?: DiagramSpec;
+  diagram?: DiagramSpec; // optional - falls back to a generic diagram if omitted
 }
 
 export interface TrainingState {

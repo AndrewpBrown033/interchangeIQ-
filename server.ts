@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -12,27 +13,31 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Lazy initializer for Gemini API client to prevent startup errors if key is empty
-function getGemAIClient() {
-  return new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY || "",
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
+// Initialize Gemini API client on the server side (still used by /api/import-drill)
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY || "",
+  httpOptions: {
+    headers: {
+      "User-Agent": "aistudio-build",
     },
-  });
-}
+  },
+});
+
+// Initialize Claude API client on the server side (used by /api/jarvis)
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || "",
+});
 
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", service: "InterchangeIQ API" });
 });
 
-// Jarvis AI Assistant endpoint (uses Gemini Flash)
+// Jarvis AI Assistant endpoint
 app.post("/api/jarvis", async (req, res) => {
   try {
-    const { message, history, squad, drills, growthRecords } = req.body;
+    const { message, history, squad, drills, growthRecords, apiKeyOverride } = req.body;
+    const provider: "claude" | "gemini" = req.body.provider === "gemini" ? "gemini" : "claude";
 
     if (!message) {
       return res.status(400).json({ error: "Message is required." });
@@ -107,43 +112,94 @@ ${squadSummary}
 CURRENT DRILL LIBRARY IN SYSTEM:
 ${drillsSummary}`;
 
-    if (!process.env.GEMINI_API_KEY) {
+    // Check if a usable API key exists for the selected provider (env var OR an
+    // admin-entered override from Admin > Jarvis Settings > API Keys)
+    const effectiveKey = provider === "gemini"
+      ? (apiKeyOverride || process.env.GEMINI_API_KEY)
+      : (apiKeyOverride || process.env.ANTHROPIC_API_KEY);
+
+    if (!effectiveKey) {
+      const missingKeyName = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+      const providerLabel = provider === "gemini" ? "Gemini" : "Claude";
       return res.json({
-        reply: `G'day Coach! I'm **Jarvis**, your agentic AFL Coaching & Performance Agent.\n\n*Note: GEMINI_API_KEY is currently not configured in your environment.* \n\nI have scanned your squad data (${Array.isArray(squad) ? squad.length : 0} players) and drill library (${Array.isArray(drills) ? drills.length : 0} drills).\n\nHere are top recommended drills for your session:\n\n` +
+        reply: `G'day Coach! I'm **Jarvis**, your agentic AFL Coaching & Performance Agent.\n\n*Note: To enable live ${providerLabel} AI generation, please add a ${providerLabel} API key in Admin > Jarvis Settings > API Keys, or set ${missingKeyName} in your platform Secrets panel.* \n\nI have scanned your squad data (${Array.isArray(squad) ? squad.length : 0} players) and drill library (${Array.isArray(drills) ? drills.length : 0} drills).\n\nHere are top recommended drills for your session:\n\n` +
           (Array.isArray(drills) ? drills.slice(0, 3).map((d: any) => `• **${d.title}** (${d.mins} mins) - ${d.overview}`).join('\n\n') : 'No drills found.')
       });
     }
 
-    const ai = getGemAIClient();
-    const geminiContents: any[] = [];
-    if (Array.isArray(history) && history.length > 0) {
-      for (const item of history.slice(-6)) {
-        if (item.role === 'user' || item.role === 'model' || item.role === 'assistant') {
-          geminiContents.push({
-            role: item.role === 'assistant' ? 'model' : item.role,
-            parts: [{ text: item.content || item.text || '' }]
-          });
+    let replyText: string;
+
+    if (provider === "gemini") {
+      // Format chat contents for the Gemini API
+      const geminiContents: any[] = [];
+      if (Array.isArray(history) && history.length > 0) {
+        for (const item of history.slice(-6)) {
+          if (item.role === 'user' || item.role === 'model' || item.role === 'assistant') {
+            geminiContents.push({
+              role: item.role === 'assistant' ? 'model' : item.role,
+              parts: [{ text: item.content || item.text || '' }]
+            });
+          }
         }
       }
-    }
-    geminiContents.push({ role: 'user', parts: [{ text: message }] });
+      geminiContents.push({ role: 'user', parts: [{ text: message }] });
 
-    const geminiResponse = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: geminiContents,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
+      // Use a one-off client with the admin-entered key if one was supplied,
+      // otherwise fall back to the shared server-configured client.
+      const geminiClient = apiKeyOverride
+        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
+        : ai;
+
+      const geminiResponse = await geminiClient.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: geminiContents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
+      });
+
+      replyText = geminiResponse.text || "I was unable to generate a response. Please try again.";
+    } else {
+      // Format chat contents for the Claude Messages API
+      const claudeContents: { role: 'user' | 'assistant'; content: string }[] = [];
+      if (Array.isArray(history) && history.length > 0) {
+        for (const item of history.slice(-6)) {
+          if (item.role === 'user' || item.role === 'model' || item.role === 'assistant') {
+            claudeContents.push({
+              role: item.role === 'user' ? 'user' : 'assistant',
+              content: item.content || item.text || ''
+            });
+          }
+        }
       }
-    });
+      claudeContents.push({ role: 'user', content: message });
 
-    const replyText = geminiResponse.text || "I was unable to generate a response. Please try again.";
-    return res.json({ reply: replyText, provider: "gemini" });
+      // Use a one-off client with the admin-entered key if one was supplied,
+      // otherwise fall back to the shared server-configured client.
+      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
+
+      const claudeResponse = await claudeClient.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 2048,
+        system: systemInstruction,
+        temperature: 0.7,
+        messages: claudeContents,
+      });
+
+      replyText = claudeResponse.content
+        .map((block: any) => (block.type === 'text' ? block.text : ''))
+        .join('\n')
+        .trim()
+        || "I was unable to generate a response. Please try again.";
+    }
+
+    return res.json({ reply: replyText, provider });
   } catch (err: any) {
     console.error("Jarvis API error:", err);
     return res.status(500).json({
       error: "Jarvis processing error",
-      details: err.message || "An error occurred while communicating with Gemini."
+      details: err.message || "An error occurred while communicating with the AI provider."
     });
   }
 });
@@ -228,16 +284,22 @@ app.post("/api/send-invite", async (req, res) => {
 // AI-powered drill import: converts raw pasted drill notes into a structured Drill object
 app.post("/api/import-drill", async (req, res) => {
   try {
-    const { rawText } = req.body;
+    const { rawText, apiKeyOverride } = req.body;
+    const provider: "claude" | "gemini" = req.body.provider === "gemini" ? "gemini" : "claude";
 
     if (!rawText || !String(rawText).trim()) {
       return res.status(400).json({ error: "rawText is required." });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const effectiveKey = provider === "gemini"
+      ? (apiKeyOverride || process.env.GEMINI_API_KEY)
+      : (apiKeyOverride || process.env.ANTHROPIC_API_KEY);
+
+    if (!effectiveKey) {
+      const missingKeyName = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
       return res.status(503).json({
         error: "AI import not configured",
-        details: "GEMINI_API_KEY is not set on the server. Fill in the drill fields manually instead.",
+        details: `${missingKeyName} is not set on the server. Add a key in Admin > Jarvis Settings > API Keys, fill in the drill fields manually, or switch providers.`,
       });
     }
 
@@ -267,18 +329,38 @@ Rules:
 - If the notes describe multiple drills, extract only the FIRST one.
 - Return ONLY the JSON object - no markdown code fences, no preamble, no explanation.`;
 
-    const ai = getGemAIClient();
-    const geminiResponse = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [{ role: "user", parts: [{ text: String(rawText) }] }],
-      config: {
-        systemInstruction,
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      },
-    });
+    let raw = "";
 
-    const raw = geminiResponse.text || "";
+    if (provider === "gemini") {
+      const geminiClient = apiKeyOverride
+        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
+        : ai;
+
+      const geminiResponse = await geminiClient.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: [{ role: "user", parts: [{ text: String(rawText) }] }],
+        config: {
+          systemInstruction,
+          temperature: 0.3,
+          responseMimeType: "application/json",
+        },
+      });
+      raw = geminiResponse.text || "";
+    } else {
+      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
+
+      const claudeResponse = await claudeClient.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 1024,
+        system: systemInstruction,
+        temperature: 0.3,
+        messages: [{ role: "user", content: String(rawText) }],
+      });
+      raw = claudeResponse.content
+        .map((block: any) => (block.type === 'text' ? block.text : ''))
+        .join('\n');
+    }
+
     const cleaned = raw.replace(/```json|```/g, "").trim();
 
     let parsed: any;
@@ -299,7 +381,7 @@ Rules:
       });
     }
 
-    return res.json({ drill: parsed, provider: "gemini" });
+    return res.json({ drill: parsed, provider });
   } catch (err: any) {
     console.error("Import drill error:", err);
     return res.status(500).json({

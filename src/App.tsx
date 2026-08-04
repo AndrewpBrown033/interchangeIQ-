@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
-  Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment
+  Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment, ApiKeySettings
 } from './types';
 import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers } from './constants';
 
@@ -222,6 +222,18 @@ export default function App() {
       console.warn("Failed to parse growthRecords:", e);
     }
     return DEFAULT_GROWTH_RECORDS;
+  });
+
+  // Jarvis AI Provider API Keys (entered via Admin > Jarvis Settings)
+  const [apiKeys, setApiKeys] = useState<ApiKeySettings>(() => {
+    try {
+      const saved = localStorage.getItem('iiq_api_keys');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) {
+      console.warn("Failed to parse apiKeys:", e);
+    }
+    return {};
   });
 
   const [trainingState, setTrainingState] = useState<TrainingState>(() => {
@@ -697,6 +709,45 @@ export default function App() {
   useEffect(() => { localStorage.setItem('iiq_audit_logs', JSON.stringify(auditLogs)); }, [auditLogs]);
   useEffect(() => { localStorage.setItem('iiq_drills', JSON.stringify(drills)); }, [drills]);
   useEffect(() => { localStorage.setItem('iiq_growth_records', JSON.stringify(growthRecords)); }, [growthRecords]);
+  useEffect(() => { localStorage.setItem('iiq_api_keys', JSON.stringify(apiKeys)); }, [apiKeys]);
+
+  // Pull API keys from Firestore once on mount (best-effort) - fills in any
+  // key set from another device/browser without clobbering a locally-set one.
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'apiKeys'));
+        if (snap.exists()) {
+          const remote = snap.data() as ApiKeySettings;
+          setApiKeys((prev) => ({
+            anthropicApiKey: prev.anthropicApiKey || remote.anthropicApiKey,
+            geminiApiKey: prev.geminiApiKey || remote.geminiApiKey,
+            updatedAt: remote.updatedAt || prev.updatedAt,
+            updatedBy: remote.updatedBy || prev.updatedBy,
+          }));
+        }
+      } catch (err) {
+        console.warn('Could not fetch API key settings from Firestore:', err);
+      }
+    })();
+  }, []);
+
+  // Save API keys locally and push (best-effort) to Firestore so other coaches'
+  // devices can also pick them up.
+  const handleUpdateApiKeys = async (newKeys: ApiKeySettings) => {
+    const merged: ApiKeySettings = {
+      ...apiKeys,
+      ...newKeys,
+      updatedAt: Date.now(),
+      updatedBy: userEmail || 'Administrator',
+    };
+    setApiKeys(merged);
+    try {
+      await setDoc(doc(db, 'settings', 'apiKeys'), merged, { merge: true });
+    } catch (err) {
+      console.warn('Error saving API keys to Firestore:', err);
+    }
+  };
   useEffect(() => { localStorage.setItem('iiq_training_state', JSON.stringify(trainingState)); }, [trainingState]);
   useEffect(() => { localStorage.setItem('iiq_teams', JSON.stringify(teams)); }, [teams]);
   useEffect(() => { localStorage.setItem('iiq_users', JSON.stringify(users)); }, [users]);
@@ -1924,6 +1975,7 @@ export default function App() {
             trainingState={trainingState}
             onUpdateTrainingState={setTrainingState}
             onNavigateTab={handleSelectTab}
+            apiKeys={apiKeys}
           />
         )}
         {activeTab === 'team' && (
@@ -1957,6 +2009,7 @@ export default function App() {
             trainingState={trainingState}
             onUpdateTrainingState={setTrainingState}
             onNavigateToJarvis={() => handleSelectTab('jarvis')}
+            apiKeys={apiKeys}
           />
         )}
         {activeTab === 'history' && (
@@ -1992,6 +2045,8 @@ export default function App() {
             isDebugEnabled={isDebugEnabled}
             onToggleDebug={handleToggleDebug}
             onOpenDebugModal={() => setIsDebugModalOpen(true)}
+            apiKeys={apiKeys}
+            onUpdateApiKeys={handleUpdateApiKeys}
           />
         )}
         {activeTab === 'settings' && (

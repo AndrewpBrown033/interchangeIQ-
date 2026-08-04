@@ -28,7 +28,7 @@ interface DiagnosticResult {
   };
   tests: {
     name: string;
-    status: 'pending' | 'success' | 'error';
+    status: 'pending' | 'success' | 'warning' | 'error';
     message: string;
     details?: any;
   }[];
@@ -121,40 +121,35 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
       }
     }
 
-    // Test 3: Firestore Write Test (using _health_checks collection)
+    // Test 3: Firestore Write to 'passkeys'
     const testDocId = `debug_test_${Date.now()}`;
-    addLog(`Testing Firestore write to _health_checks/${testDocId}...`);
-    let testRef: any = null;
+    addLog(`Testing Firestore write to passkeys/${testDocId}...`);
     try {
-      testRef = doc(db, '_health_checks', testDocId);
+      const testRef = doc(db, 'passkeys', testDocId);
       await setDoc(testRef, {
         test: true,
         created: Date.now(),
         createdBy: auth.currentUser?.uid || appUserEmail || 'anonymous',
       });
-      addLog('Write to _health_checks collection SUCCEEDED!');
+      addLog('Write to passkeys collection SUCCEEDED!');
       diag.tests.push({
-        name: 'Firestore Write Test',
+        name: 'Firestore Write (passkeys)',
         status: 'success',
-        message: 'Successfully wrote and verified test document in Firestore.',
+        message: 'Successfully wrote test document to passkeys collection.',
       });
+
+      // Cleanup test doc
+      addLog(`Cleaning up test doc passkeys/${testDocId}...`);
+      await deleteDoc(testRef);
+      addLog('Cleanup succeeded.');
     } catch (fsErr: any) {
       addLog(`Firestore write error: ${fsErr.code || fsErr.message}`);
       diag.tests.push({
-        name: 'Firestore Write Test',
+        name: 'Firestore Write (passkeys)',
         status: 'error',
         message: `Write failed (${fsErr.code || fsErr.message}). Check firestore.rules permissions or Auth state.`,
         details: fsErr.toString(),
       });
-    } finally {
-      if (testRef) {
-        try {
-          await deleteDoc(testRef);
-          addLog('Test document cleaned up.');
-        } catch (_cErr) {
-          // Ignore cleanup errors
-        }
-      }
     }
 
     // Test 4: Firestore Read from 'teams'
@@ -193,6 +188,74 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
         name: 'LocalStorage Offline Cache',
         status: 'error',
         message: `Local cache check error: ${lErr.message}`,
+      });
+    }
+
+    // Test 6: Jarvis AI Connection
+    const aiProvider = localStorage.getItem('iiq_ai_provider') === 'gemini' ? 'gemini' : 'claude';
+    const providerLabel = aiProvider === 'gemini' ? 'Gemini' : 'Claude';
+    addLog(`Testing Jarvis AI connection (provider: ${providerLabel})...`);
+    try {
+      const jarvisRes = await fetch('/api/jarvis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Diagnostic connectivity check - reply with a short confirmation.',
+          provider: aiProvider,
+          squad: [],
+          drills: [],
+          growthRecords: [],
+          history: [],
+        }),
+      });
+
+      const jarvisText = await jarvisRes.text();
+      let jarvisData: any = {};
+      try {
+        jarvisData = JSON.parse(jarvisText);
+      } catch (_e) {
+        // leave jarvisData empty; handled below
+      }
+
+      if (!jarvisRes.ok) {
+        addLog(`Jarvis API error (${jarvisRes.status}): ${jarvisData.details || jarvisData.error || jarvisText.slice(0, 200)}`);
+        diag.tests.push({
+          name: `Jarvis AI Connection (${providerLabel})`,
+          status: 'error',
+          message: `Request failed (HTTP ${jarvisRes.status}): ${jarvisData.details || jarvisData.error || 'Unknown server error.'} Check that the server is deployed with API access and the relevant API key is set.`,
+          details: jarvisText.slice(0, 500),
+        });
+      } else if (typeof jarvisData.reply === 'string' && /ANTHROPIC_API_KEY|GEMINI_API_KEY/.test(jarvisData.reply)) {
+        // Jarvis returns HTTP 200 with a static fallback message when the provider's API key isn't set
+        addLog(`Jarvis reachable, but the API key for ${providerLabel} is not configured on the server.`);
+        diag.tests.push({
+          name: `Jarvis AI Connection (${providerLabel})`,
+          status: 'warning',
+          message: `Jarvis endpoint is reachable, but is running in fallback mode - the ${providerLabel === 'Gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY'} is not set on the server, so responses are static rather than AI-generated.`,
+        });
+      } else if (jarvisData.reply) {
+        addLog(`Jarvis AI responded successfully via ${jarvisData.provider || providerLabel}.`);
+        diag.tests.push({
+          name: `Jarvis AI Connection (${providerLabel})`,
+          status: 'success',
+          message: `Jarvis responded successfully using ${jarvisData.provider === 'gemini' ? 'Gemini' : 'Claude'}.`,
+        });
+      } else {
+        addLog('Jarvis responded but with an unexpected payload shape.');
+        diag.tests.push({
+          name: `Jarvis AI Connection (${providerLabel})`,
+          status: 'error',
+          message: 'Jarvis responded with HTTP 200 but no reply text was found in the payload.',
+          details: jarvisText.slice(0, 500),
+        });
+      }
+    } catch (jErr: any) {
+      addLog(`Jarvis connection error: ${jErr.message || jErr}`);
+      diag.tests.push({
+        name: `Jarvis AI Connection (${providerLabel})`,
+        status: 'error',
+        message: `Could not reach /api/jarvis (${jErr.message || 'network error'}). Confirm the Express server is running and reachable - Firebase Hosting alone cannot serve this route.`,
+        details: jErr.toString(),
       });
     }
 
@@ -240,8 +303,8 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
               <Terminal className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-lg text-gray-900 tracking-tight">Firebase & Firestore System Diagnostics</h3>
-              <p className="text-xs text-gray-500 font-medium">Real-time inspection of Auth Engine, Firestore Rules, and Sync state</p>
+              <h3 className="font-black text-lg text-gray-900 tracking-tight">System Diagnostics</h3>
+              <p className="text-xs text-gray-500 font-medium">Real-time inspection of Auth Engine, Firestore Rules, Sync state, and Jarvis AI connectivity</p>
             </div>
           </div>
           <button
@@ -315,6 +378,8 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
               className={`p-3.5 rounded-2xl border text-xs flex items-start gap-3 ${
                 t.status === 'success'
                   ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
+                  : t.status === 'warning'
+                  ? 'bg-amber-50/60 border-amber-200 text-amber-900'
                   : t.status === 'error'
                   ? 'bg-red-50/60 border-red-200 text-red-900'
                   : 'bg-gray-50 border-gray-200 text-gray-700'
@@ -322,6 +387,8 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
             >
               {t.status === 'success' ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : t.status === 'warning' ? (
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               ) : (
                 <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               )}
@@ -329,7 +396,9 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
                 <div className="font-extrabold">{t.name}</div>
                 <div className="opacity-90 leading-relaxed">{t.message}</div>
                 {t.details && (
-                  <div className="mt-1 font-mono text-[10px] bg-red-100/70 p-1.5 rounded-lg text-red-800 break-all">
+                  <div className={`mt-1 font-mono text-[10px] p-1.5 rounded-lg break-all ${
+                    t.status === 'warning' ? 'bg-amber-100/70 text-amber-800' : 'bg-red-100/70 text-red-800'
+                  }`}>
                     {t.details}
                   </div>
                 )}

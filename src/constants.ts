@@ -158,7 +158,32 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Read the drop", "Player 2 reads the kick and works to intercept-mark before the ball hits the ground."],
       ["Return kick", "Player 2 sets up and kicks back into Player 1's square."],
       ["Repeat", "Continue back and forth. A point is scored whenever a kick lands inside the opponent's square."]
-    ]
+    ],
+    diagram: {
+      zones: [
+        { x: 120, y: 150, width: 220, height: 220, label: 'POSITION A' },
+        { x: 560, y: 150, width: 220, height: 220, label: 'POSITION B' }
+      ],
+      cones: [
+        { x: 120, y: 150 }, { x: 340, y: 150 }, { x: 120, y: 370 }, { x: 340, y: 370 },
+        { x: 560, y: 150 }, { x: 780, y: 150 }, { x: 560, y: 370 }, { x: 780, y: 370 }
+      ],
+      players: [
+        { label: '1', x: 230, y: 260 },
+        { label: '2', x: 670, y: 260, kind: 'opp' }
+      ],
+      arrows: [
+        { path: 'M255 245 C390 100,510 100,645 245', color: '#C6FF32', dash: '10 8' },
+        { path: 'M645 275 C510 420,390 420,255 275', color: '#C6FF32', dash: '10 8' }
+      ],
+      ballPositions: [
+        { x: 230, y: 260 },
+        { x: 450, y: 140 },
+        { x: 645, y: 245 },
+        { x: 450, y: 380 },
+        { x: 255, y: 275 }
+      ]
+    }
   },
   {
     id: "hot-spot-kick",
@@ -172,7 +197,25 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Kick", "A kicks under pressure to the marked hot spot."],
       ["Front square", "E moves toward the drop zone while support players attack the crumb."],
       ["Reset", "Players reset and rotate through the stations."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 250, y: 300 },
+        { label: 'E', x: 560, y: 350 },
+        { label: 'D', x: 740, y: 300, kind: 'opp' }
+      ],
+      contestCircle: { x: 700, y: 255, r: 55, color: '#F97316', label: 'HOT SPOT' },
+      arrows: [
+        { path: 'M270 285 C420 190,560 170,690 240', color: '#DC2626', dash: '10 8' },
+        { path: 'M560 340 C620 300,660 275,685 265', color: '#38BDF8', dash: '6 6' }
+      ],
+      ballPositions: [
+        { x: 250, y: 300 },
+        { x: 480, y: 200 },
+        { x: 700, y: 255 },
+        { x: 700, y: 255 }
+      ]
+    }
   },
   {
     id: "criss-cross-handball",
@@ -188,7 +231,29 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Call", "(B) must call with a loud voice as they will be in traffic."],
       ["Simultaneous line", "Simultaneously (C) runs and handballs diagonally across to (D), and must also avoid colliding with the intersecting group."],
       ["Repeat", "The process is repeated with (B) handballing to the next (A), and (D) handballing to the next (C)."]
-    ]
+    ],
+    diagram: {
+      cones: [{ x: 170, y: 390 }, { x: 730, y: 105 }, { x: 170, y: 105 }, { x: 730, y: 390 }],
+      players: [
+        { label: 'A', x: 170, y: 390 },
+        { label: 'B', x: 730, y: 105 },
+        { label: 'C', x: 170, y: 105, kind: 'opp' },
+        { label: 'D', x: 730, y: 390, kind: 'opp' }
+      ],
+      arrows: [
+        { path: 'M190 372 C340 260,540 210,710 120', color: '#1D4ED8', dash: '12 8' },
+        { path: 'M190 122 C350 235,545 285,710 372', color: '#A3E635', dash: '12 8' }
+      ],
+      contestCircle: { x: 450, y: 250, r: 45, color: '#F97316' },
+      ballPositions: [
+        { x: 190, y: 372 },
+        { x: 400, y: 220 },
+        { x: 450, y: 250 },
+        { x: 710, y: 120 },
+        { x: 400, y: 290 },
+        { x: 190, y: 372 }
+      ]
+    }
   },
   {
     id: "marking-contest",
@@ -202,7 +267,22 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Delivery", "Coach kicks to the contest."],
       ["Contest", "Players compete to mark or spoil."],
       ["Rotate", "Next pair enters."]
-    ]
+    ],
+    diagram: {
+      cones: [{ x: 350, y: 285 }, { x: 560, y: 285 }, { x: 450, y: 420 }],
+      players: [
+        { label: 'C', x: 450, y: 400, kind: 'coach' },
+        { label: 'A', x: 410, y: 235 },
+        { label: 'B', x: 495, y: 235, kind: 'opp' }
+      ],
+      arrows: [{ path: 'M450 385 C445 325,450 285,455 245', color: '#DC2626' }],
+      ballPositions: [
+        { x: 450, y: 385 },
+        { x: 450, y: 300 },
+        { x: 452, y: 245 },
+        { x: 452, y: 245 }
+      ]
+    }
   },
   {
     id: "three-man-weave",
@@ -218,7 +298,29 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Shepherd again", "After giving, this player must then run behind the recipient with arms outstretched, instructing them."],
       ["Finish", "The last recipient handballs to the middle player (A) at the other end."],
       ["Repeat", "The second line repeats the process."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 455, y: 400 },
+        { label: 'B', x: 310, y: 260 },
+        { label: 'C', x: 600, y: 260 },
+        { label: 'A2', x: 455, y: 90 }
+      ],
+      arrows: [
+        { path: 'M455 386 C400 332,360 287,320 268', color: '#1D4ED8', dash: '12 8' },
+        { path: 'M320 260 C420 190,500 190,590 255', color: '#A3E635', dash: '9 8' },
+        { path: 'M590 250 C540 180,500 130,460 105', color: '#1D4ED8', dash: '12 8' },
+        { path: 'M455 392 C385 370,340 320,320 280', color: '#A3E635', dash: '5 8' }
+      ],
+      ballPositions: [
+        { x: 455, y: 392 },
+        { x: 320, y: 268 },
+        { x: 590, y: 255 },
+        { x: 460, y: 105 },
+        { x: 460, y: 105 },
+        { x: 455, y: 392 }
+      ]
+    }
   },
   {
     id: "handball-soccer",
@@ -233,7 +335,26 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Contact rules", "For U/10 and older, opposition players may tackle the player with the ball; younger players should only be allowed to grab the jumper or shorts. Kicking is not allowed."],
       ["Turnover", "Once a turnover occurs, team (B) attacks their goal and team (A) must defend."],
       ["Score", "Keep score and have a short break between halves."]
-    ]
+    ],
+    diagram: {
+      surface: 'soccer',
+      players: [
+        { label: 'A', x: 230, y: 260 },
+        { label: 'B', x: 335, y: 190 },
+        { label: 'C', x: 335, y: 330 },
+        { label: '1', x: 520, y: 260, kind: 'opp' },
+        { label: '2', x: 620, y: 190, kind: 'opp' },
+        { label: '3', x: 635, y: 330, kind: 'opp' }
+      ],
+      arrows: [{ path: 'M235 260 C395 120,565 145,780 255', color: '#1D4ED8', dash: '12 7' }],
+      ballPositions: [
+        { x: 255, y: 250 },
+        { x: 420, y: 175 },
+        { x: 570, y: 235 },
+        { x: 775, y: 255 },
+        { x: 775, y: 255 }
+      ]
+    }
   },
   {
     id: "eight-point-front-square",
@@ -247,7 +368,24 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Front and square", "Each receiver must time their run to be front and square before the handball is delivered."],
       ["Handball", "The ball carrier delivers a handball once the receiver is in the correct position."],
       ["Rotate", "Players rotate through each station around the pattern."]
-    ]
+    ],
+    diagram: {
+      cones: [
+        { x: 450, y: 90 }, { x: 650, y: 140 }, { x: 730, y: 270 }, { x: 650, y: 400 },
+        { x: 450, y: 450 }, { x: 250, y: 400 }, { x: 170, y: 270 }, { x: 250, y: 140 }
+      ],
+      players: [
+        { label: 'A', x: 450, y: 90 },
+        { label: 'B', x: 650, y: 140 }
+      ],
+      arrows: [{ path: 'M475 105 C540 115,595 125,635 145', color: '#A3E635', dash: '8 8' }],
+      ballPositions: [
+        { x: 450, y: 90 },
+        { x: 550, y: 110 },
+        { x: 650, y: 140 },
+        { x: 500, y: 95 }
+      ]
+    }
   },
   {
     id: "switch-through-centre",
@@ -261,7 +399,25 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Central delivery", "Deliver by handball or kick to the player front and square in the centre."],
       ["Switch wide", "The central player gives on to a wider running option to switch the play."],
       ["Rotate", "Players rotate through the lines and repeat."]
-    ]
+    ],
+    diagram: {
+      cones: [{ x: 450, y: 320 }],
+      players: [
+        { label: 'A', x: 200, y: 260 },
+        { label: 'T', x: 450, y: 260 },
+        { label: 'W', x: 720, y: 140 }
+      ],
+      arrows: [
+        { path: 'M225 258 C300 258,370 258,430 260', color: '#1D4ED8', dash: '8 8' },
+        { path: 'M470 250 C560 200,650 165,700 148', color: '#A3E635', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 200, y: 260 },
+        { x: 450, y: 260 },
+        { x: 650, y: 180 },
+        { x: 200, y: 260 }
+      ]
+    }
   },
   {
     id: "crumbing-triangle",
@@ -275,7 +431,24 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Work the sides", "The attacker has a ball, as does one outside player. The remaining 3 players work the length of one side of the triangle each."],
       ["Crumb", "Players focus on working low to the ground to win the crumb under pressure."],
       ["Rotate", "Rotate roles so every player has a turn as attacker and defender."]
-    ]
+    ],
+    diagram: {
+      cones: [{ x: 450, y: 120 }, { x: 320, y: 400 }, { x: 580, y: 400 }],
+      players: [
+        { label: 'B', x: 450, y: 130 },
+        { label: 'E', x: 320, y: 400 },
+        { label: 'F', x: 580, y: 400 },
+        { label: 'A', x: 430, y: 345 },
+        { label: 'D', x: 470, y: 355, kind: 'opp' }
+      ],
+      arrows: [{ path: 'M450 145 C450 220,450 280,450 330', color: '#DC2626', dash: '8 6' }],
+      ballPositions: [
+        { x: 450, y: 130 },
+        { x: 450, y: 250 },
+        { x: 450, y: 350 },
+        { x: 450, y: 350 }
+      ]
+    }
   },
   {
     id: "red-rover-handball",
@@ -289,7 +462,25 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Split teams", "Form two teams: one starts scattered within the area, the other spreads across one end of the zone."],
       ["Decide", "Ball carriers must decide whether to take on the defender or move it to a better-placed teammate."],
       ["Rotate", "Swap roles and repeat with a fresh group."]
-    ]
+    ],
+    diagram: {
+      zones: [{ x: 150, y: 150, width: 600, height: 220, label: 'PLAY ZONE' }],
+      players: [
+        { label: 'A', x: 300, y: 260 },
+        { label: 'D', x: 500, y: 260, kind: 'opp' },
+        { label: 'T', x: 650, y: 200 }
+      ],
+      arrows: [
+        { path: 'M320 255 C420 210,530 200,635 205', color: '#A3E635', dash: '8 8' },
+        { path: 'M320 260 C380 260,440 260,480 260', color: '#DC2626', dash: '4 6' }
+      ],
+      ballPositions: [
+        { x: 300, y: 260 },
+        { x: 300, y: 260 },
+        { x: 400, y: 250 },
+        { x: 635, y: 205 }
+      ]
+    }
   },
   {
     id: "decision-making-lanework",
@@ -303,7 +494,26 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Read the defender", "Ball carriers read which way the defender commits before choosing their option."],
       ["Execute", "Deliver to the free option in the lane."],
       ["Rotate", "Rotate through defender and attacker roles."]
-    ]
+    ],
+    diagram: {
+      cones: [{ x: 300, y: 260 }, { x: 450, y: 260 }, { x: 600, y: 260 }],
+      players: [
+        { label: 'Def', x: 450, y: 300, kind: 'opp' },
+        { label: 'X', x: 450, y: 420 },
+        { label: 'A', x: 300, y: 420 },
+        { label: 'C', x: 600, y: 420 }
+      ],
+      arrows: [
+        { path: 'M440 405 C400 360,350 320,310 275', color: '#38BDF8', dash: '8 8' },
+        { path: 'M460 405 C500 360,550 320,590 275', color: '#38BDF8', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 450, y: 420 },
+        { x: 450, y: 380 },
+        { x: 350, y: 300 },
+        { x: 450, y: 420 }
+      ]
+    }
   },
   {
     id: "loose-ball-1on1",
@@ -317,7 +527,21 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Delivery", "Coach delivers a loose ball between the front two players in each line."],
       ["Contest", "The pair engage in a 1-on-1 duel to win the crumb."],
       ["Rotate", "Next pair steps forward and repeat."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'C', x: 450, y: 120, kind: 'coach' },
+        { label: 'A', x: 400, y: 260 },
+        { label: 'B', x: 500, y: 260, kind: 'opp' }
+      ],
+      arrows: [{ path: 'M450 140 C450 175,450 205,450 225', color: '#DC2626', dash: '6 6' }],
+      ballPositions: [
+        { x: 450, y: 120 },
+        { x: 450, y: 220 },
+        { x: 450, y: 260 },
+        { x: 450, y: 260 }
+      ]
+    }
   },
   {
     id: "kick-follow-up-hands",
@@ -331,7 +555,24 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Mark and return", "The left cone player marks, gives a return handball and stays at the station."],
       ["Kick and follow", "The right cone player kicks and then runs to the next station to follow up."],
       ["Rotate", "Continue through all stations."]
-    ]
+    ],
+    diagram: {
+      cones: [{ x: 250, y: 260 }, { x: 650, y: 260 }, { x: 450, y: 150 }],
+      players: [
+        { label: 'L', x: 230, y: 260 },
+        { label: 'R', x: 670, y: 260 }
+      ],
+      arrows: [
+        { path: 'M650 250 C550 200,400 200,260 250', color: '#DC2626', dash: '10 8' },
+        { path: 'M670 250 C620 200,540 170,460 155', color: '#38BDF8', dash: '6 6' }
+      ],
+      ballPositions: [
+        { x: 650, y: 260 },
+        { x: 260, y: 255 },
+        { x: 450, y: 170 },
+        { x: 250, y: 260 }
+      ]
+    }
   },
   {
     id: "backdoor-switch-handball",
@@ -345,7 +586,24 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Time the run", "(B) is running towards (C) and must time their run to make (A)'s handball easy."],
       ["Switch", "(B) switches the ball laterally to the open running player."],
       ["Rotate", "Rotate through the stations and repeat."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 350, y: 320 },
+        { label: 'B', x: 480, y: 230 },
+        { label: 'X', x: 715, y: 300 }
+      ],
+      arrows: [
+        { path: 'M370 305 C420 275,450 250,470 235', color: '#1D4ED8', dash: '8 8' },
+        { path: 'M500 225 C600 210,680 240,715 300', color: '#A3E635', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 350, y: 320 },
+        { x: 480, y: 230 },
+        { x: 715, y: 300 },
+        { x: 350, y: 320 }
+      ]
+    }
   },
   {
     id: "kick-to-space-numbers",
@@ -359,7 +617,20 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Lead", "(B) leads wide and defensively."],
       ["Kick to the spot", "Players should kick so the leading player can run onto the ball, not have to wait under it. Don't let players 'cheat' by always coming across the front - receiving around the back is more realistic."],
       ["Continue the loop", "Pairs (C), (D) and (A) repeat the actions of pair (B) to complete the loop."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 200, y: 380 },
+        { label: 'B', x: 480, y: 150 }
+      ],
+      arrows: [{ path: 'M225 365 C320 280,400 210,460 165', color: '#DC2626', dash: '10 8' }],
+      ballPositions: [
+        { x: 200, y: 380 },
+        { x: 350, y: 260 },
+        { x: 480, y: 150 },
+        { x: 480, y: 150 }
+      ]
+    }
   },
   {
     id: "huddle-and-break",
@@ -373,7 +644,26 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Huddle", "All players bunch together in the huddle formation as the full-back prepares the kick-in."],
       ["Break", "On the kick-in, players break from the huddle to their assigned targets."],
       ["Rotate", "Rotate roles and repeat."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'H', x: 200, y: 260 },
+        { label: 'B', x: 400, y: 140 },
+        { label: 'D', x: 550, y: 280 },
+        { label: 'E', x: 750, y: 150 }
+      ],
+      arrows: [
+        { path: 'M220 250 C280 210,340 175,390 150', color: '#A3E635', dash: '8 8' },
+        { path: 'M220 265 C320 275,440 280,540 280', color: '#DC2626', dash: '10 8' },
+        { path: 'M220 255 C400 200,600 175,740 155', color: '#38BDF8', dash: '6 6' }
+      ],
+      ballPositions: [
+        { x: 200, y: 260 },
+        { x: 200, y: 260 },
+        { x: 550, y: 280 },
+        { x: 200, y: 260 }
+      ]
+    }
   },
   {
     id: "left-right-combo",
@@ -387,7 +677,24 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Reflex catch", "As the ball is in flight towards (B), (C) handballs to (A), who must take a reflex catch."],
       ["Continue", "Repeat the pattern continuously to build reflex speed."],
       ["Rotate", "Rotate positions so each player gets reps in every role."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 300, y: 260 },
+        { label: 'B', x: 500, y: 180 },
+        { label: 'C', x: 500, y: 340 }
+      ],
+      arrows: [
+        { path: 'M320 250 C380 220,440 200,485 185', color: '#A3E635', dash: '8 8' },
+        { path: 'M485 330 C420 310,360 285,320 268', color: '#1D4ED8', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 300, y: 260 },
+        { x: 480, y: 190 },
+        { x: 320, y: 270 },
+        { x: 480, y: 340 }
+      ]
+    }
   },
   {
     id: "tap-and-crumb",
@@ -401,7 +708,20 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Tap", "(B) handballs a ball at the feet of (A)."],
       ["Crumb", "(A) works low to the ground to gather the crumb."],
       ["Repeat", "Continue for 60-90 seconds then rotate roles."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 400, y: 280 },
+        { label: 'B', x: 400, y: 180 }
+      ],
+      arrows: [{ path: 'M400 195 C400 220,400 250,400 268', color: '#DC2626', dash: '6 6' }],
+      ballPositions: [
+        { x: 400, y: 180 },
+        { x: 400, y: 230 },
+        { x: 400, y: 280 },
+        { x: 400, y: 180 }
+      ]
+    }
   },
   {
     id: "shuttle-run-stop-kick",
@@ -415,7 +735,18 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Shuttle run", "Players run hard between the cones."],
       ["Stop and kick", "Players stop suddenly, balance, and kick to the target cone."],
       ["Rotate", "Swap roles and repeat."]
-    ]
+    ],
+    diagram: {
+      cones: [{ x: 150, y: 450 }, { x: 250, y: 450 }, { x: 200, y: 200 }],
+      players: [{ label: 'A', x: 200, y: 460 }],
+      arrows: [{ path: 'M200 440 C200 380,200 300,200 220', color: '#DC2626', dash: '8 8' }],
+      ballPositions: [
+        { x: 200, y: 460 },
+        { x: 200, y: 460 },
+        { x: 200, y: 250 },
+        { x: 200, y: 460 }
+      ]
+    }
   },
   {
     id: "second-effort-circuit",
@@ -431,7 +762,27 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Second line", "(A) handballs to (D), who in turn handballs back to (C)."],
       ["Second effort", "(C) kicks long to (B), while (D) sprints up the ground to get to the next contest, then does a U-turn and joins station (D)."],
       ["Finish", "(B) marks and handballs to (D), who has run up the ground to receive; (D) then handballs to (A), who handballs to (B)."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 150, y: 400 },
+        { label: 'B', x: 500, y: 400 },
+        { label: 'C', x: 750, y: 150 },
+        { label: 'D', x: 150, y: 150 }
+      ],
+      arrows: [
+        { path: 'M175 385 C350 300,550 220,725 165', color: '#DC2626', dash: '10 8' },
+        { path: 'M175 150 C350 220,480 300,500 385', color: '#38BDF8', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 150, y: 400 },
+        { x: 750, y: 150 },
+        { x: 500, y: 380 },
+        { x: 150, y: 150 },
+        { x: 500, y: 380 },
+        { x: 150, y: 400 }
+      ]
+    }
   },
   {
     id: "inside-runners",
@@ -447,7 +798,32 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Break the lines", "(C) must be steaming through at pace, then makes yards before kicking long to leading (D). A bounce is acceptable for weaker kicks."],
       ["Far wing lead", "(D) simulates a defensive mark, back-pedals, then honours a lead made by (E) to the far wing. (F) cuts inside and delivers a kick to (A), who marks and the circuit begins again."],
       ["Progression", "Optional: introduce defenders to stand the marks of (B & E), who can tackle runners (C & F) or apply token pressure."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 100, y: 450 },
+        { label: 'B', x: 260, y: 360 },
+        { label: 'C', x: 430, y: 260 },
+        { label: 'D', x: 600, y: 170 },
+        { label: 'E', x: 760, y: 110 },
+        { label: 'F', x: 820, y: 300 }
+      ],
+      arrows: [
+        { path: 'M125 435 C170 405,215 385,250 370', color: '#DC2626', dash: '10 8' },
+        { path: 'M280 350 C330 320,375 290,415 270', color: '#A3E635', dash: '9 8' },
+        { path: 'M450 250 C500 220,550 195,585 178', color: '#1D4ED8', dash: '10 8' },
+        { path: 'M620 160 C670 140,715 122,748 115', color: '#38BDF8', dash: '8 8' },
+        { path: 'M800 290 C700 380,400 440,130 460', color: '#7C3AED', dash: '6 8' }
+      ],
+      ballPositions: [
+        { x: 100, y: 450 },
+        { x: 260, y: 360 },
+        { x: 430, y: 260 },
+        { x: 600, y: 170 },
+        { x: 760, y: 110 },
+        { x: 820, y: 300 }
+      ]
+    }
   },
   {
     id: "front-square-cutover",
@@ -461,7 +837,28 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["First handball", "(A) starts by running out and handballing to (B) cutting across, who has timed their run to be front and square."],
       ["Second handball", "(B) takes and handballs to (C) running wider."],
       ["Long kick", "(C) runs, steadies and kicks long to leading (D), who marks and gives quickly to (E) cutting across front and square."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 200, y: 380 },
+        { label: 'B', x: 350, y: 300 },
+        { label: 'C', x: 520, y: 260 },
+        { label: 'D', x: 700, y: 160 },
+        { label: 'E', x: 760, y: 220 }
+      ],
+      arrows: [
+        { path: 'M225 365 C270 340,310 320,335 305', color: '#A3E635', dash: '8 8' },
+        { path: 'M370 295 C420 280,470 270,505 262', color: '#A3E635', dash: '8 8' },
+        { path: 'M540 250 C600 220,650 195,685 170', color: '#DC2626', dash: '10 8' },
+        { path: 'M715 165 C730 180,745 195,755 210', color: '#38BDF8', dash: '5 6' }
+      ],
+      ballPositions: [
+        { x: 200, y: 380 },
+        { x: 350, y: 300 },
+        { x: 520, y: 260 },
+        { x: 700, y: 160 }
+      ]
+    }
   },
   {
     id: "fat-side-avenue",
@@ -476,7 +873,27 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Break the fat side", "Either (A), (B) or (C) must hit (D) with a kick. These 4 players carry the ball past opposition (1) and (2) using the open fat side, with kicks allowed but everything play-on."],
       ["Wing support", "The next recipient is either (E) or (F), who have sprinted from the far wing, with defender (3) trying to cover both."],
       ["Finish", "After a target is hit, take a shot, or runners assist to kick the goal if the ball hits the ground. Attacking players (A-D) then join stations (E-H) and vice versa, rotating around one station each time; swap opposition players after 2 ends and introduce extra defenders (5) and (6) for added difficulty."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 600, y: 340 },
+        { label: '1', x: 630, y: 310, kind: 'opp' },
+        { label: 'D', x: 480, y: 420 },
+        { label: 'E', x: 200, y: 460 }
+      ],
+      arrows: [
+        { path: 'M600 355 C560 390,520 415,485 420', color: '#DC2626', dash: '10 8' },
+        { path: 'M460 415 C380 440,290 455,215 460', color: '#A3E635', dash: '8 8' },
+        { path: 'M220 445 C350 380,550 300,690 260', color: '#38BDF8', dash: '6 8' }
+      ],
+      ballPositions: [
+        { x: 600, y: 340 },
+        { x: 600, y: 340 },
+        { x: 480, y: 420 },
+        { x: 200, y: 460 },
+        { x: 700, y: 258 }
+      ]
+    }
   },
   {
     id: "draw-the-opponent",
@@ -491,7 +908,29 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Continue", "Once Line (A) is past (B), they handball to the middle player in Line (D)."],
       ["Repeat", "Line (D) then repeats the process, with (C) defending them."],
       ["Increase difficulty", "To increase difficulty, (B) and (C) defend against both lines; lengthen the drill if you choose this option."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 230, y: 320 },
+        { label: 'B', x: 420, y: 320, kind: 'opp' },
+        { label: 'T1', x: 230, y: 200 },
+        { label: 'D', x: 650, y: 320 },
+        { label: 'C', x: 650, y: 200, kind: 'opp' },
+        { label: 'T2', x: 650, y: 200 }
+      ],
+      arrows: [
+        { path: 'M250 305 C310 300,360 305,400 315', color: '#DC2626', dash: '4 6' },
+        { path: 'M235 305 C235 275,232 240,230 215', color: '#A3E635', dash: '8 8' },
+        { path: 'M280 200 C400 210,540 215,635 210', color: '#1D4ED8', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 230, y: 320 },
+        { x: 230, y: 200 },
+        { x: 650, y: 320 },
+        { x: 650, y: 200 },
+        { x: 650, y: 200 }
+      ]
+    }
   },
   {
     id: "rolling-ball-rising-handball",
@@ -505,7 +944,284 @@ export const DEFAULT_DRILLS: Drill[] = [
       ["Gather and give", "(B) gathers and handballs on-the-up to (C)."],
       ["Call and receive", "(C) must be front and square and call with a loud voice."],
       ["Continue", "(C) rolls the ball out in front of (D), who gathers and handballs on-the-up to (A) to continue the cycle."]
-    ]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 200, y: 300 },
+        { label: 'B', x: 380, y: 300 },
+        { label: 'C', x: 560, y: 300 },
+        { label: 'D', x: 740, y: 300 }
+      ],
+      arrows: [
+        { path: 'M220 305 C260 320,320 320,360 308', color: '#F97316', dash: '3 6' },
+        { path: 'M400 295 C440 275,500 270,540 290', color: '#A3E635', dash: '8 8' },
+        { path: 'M580 305 C620 320,680 320,720 308', color: '#F97316', dash: '3 6' }
+      ],
+      ballPositions: [
+        { x: 290, y: 300 },
+        { x: 380, y: 300 },
+        { x: 560, y: 300 },
+        { x: 740, y: 300 }
+      ]
+    }
+  },
+  {
+    id: "hashtag-drill",
+    title: "AFL Hashtag Drill",
+    cat: "Kicking",
+    mins: 15,
+    players: "8-16",
+    overview: "A continuous rotation drill using two connected squares (a '#' hashtag shape) that develops kicking accuracy, leading patterns, timing of movement, communication, ball movement and decision making, plus aerobic conditioning through continuous rotation.",
+    steps: [
+      ["Setup", "Set up two squares connected together to form a hashtag (#) shape using 8 cones (A-H), with a player starting at each cone and one football at Cone (A)."],
+      ["Kick A to B", "Player (A) kicks to Player (B) - hit the leading target and kick to advantage."],
+      ["Follow your kick", "After kicking, (A) sprints to follow their kick and joins the back of Cone (B)'s line."],
+      ["Kick B to D", "Player (B) marks the ball and immediately kicks to Player (D), then follows their kick and joins Cone (D)."],
+      ["Kick D to C", "Player (D) turns and kicks to Player (C), then follows their kick and joins Cone (C)."],
+      ["Kick C to A", "Player (C) kicks back to Player (A)'s line and follows their kick - this completes the first square."],
+      ["Continue second square", "The same pattern continues through the second square: (E) to (F), (F) to (H), (H) to (G), (G) back to (E), with every player following their kick."],
+      ["Progress the drill", "Once the pattern is understood, introduce a second football, increase pace, and have receivers lead before receiving so the drill becomes continuous with multiple balls moving around the hashtag."]
+    ],
+    diagram: {
+      zones: [
+        { x: 300, y: 90, width: 300, height: 140, label: 'SQUARE 1' },
+        { x: 300, y: 290, width: 300, height: 140, label: 'SQUARE 2' }
+      ],
+      cones: [
+        { x: 300, y: 90 }, { x: 600, y: 90 }, { x: 300, y: 230 }, { x: 600, y: 230 },
+        { x: 300, y: 290 }, { x: 600, y: 290 }, { x: 300, y: 430 }, { x: 600, y: 430 }
+      ],
+      players: [
+        { label: 'A', x: 300, y: 90 },
+        { label: 'B', x: 600, y: 90 },
+        { label: 'C', x: 300, y: 230 },
+        { label: 'D', x: 600, y: 230 },
+        { label: 'E', x: 300, y: 290 },
+        { label: 'F', x: 600, y: 290 },
+        { label: 'G', x: 300, y: 430 },
+        { label: 'H', x: 600, y: 430 }
+      ],
+      arrows: [
+        { path: 'M320 90 L580 90', color: '#A3E635', dash: '10 8' },
+        { path: 'M600 110 L600 210', color: '#A3E635', dash: '10 8' },
+        { path: 'M580 230 L320 230', color: '#A3E635', dash: '10 8' },
+        { path: 'M300 210 L300 110', color: '#A3E635', dash: '10 8' },
+        { path: 'M320 290 L580 290', color: '#1D4ED8', dash: '10 8' },
+        { path: 'M600 310 L600 410', color: '#1D4ED8', dash: '10 8' },
+        { path: 'M580 430 L320 430', color: '#1D4ED8', dash: '10 8' },
+        { path: 'M300 410 L300 310', color: '#1D4ED8', dash: '10 8' }
+      ],
+      ballPositions: [
+        { x: 300, y: 90 },
+        { x: 450, y: 90 },
+        { x: 600, y: 90 },
+        { x: 600, y: 160 },
+        { x: 450, y: 230 },
+        { x: 300, y: 160 },
+        { x: 300, y: 290 },
+        { x: 600, y: 430 }
+      ]
+    }
+  },
+  {
+    id: "circle-work",
+    title: "Circle Work",
+    cat: "Kicking",
+    mins: 10,
+    players: "7-11 (6-10 outside + 1 middle)",
+    overview: "Kicking to leading targets, using the ball under pressure, and quick decision making with a middle player leading to receive from, and kick back out to, players spread around a circle.",
+    steps: [
+      ["Setup", "Form a circle of 6-10 players with 1 player in the middle."],
+      ["Lead", "The middle player leads sharply towards a player on the outside."],
+      ["Kick to the lead", "The outside player presents hands early and kicks to the lead - kicking to space, not directly at the player."],
+      ["Mark", "The middle player marks the ball."],
+      ["Kick out", "The middle player turns and kicks to another outside player, then continue for 30-60 seconds before rotating the middle player."]
+    ],
+    diagram: {
+      players: [
+        { label: '1', x: 680, y: 270 },
+        { label: '2', x: 613, y: 390 },
+        { label: '3', x: 450, y: 440 },
+        { label: '4', x: 287, y: 390 },
+        { label: '5', x: 220, y: 270 },
+        { label: '6', x: 287, y: 150 },
+        { label: '7', x: 450, y: 100 },
+        { label: '8', x: 613, y: 150 },
+        { label: 'M', x: 450, y: 270 }
+      ],
+      arrows: [
+        { path: 'M450 115 L450 255', color: '#DC2626', dash: '8 8' },
+        { path: 'M465 280 L600 375', color: '#A3E635', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 450, y: 100 },
+        { x: 450, y: 185 },
+        { x: 450, y: 270 },
+        { x: 531, y: 330 },
+        { x: 613, y: 390 }
+      ]
+    }
+  },
+  {
+    id: "diamond-drill",
+    title: "Diamond Drill",
+    cat: "Kicking",
+    mins: 10,
+    players: "Groups of 4",
+    overview: "Angled kicking, leading patterns and supporting runs, using a diamond formation where each player kicks to the next point and follows their kick around the diamond.",
+    steps: [
+      ["Setup", "Form a diamond with (A) at left, (B) at top, (C) at right and (D) at bottom."],
+      ["A to B", "(A) kicks to (B), hitting the lead, and follows their kick to join (B)'s line."],
+      ["B to C", "(B) kicks to (C), using both sides of the body, and follows their kick to join (C)'s line."],
+      ["C to D", "(C) kicks to (D) and follows their kick to join (D)'s line."],
+      ["D to A", "(D) kicks back to (A), completing the diamond, and follows their kick to keep moving into (A)'s line."]
+    ],
+    diagram: {
+      players: [
+        { label: 'A', x: 280, y: 270 },
+        { label: 'B', x: 450, y: 120 },
+        { label: 'C', x: 620, y: 270 },
+        { label: 'D', x: 450, y: 420 }
+      ],
+      arrows: [
+        { path: 'M300 250 C350 200,400 160,435 135', color: '#A3E635', dash: '10 8' },
+        { path: 'M470 135 C520 170,570 210,605 250', color: '#A3E635', dash: '10 8' },
+        { path: 'M610 290 C570 330,520 370,470 405', color: '#A3E635', dash: '10 8' },
+        { path: 'M430 410 C380 370,330 320,295 285', color: '#A3E635', dash: '10 8' }
+      ],
+      ballPositions: [
+        { x: 280, y: 270 },
+        { x: 450, y: 120 },
+        { x: 620, y: 270 },
+        { x: 450, y: 420 },
+        { x: 280, y: 270 }
+      ]
+    }
+  },
+  {
+    id: "chaos-ball",
+    title: "Chaos Ball Drill",
+    cat: "Contested Ball",
+    mins: 12,
+    players: "Small groups",
+    overview: "Ground ball gets, quick decisions and pressure handling, with the coach rolling multiple footballs into a small contested square to force fast, clean hands under traffic.",
+    steps: [
+      ["Setup", "Mark a 15m x 15m square. Have several footballs ready with the coach positioned at one edge."],
+      ["Roll into contest", "The coach rolls a ball into the contest - players stay low and read the ball early."],
+      ["Compete", "Players compete hard for possession, prioritising first hands clean."],
+      ["Handball immediately", "The player who wins the ball reacts quickly and handballs immediately rather than holding it."],
+      ["Add balls", "The coach continually adds more balls into the square to increase chaos and decision-making load."]
+    ],
+    diagram: {
+      zones: [{ x: 340, y: 170, width: 220, height: 220, label: 'CONTEST ZONE' }],
+      players: [
+        { label: 'C', x: 450, y: 80, kind: 'coach' },
+        { label: 'A', x: 400, y: 300 },
+        { label: 'B', x: 500, y: 300, kind: 'opp' },
+        { label: 'D', x: 450, y: 340 }
+      ],
+      arrows: [{ path: 'M450 100 C450 160,450 210,450 250', color: '#DC2626', dash: '4 6' }],
+      ballPositions: [
+        { x: 450, y: 120 },
+        { x: 450, y: 270 },
+        { x: 450, y: 270 },
+        { x: 420, y: 250 },
+        { x: 470, y: 285 }
+      ]
+    }
+  },
+  {
+    id: "numbers-game",
+    title: "Numbers Game",
+    cat: "Game Sense",
+    mins: 15,
+    players: "Variable (2v1 up to 4v3)",
+    overview: "Decision making and transition offence/defence, using a zone between two goals where the coach calls a number of attackers and defenders to enter and play out an advantage situation (e.g. 2v1, 3v2, 4v3).",
+    steps: [
+      ["Setup", "Mark a full-width zone between two goals. All players wait outside the zone until called."],
+      ["Coach calls numbers", "The coach calls a number (e.g. 2v1, 3v2, 4v3) and that many attackers and defenders enter the zone."],
+      ["Play the advantage", "Attackers spread quickly and use overlap runners to work the ball toward the danger space, while defenders work to defend it."],
+      ["Score or reset", "Attackers finish with a shot on goal or the ball goes out of the zone; players reset and the coach calls new numbers."]
+    ],
+    diagram: {
+      zones: [{ x: 150, y: 150, width: 600, height: 220, label: 'PLAY ZONE' }],
+      players: [
+        { label: 'C', x: 450, y: 80, kind: 'coach' },
+        { label: 'A1', x: 250, y: 260 },
+        { label: 'A2', x: 300, y: 300 },
+        { label: 'D1', x: 600, y: 260, kind: 'opp' }
+      ],
+      arrows: [{ path: 'M320 290 C450 320,600 300,700 260', color: '#A3E635', dash: '8 8' }],
+      ballPositions: [
+        { x: 250, y: 260 },
+        { x: 250, y: 260 },
+        { x: 500, y: 280 },
+        { x: 700, y: 258 }
+      ]
+    }
+  },
+  {
+    id: "wave-drill",
+    title: "Wave Drill",
+    cat: "Fitness",
+    mins: 15,
+    players: "Full group",
+    overview: "Team transition, running patterns and conditioning, where the team attacks one goal, then must sprint the length of the ground to transition and defend a new ball released by the coach at the opposite end.",
+    steps: [
+      ["Attack", "The team attacks one goal, working the ball forward with quick decisions."],
+      ["Shot", "A shot is taken at goal to finish the attacking sequence."],
+      ["Release", "As the shot goes up, the coach releases a new ball at the opposite end of the ground."],
+      ["Transition", "The entire group sprints to transition back, spreading wide, protecting the corridor, and recovering quickly to defend the new ball."]
+    ],
+    diagram: {
+      players: [
+        { label: 'C', x: 450, y: 80, kind: 'coach' },
+        { label: 'A1', x: 300, y: 260 },
+        { label: 'A2', x: 350, y: 300 }
+      ],
+      arrows: [
+        { path: 'M280 260 C450 220,600 220,760 255', color: '#DC2626', dash: '8 8' },
+        { path: 'M760 300 C600 340,400 340,250 320', color: '#38BDF8', dash: '8 8' }
+      ],
+      ballPositions: [
+        { x: 280, y: 260 },
+        { x: 760, y: 255 },
+        { x: 450, y: 80 },
+        { x: 250, y: 320 }
+      ]
+    }
+  },
+  {
+    id: "front-and-centre",
+    title: "Front-and-Centre Drill",
+    cat: "Contested Ball",
+    mins: 12,
+    players: "Small groups",
+    overview: "Crumbing, reading contests and goal kicking, with the coach kicking long to a marking contest while crumbing players position front and centre to gather any loose ball and shoot on goal.",
+    steps: [
+      ["Coach kicks long", "The coach kicks long to a contest near goal."],
+      ["Contest the mark", "Two players read the ball early and compete for it in the air."],
+      ["Crumb position", "Crumbing players position front and centre, staying balanced and ready to pounce on any loose ball."],
+      ["Gather and shoot", "The crumber gathers cleanly, accelerates through the ball, and shoots on goal."]
+    ],
+    diagram: {
+      players: [
+        { label: 'C', x: 450, y: 80, kind: 'coach' },
+        { label: 'M1', x: 680, y: 255 },
+        { label: 'M2', x: 700, y: 230, kind: 'opp' },
+        { label: 'Cr', x: 660, y: 290 }
+      ],
+      arrows: [
+        { path: 'M450 100 C550 150,640 200,690 240', color: '#DC2626', dash: '8 8' },
+        { path: 'M660 295 C680 280,695 265,705 255', color: '#A3E635', dash: '6 6' }
+      ],
+      ballPositions: [
+        { x: 450, y: 100 },
+        { x: 690, y: 240 },
+        { x: 660, y: 290 },
+        { x: 700, y: 255 }
+      ]
+    }
   }
 ];
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Drill, TrainingState, DiagramSpec } from '../types';
+import { Drill, TrainingState, DiagramSpec, ApiKeySettings } from '../types';
 import { Play, Pause, Library, FolderHeart, Plus, Trash, ArrowLeft, ArrowRight, Eye, Edit3, Check, X, FileEdit, Bot, Sparkles, Loader2, Cpu } from 'lucide-react';
 
 interface TrainingScreenProps {
@@ -8,6 +8,7 @@ interface TrainingScreenProps {
   trainingState: TrainingState;
   onUpdateTrainingState: (state: TrainingState) => void;
   onNavigateToJarvis?: () => void;
+  apiKeys?: ApiKeySettings;
 }
 
 export default function TrainingScreen({
@@ -16,6 +17,7 @@ export default function TrainingScreen({
   trainingState,
   onUpdateTrainingState,
   onNavigateToJarvis,
+  apiKeys,
 }: TrainingScreenProps) {
   const [showAddEditModal, setShowAddEditModal] = useState(false);
   const [editingDrill, setEditingDrill] = useState<Drill | null>(null);
@@ -316,7 +318,11 @@ export default function TrainingScreen({
       const res = await fetch('/api/import-drill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText: importRawText, provider: aiProvider }),
+        body: JSON.stringify({
+          rawText: importRawText,
+          provider: aiProvider,
+          apiKeyOverride: aiProvider === 'gemini' ? apiKeys?.geminiApiKey : apiKeys?.anthropicApiKey,
+        }),
       });
       const data = await res.json().catch(() => ({}));
 

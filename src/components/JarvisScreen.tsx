@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Player, Drill, TrainingState, SkillAssessment } from '../types';
+import { Player, Drill, TrainingState, SkillAssessment, ApiKeySettings } from '../types';
 import {
   Bot,
   Sparkles,
@@ -42,6 +42,7 @@ interface JarvisScreenProps {
   trainingState: TrainingState;
   onUpdateTrainingState: (state: TrainingState) => void;
   onNavigateTab: (tab: string) => void;
+  apiKeys?: ApiKeySettings;
 }
 
 const DEFAULT_WELCOME_MESSAGE: Message = {
@@ -58,6 +59,7 @@ export default function JarvisScreen({
   trainingState,
   onUpdateTrainingState,
   onNavigateTab,
+  apiKeys,
 }: JarvisScreenProps) {
   // Navigation sub-tab: 'thread' or 'history'
   const [activeTab, setActiveTab] = useState<'thread' | 'history'>('thread');
@@ -266,6 +268,7 @@ export default function JarvisScreen({
           drills: drills,
           growthRecords: growthRecords,
           provider: aiProvider,
+          apiKeyOverride: aiProvider === 'gemini' ? apiKeys?.geminiApiKey : apiKeys?.anthropicApiKey,
           history: newMessages.slice(-6).map((m) => ({
             role: m.role,
             content: m.content,
