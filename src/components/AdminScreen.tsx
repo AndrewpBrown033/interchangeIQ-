@@ -201,6 +201,8 @@ export default function AdminScreen({
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [teamSyncMsg, setTeamSyncMsg] = useState<string | null>(null);
 
+  const [selectedCoachUid, setSelectedCoachUid] = useState<string | null>(null);
+
   // Jarvis Settings > API Keys panel state
   const [anthropicInput, setAnthropicInput] = useState('');
   const [geminiInput, setGeminiInput] = useState('');
@@ -744,6 +746,7 @@ export default function AdminScreen({
   };
 
   const activeCoaches = users.filter((u) => u.status !== 'Pending' && u.email !== 'anonymous@interchangeiq.com');
+  const selectedCoach = activeCoaches.find((u) => u.uid === selectedCoachUid) || activeCoaches[0] || null;
   const pendingInvites = users.filter((u) => u.status === 'Pending');
 
   return (
@@ -989,42 +992,18 @@ export default function AdminScreen({
                   <Landmark className="w-4 h-4 text-[var(--blue)]" />
                   <span>Teams & Clubs ({teams.length})</span>
                 </h3>
-                {onForceSyncTeams && (
-                  <button
-                    disabled={isSyncingTeams}
-                    onClick={async () => {
-                      setIsSyncingTeams(true);
-                      setTeamSyncMsg(null);
-                      const res = await onForceSyncTeams();
-                      setIsSyncingTeams(false);
-                      setTeamSyncMsg(res.message);
-                      setTimeout(() => setTeamSyncMsg(null), 8000);
-                    }}
-                    className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-                    title="Push all local team profiles to Cloud Firestore and sync remote team roster data"
-                  >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isSyncingTeams ? 'animate-spin' : ''}`} />
-                    <span>{isSyncingTeams ? 'Syncing...' : 'Sync Teams to Cloud'}</span>
-                  </button>
-                )}
               </div>
               <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
                 Manage your registered sports clubs. Active coaches can be assigned directly to individual team datasets.
               </p>
 
-              {teamSyncMsg && (
-                <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-950 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-2xs">
-                  <span>{teamSyncMsg}</span>
-                  <button onClick={() => setTeamSyncMsg(null)} className="text-indigo-600 hover:text-indigo-800 p-0.5 rounded cursor-pointer">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
               <div className="space-y-2 pt-1">
                 {teams.map((t, index) => {
                   const isActive = activeTeamId === t.id;
                   const isInactive = !!t.isInactive;
+                  const assignedCoachesForTeam = users.filter((u) => u.teamIds?.includes(t.id) || u.role === 'Admin');
+                  const isLinkedToSelectedCoach = selectedCoach && (selectedCoach.teamIds?.includes(t.id) || selectedCoach.role === 'Admin');
+
                   return (
                     <div
                       key={`team-profile-${t.id || 'new'}-${index}`}
@@ -1033,10 +1012,12 @@ export default function AdminScreen({
                           ? 'border-amber-200 bg-amber-50/30'
                           : isActive
                           ? 'border-[var(--green)] bg-green-50/50'
+                          : isLinkedToSelectedCoach
+                          ? 'border-blue-300 bg-blue-50/20'
                           : 'border-gray-100 bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <b className={`text-sm font-extrabold block ${isInactive ? 'text-gray-600 line-through decoration-amber-500/60' : 'text-[var(--ink)]'}`}>{t.name}</b>
                           {isInactive && (
@@ -1044,10 +1025,42 @@ export default function AdminScreen({
                               Inactive • Season Finished
                             </span>
                           )}
+                          {isLinkedToSelectedCoach && selectedCoach && (
+                            <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200 rounded-md flex items-center gap-1">
+                              <UserCheck className="w-3 h-3 text-blue-600" />
+                              <span>Linked to {selectedCoach.name}</span>
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 flex-wrap">
                           <span>ID: {t.id}</span>
                           {isActive && <span className="text-emerald-600 font-extrabold">• Active Selection</span>}
+                        </div>
+                        {/* Assigned Coaches List for this Team */}
+                        <div className="flex items-center gap-1 flex-wrap pt-0.5 text-[10px]">
+                          <span className="font-bold text-gray-400">Coaches:</span>
+                          {assignedCoachesForTeam.length > 0 ? (
+                            assignedCoachesForTeam.map((c) => {
+                              const isThisSelected = selectedCoach && selectedCoach.uid === c.uid;
+                              return (
+                                <button
+                                  key={`team-coach-tag-${t.id}-${c.uid}`}
+                                  type="button"
+                                  onClick={() => setSelectedCoachUid(c.uid)}
+                                  className={`px-1.5 py-0.5 rounded font-extrabold transition cursor-pointer ${
+                                    isThisSelected
+                                      ? 'bg-blue-600 text-white shadow-2xs'
+                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
+                                  title={`Click to select ${c.name}`}
+                                >
+                                  {c.name}
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <span className="text-gray-400 italic font-medium">Unassigned</span>
+                          )}
                         </div>
                       </div>
 
@@ -1157,7 +1170,170 @@ export default function AdminScreen({
 
               {/* Active Members Sub-view */}
               {activeUserSubTab === 'active' && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* Coach Selection Toolbar */}
+                  {activeCoaches.length > 0 && (
+                    <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-[10px] font-black uppercase text-blue-900 tracking-wider flex items-center gap-1.5">
+                          <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Select Coach to View Assigned / Linked Teams</span>
+                        </span>
+                        {selectedCoach && (
+                          <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full border border-blue-200">
+                            Active Coach: {selectedCoach.name} ({selectedCoach.role === 'Admin' ? 'All Teams' : `${selectedCoach.teamIds?.length || 0} Teams Linked`})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeCoaches.map((c) => {
+                          const isSelected = selectedCoach?.uid === c.uid;
+                          const linkedCount = c.teamIds?.length || 0;
+                          return (
+                            <button
+                              key={`coach-pill-${c.uid}`}
+                              type="button"
+                              onClick={() => setSelectedCoachUid(c.uid)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-400'
+                                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span>{c.name}</span>
+                              <span
+                                className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                                  isSelected ? 'bg-blue-800 text-white' : 'bg-gray-100 text-gray-600'
+                                }`}
+                              >
+                                {c.role === 'Admin' ? 'All' : `${linkedCount} teams`}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Direct Coach & Linked Teams Alignment Panel */}
+                  {selectedCoach && (
+                    <div className="p-4 bg-gradient-to-br from-indigo-50/80 via-blue-50/40 to-white border-2 border-blue-200 rounded-2xl space-y-3 shadow-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-100 pb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-2xs">
+                            {selectedCoach.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <b className="text-sm font-black text-[var(--navy)]">{selectedCoach.name}</b>
+                              <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                {selectedCoach.role}
+                              </span>
+                              {selectedCoach.role === 'Admin' && (
+                                <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-red-100 text-red-800 border border-red-200">
+                                  Full System Admin
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500 font-semibold">{selectedCoach.email}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] font-black uppercase text-gray-400 block">Coach &amp; Squad Alignment</span>
+                          <span className="text-xs font-black text-blue-700">
+                            {selectedCoach.role === 'Admin'
+                              ? 'Authorized across all teams'
+                              : `${selectedCoach.teamIds?.length || 0} / ${teams.length} Teams Linked`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Teams Alignment Matrix */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider block">
+                          Teams &amp; Clubs Assigned to {selectedCoach.name}:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {teams.map((t) => {
+                            const isLinked = selectedCoach.role === 'Admin' || selectedCoach.teamIds?.includes(t.id);
+                            const isCurrentActiveTeam = activeTeamId === t.id;
+                            return (
+                              <div
+                                key={`aligned-team-${selectedCoach.uid}-${t.id}`}
+                                className={`p-3 rounded-xl border flex items-center justify-between gap-2 transition ${
+                                  isLinked
+                                    ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-2xs'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <b className="text-xs font-extrabold truncate">{t.name}</b>
+                                    {isLinked && (
+                                      <span className="px-1.5 py-0.2 text-[8px] font-black uppercase bg-emerald-200 text-emerald-900 rounded">
+                                        Assigned / Linked
+                                      </span>
+                                    )}
+                                    {isCurrentActiveTeam && (
+                                      <span className="px-1.5 py-0.2 text-[8px] font-black uppercase bg-blue-100 text-blue-800 rounded border border-blue-200">
+                                        Active View
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[9px] text-gray-400 font-bold block truncate">Squad ID: {t.id}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {isLinked ? (
+                                    <>
+                                      {!isCurrentActiveTeam && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            onSelectTeam(t.id);
+                                            if (onNavigateTab) onNavigateTab('team');
+                                          }}
+                                          className="px-2.5 py-1 text-[10px] font-extrabold bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition shadow-2xs"
+                                          title="Switch active squad view to this team"
+                                        >
+                                          Switch View →
+                                        </button>
+                                      )}
+                                      {selectedCoach.role !== 'Admin' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAssignTeamToUser(selectedCoach.uid, t.id)}
+                                          className="px-2 py-1 text-[10px] font-bold bg-emerald-200 hover:bg-emerald-300 text-emerald-900 rounded-lg cursor-pointer transition"
+                                          title="Unlink team from this coach"
+                                        >
+                                          Unlink
+                                        </button>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAssignTeamToUser(selectedCoach.uid, t.id)}
+                                      className="px-2.5 py-1 text-[10px] font-extrabold bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg cursor-pointer transition"
+                                      title={`Link ${t.name} to ${selectedCoach.name}`}
+                                    >
+                                      + Link Team
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {teams.length === 0 && (
+                            <p className="text-xs text-gray-400 font-semibold italic col-span-2">No registered teams found in system.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Quick Role Feature Access Matrix */}
                   <div className="p-3 bg-gray-50 border border-gray-200/80 rounded-xl space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-1">
@@ -1221,33 +1397,45 @@ export default function AdminScreen({
                     </div>
                   </div>
 
-                  {activeCoaches.map((u, idx) => (
-                    <div
-                      key={`active-coach-${u.uid || 'coach'}-${idx}`}
-                      className="p-4 border border-gray-100 bg-white rounded-xl space-y-3 shadow-xs"
-                    >
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                          <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
-                            {u.name}
-                            {u.role === 'Admin' && <Shield className="w-3.5 h-3.5 text-red-500" />}
-                          </b>
-                          <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
+                  {activeCoaches.map((u, idx) => {
+                    const isSelectedCoach = selectedCoach?.uid === u.uid;
+                    return (
+                      <div
+                        key={`active-coach-${u.uid || 'coach'}-${idx}`}
+                        onClick={() => setSelectedCoachUid(u.uid)}
+                        className={`p-4 border rounded-xl space-y-3 shadow-xs transition cursor-pointer ${
+                          isSelectedCoach
+                            ? 'border-blue-400 bg-blue-50/20 ring-2 ring-blue-400/80'
+                            : 'border-gray-100 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
+                              {u.name}
+                              {u.role === 'Admin' && <Shield className="w-3.5 h-3.5 text-red-500" />}
+                              {isSelectedCoach && (
+                                <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-blue-600 text-white rounded-md shadow-2xs">
+                                  Selected Alignment
+                                </span>
+                              )}
+                            </b>
+                            <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
+                          </div>
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <label className="text-[10px] font-black uppercase text-gray-400">Role:</label>
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
+                              className="px-2.5 py-1 text-xs font-extrabold bg-gray-50 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                            >
+                              <option value="Coach">Coach</option>
+                              <option value="Assistant Coach">Assistant Coach</option>
+                              <option value="Manager">Manager</option>
+                              <option value="Admin">Admin</option>
+                            </select>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-[10px] font-black uppercase text-gray-400">Role:</label>
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
-                            className="px-2.5 py-1 text-xs font-extrabold bg-gray-50 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                          >
-                            <option value="Coach">Coach</option>
-                            <option value="Assistant Coach">Assistant Coach</option>
-                            <option value="Manager">Manager</option>
-                            <option value="Admin">Admin</option>
-                          </select>
-                        </div>
-                      </div>
 
                       {/* Team assignments */}
                       {u.role !== 'Admin' && (
@@ -1338,7 +1526,8 @@ export default function AdminScreen({
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
 
                   {activeCoaches.length === 0 && (
                     <div className="text-center py-8 border border-dashed border-gray-100 rounded-xl">

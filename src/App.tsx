@@ -445,6 +445,7 @@ export default function App() {
             id: teamId,
             name: data.name || 'Unnamed Squad',
             createdAt: typeof data.createdAt === 'number' && data.createdAt > 0 ? data.createdAt : 0,
+            isInactive: !!data.isInactive,
           });
         }
       });
@@ -524,6 +525,7 @@ export default function App() {
         id: t.id,
         name: t.name,
         createdAt: t.createdAt || Date.now(),
+        isInactive: !!t.isInactive,
         updatedAt: Date.now()
       }, { merge: true }).catch(err => console.warn("Error saving team doc to Firestore:", err));
     }
@@ -556,6 +558,7 @@ export default function App() {
             id: t.id,
             name: t.name,
             createdAt: t.createdAt || Date.now(),
+            isInactive: !!t.isInactive,
             players: Array.isArray(players) ? players : [],
             lineup,
             score,
@@ -576,6 +579,7 @@ export default function App() {
             id: t.id,
             name: t.name,
             createdAt: t.createdAt || Date.now(),
+            isInactive: !!t.isInactive,
             updatedAt: Date.now()
           }, { merge: true });
         }
@@ -594,6 +598,7 @@ export default function App() {
             id: teamId,
             name: data.name || 'Unnamed Squad',
             createdAt: data.createdAt || Date.now(),
+            isInactive: !!data.isInactive,
           });
         }
       });
@@ -2082,13 +2087,6 @@ export default function App() {
             players={players}
             onUpdatePlayers={setPlayers}
             onUpdateLineup={setLineup}
-            teams={teams}
-            activeTeamId={activeTeamId}
-            onSelectTeam={handleSwitchTeam}
-            onNavigateTab={handleSelectTab}
-            currentUserRole={currentUserRole}
-            userTeamIds={matchedUserProfile?.teamIds || []}
-            onUpdateTeams={handleUpdateTeams}
           />
         )}
       </main>
