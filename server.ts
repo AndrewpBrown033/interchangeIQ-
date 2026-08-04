@@ -155,6 +155,165 @@ ${drillsSummary}`;
   }
 });
 
+// Send invitation email endpoint
+app.post("/api/send-invite", async (req, res) => {
+  try {
+    const { toEmail, toName, inviterName, role, inviteLink, teamName } = req.body;
+
+    if (!toEmail || !inviteLink) {
+      return res.status(400).json({ error: "toEmail and inviteLink are required." });
+    }
+
+    const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+    const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
+
+    if (!RESEND_API_KEY) {
+      // No email provider configured - tell the caller explicitly so the UI
+      // can fall back to "copy link" instead of silently pretending to succeed.
+      return res.status(503).json({
+        error: "Email provider not configured",
+        details: "RESEND_API_KEY is not set on the server. Use the Copy Invite Link fallback for now.",
+      });
+    }
+
+    const subject = `You're invited to join InterchangeIQ${teamName ? ` — ${teamName}` : ""}`;
+    const html = `
+      <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color:#0f172a;">You've been invited to InterchangeIQ</h2>
+        <p style="color:#334155; font-size:14px; line-height:1.6;">
+          Hi ${toName || "there"},<br/><br/>
+          ${inviterName || "An administrator"} has invited you to join
+          ${teamName ? `<b>${teamName}</b>` : "InterchangeIQ"} as a <b>${role || "Coach"}</b>.
+        </p>
+        <p style="text-align:center; margin: 32px 0;">
+          <a href="${inviteLink}"
+             style="background:#2563eb; color:#fff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; font-size:14px;">
+            Accept Invitation
+          </a>
+        </p>
+        <p style="color:#94a3b8; font-size:12px; line-height:1.5;">
+          Or copy this link into your browser:<br/>
+          <a href="${inviteLink}" style="color:#2563eb;">${inviteLink}</a>
+        </p>
+      </div>
+    `;
+
+    const resendRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [toEmail],
+        subject,
+        html,
+      }),
+    });
+
+    if (!resendRes.ok) {
+      const errBody = await resendRes.text();
+      console.error("Resend API error:", resendRes.status, errBody);
+      return res.status(502).json({
+        error: "Failed to send invite email",
+        details: errBody,
+      });
+    }
+
+    const data = await resendRes.json();
+    return res.json({ success: true, id: data.id });
+  } catch (err: any) {
+    console.error("Send invite error:", err);
+    return res.status(500).json({
+      error: "Send invite processing error",
+      details: err.message || "An error occurred while sending the invitation email.",
+    });
+  }
+});
+
+// AI-powered drill import: converts raw pasted drill notes into a structured Drill object
+app.post("/api/import-drill", async (req, res) => {
+  try {
+    const { rawText } = req.body;
+
+    if (!rawText || !String(rawText).trim()) {
+      return res.status(400).json({ error: "rawText is required." });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({
+        error: "AI import not configured",
+        details: "GEMINI_API_KEY is not set on the server. Fill in the drill fields manually instead.",
+      });
+    }
+
+    const systemInstruction = `You convert raw AFL (Australian Rules Football) training drill notes into a single structured JSON object for a coaching app's drill library.
+
+Return ONLY valid JSON, no markdown fences, no commentary, matching exactly this shape:
+{
+  "title": string,
+  "cat": string,
+  "mins": number,
+  "players": string,
+  "overview": string,
+  "steps": [[string, string], ...]
+}
+
+Field guidance:
+- "cat" is one short category such as "Kicking", "Handball", "Marking", "Contested Ball", "Decision Making", "Game Sense", "Strategy", or "Fitness" - pick whichever best matches the drill's main objective.
+- "mins" is a realistic duration in minutes for one block of this drill.
+- "players" is a short description of the players/group size needed, e.g. "Pairs", "8+", "Groups of 4".
+- "overview" is a 1-3 sentence summary of what the drill develops.
+- "steps" is an ordered list of [short step title, full step instruction] pairs, in the order the drill is actually run.
+
+Rules:
+- Base every field ONLY on the provided notes - do not invent details that aren't implied by the text.
+- Fold any "coaching points", "coaching cues", or "progressions" sections into the relevant step's instruction text, or into the overview - do not add new JSON fields for them.
+- Keep step titles short (2-4 words). Keep step instructions concise but complete.
+- If the notes describe multiple drills, extract only the FIRST one.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [{ role: "user", parts: [{ text: String(rawText) }] }],
+      config: {
+        systemInstruction,
+        temperature: 0.3,
+        responseMimeType: "application/json",
+      },
+    });
+
+    const raw = response.text || "";
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("Import drill JSON parse error:", parseErr, cleaned);
+      return res.status(502).json({
+        error: "Could not parse AI response",
+        details: "The AI did not return valid JSON. Try again, or simplify the pasted text.",
+      });
+    }
+
+    if (!parsed.title || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
+      return res.status(502).json({
+        error: "Incomplete drill extracted",
+        details: "The AI response was missing a title or steps. Try again with more complete notes.",
+      });
+    }
+
+    return res.json({ drill: parsed });
+  } catch (err: any) {
+    console.error("Import drill error:", err);
+    return res.status(500).json({
+      error: "Import drill processing error",
+      details: err.message || "An error occurred while extracting the drill.",
+    });
+  }
+});
+
 // Global API Error Handler to always return JSON for server errors
 app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (res.headersSent) {

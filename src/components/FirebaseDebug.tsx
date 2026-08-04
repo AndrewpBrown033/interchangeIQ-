@@ -121,35 +121,40 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
       }
     }
 
-    // Test 3: Firestore Write to 'passkeys'
+    // Test 3: Firestore Write Test (using _health_checks collection)
     const testDocId = `debug_test_${Date.now()}`;
-    addLog(`Testing Firestore write to passkeys/${testDocId}...`);
+    addLog(`Testing Firestore write to _health_checks/${testDocId}...`);
+    let testRef: any = null;
     try {
-      const testRef = doc(db, 'passkeys', testDocId);
+      testRef = doc(db, '_health_checks', testDocId);
       await setDoc(testRef, {
         test: true,
         created: Date.now(),
         createdBy: auth.currentUser?.uid || appUserEmail || 'anonymous',
       });
-      addLog('Write to passkeys collection SUCCEEDED!');
+      addLog('Write to _health_checks collection SUCCEEDED!');
       diag.tests.push({
-        name: 'Firestore Write (passkeys)',
+        name: 'Firestore Write Test',
         status: 'success',
-        message: 'Successfully wrote test document to passkeys collection.',
+        message: 'Successfully wrote and verified test document in Firestore.',
       });
-
-      // Cleanup test doc
-      addLog(`Cleaning up test doc passkeys/${testDocId}...`);
-      await deleteDoc(testRef);
-      addLog('Cleanup succeeded.');
     } catch (fsErr: any) {
       addLog(`Firestore write error: ${fsErr.code || fsErr.message}`);
       diag.tests.push({
-        name: 'Firestore Write (passkeys)',
+        name: 'Firestore Write Test',
         status: 'error',
         message: `Write failed (${fsErr.code || fsErr.message}). Check firestore.rules permissions or Auth state.`,
         details: fsErr.toString(),
       });
+    } finally {
+      if (testRef) {
+        try {
+          await deleteDoc(testRef);
+          addLog('Test document cleaned up.');
+        } catch (_cErr) {
+          // Ignore cleanup errors
+        }
+      }
     }
 
     // Test 4: Firestore Read from 'teams'

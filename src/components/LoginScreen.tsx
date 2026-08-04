@@ -82,8 +82,9 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       }
 
       // 2. Create registration record
+      const recordId = `pass_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const record = {
-        id: `pass_${Math.random().toString(36).substr(2, 9)}`,
+        id: recordId,
         email: trimmedEmail,
         userName: trimmedName,
         registeredAt: Date.now(),
@@ -147,8 +148,9 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
     const isAdminEmail = enteredEmail === 'andrewpbrown@me.com' || enteredEmail === 'andrewpbrown33@gmail.com';
     if (isAdminEmail) {
       const nameForAdmin = 'Coach Andrew';
+      const recordId = `pass_${enteredEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const record = {
-        id: `pass_admin_${Math.random().toString(36).substr(2, 9)}`,
+        id: recordId,
         email: enteredEmail,
         userName: nameForAdmin,
         registeredAt: Date.now(),

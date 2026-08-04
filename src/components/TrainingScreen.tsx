@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Drill, TrainingState } from '../types';
-import { Play, Pause, Library, FolderHeart, Plus, Trash, ArrowLeft, ArrowRight, Eye, Edit3, Check, X, FileEdit, Bot, Sparkles } from 'lucide-react';
+import { Drill, TrainingState, DiagramSpec } from '../types';
+import { Play, Pause, Library, FolderHeart, Plus, Trash, ArrowLeft, ArrowRight, Eye, Edit3, Check, X, FileEdit, Bot, Sparkles, Loader2 } from 'lucide-react';
 
 interface TrainingScreenProps {
   drills: Drill[];
@@ -29,6 +29,11 @@ export default function TrainingScreen({
   const [formSteps, setFormSteps] = useState<[string, string][]>([['', '']]);
   const [formError, setFormError] = useState('');
 
+  // AI-powered "paste drill notes" extraction state (used inside the Add/Edit modal)
+  const [importRawText, setImportRawText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+
   const activeDrill = drills.find((d) => d.id === trainingState.activeId) || drills[0] || null;
 
   const categories = ['All', ...Array.from(new Set(drills.map((d) => d.cat || 'General')))];
@@ -39,9 +44,10 @@ export default function TrainingScreen({
 
   const activePlan = trainingState.plans.find((p) => p.id === trainingState.activePlanId) || null;
 
-  // Render SVG Diagrams depending on drill properties
+  // Render SVG Diagrams from each drill's own diagram spec (see types.ts DiagramSpec).
+  // Falls back to a generic layout only for drills that don't have a spec authored yet
+  // (e.g. custom drills created via Add Drill in the UI).
   const renderDiagram = (drill: Drill, stepIndex: number) => {
-    const key = (drill.id + ' ' + drill.title).toLowerCase();
     const isPausedClass = trainingState.motionPaused ? 'motion-paused' : '';
 
     const fieldDefs = (
@@ -64,8 +70,8 @@ export default function TrainingScreen({
       </defs>
     );
 
-    // Dynamic stripes background
-    const renderBaseField = () => {
+    // Aussie Rules stylized field
+    const renderAussieField = () => {
       const stripes = [];
       for (let i = -7; i < 16; i++) {
         stripes.push(
@@ -91,6 +97,32 @@ export default function TrainingScreen({
             <line x1="875" y1="146" x2="875" y2="188" />
           </g>
           <rect x="650" y="218" width="120" height="80" fill="none" stroke="#E8F7D9" strokeWidth="3" opacity="0.58" />
+        </>
+      );
+    };
+
+    // Soccer-style pitch (used for Handball Soccer, which is played on a marked rectangular field)
+    const renderSoccerField = () => {
+      const fieldStripes = [];
+      for (let i = 0; i < 12; i++) {
+        fieldStripes.push(
+          <rect
+            key={i}
+            x={i * 75}
+            y="0"
+            width="75"
+            height="520"
+            fill={i % 2 !== 0 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}
+          />
+        );
+      }
+      return (
+        <>
+          <rect width="900" height="520" fill="#477D28" />
+          {fieldStripes}
+          <rect x="80" y="85" width="740" height="350" rx="18" fill="none" stroke="#DDEAF8" strokeWidth="5" />
+          <line x1="80" y1="215" x2="80" y2="305" stroke="#FBBF24" strokeWidth="12" />
+          <line x1="820" y1="215" x2="820" y2="305" stroke="#FBBF24" strokeWidth="12" />
         </>
       );
     };
@@ -125,7 +157,7 @@ export default function TrainingScreen({
       </g>
     );
 
-    const renderArrow = (path: string, color: string, marker: string, dash?: string) => (
+    const renderArrow = (path: string, color: string, dash?: string) => (
       <path
         className="iiq-route"
         d={path}
@@ -135,150 +167,72 @@ export default function TrainingScreen({
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeDasharray={dash || '9 7'}
-        markerEnd={`url(#${marker})`}
+        markerEnd="url(#iiqTrLime)"
         filter="url(#iiqTrSoft)"
       />
     );
 
-    let content;
+    const renderZone = (zone: { x: number; y: number; width: number; height: number; label?: string }) => (
+      <React.Fragment key={`${zone.x}-${zone.y}`}>
+        <rect x={zone.x} y={zone.y} width={zone.width} height={zone.height} rx="8" fill="rgba(255,255,255,0.07)" stroke="#E8F7D9" strokeWidth="4" strokeDasharray="10 8" />
+        {zone.label && (
+          <text x={zone.x + zone.width / 2} y={zone.y - 15} textAnchor="middle" fill="#fff" fontSize="18" fontWeight="950">{zone.label}</text>
+        )}
+      </React.Fragment>
+    );
 
-    if (key.includes('kick tennis')) {
-      const toB = stepIndex === 0 || stepIndex === 1 || stepIndex === 4;
-      content = (
-        <>
-          {renderBaseField()}
-          <rect x="120" y="150" width="220" height="220" rx="8" fill="rgba(255,255,255,0.07)" stroke="#E8F7D9" strokeWidth="4" strokeDasharray="10 8" />
-          <rect x="560" y="150" width="220" height="220" rx="8" fill="rgba(255,255,255,0.07)" stroke="#E8F7D9" strokeWidth="4" strokeDasharray="10 8" />
-          <text x="230" y="135" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="950">POSITION A</text>
-          <text x="670" y="135" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="950">POSITION B</text>
-          {[
-            [120, 150, 'c1'], [340, 150, 'c2'], [120, 370, 'c3'], [340, 370, 'c4'],
-            [560, 150, 'c5'], [780, 150, 'c6'], [560, 370, 'c7'], [780, 370, 'c8']
-          ].map(([x, y, id]) => renderCone(x as number, y as number, id as string))}
-          {renderPlayer('1', 230, 260)}
-          {renderPlayer('2', 670, 260, 'opp')}
-          {toB
-            ? renderArrow('M255 245 C390 100,510 100,645 245', '#C6FF32', 'iiqTrLime', '10 8')
-            : renderArrow('M645 275 C510 420,390 420,255 275', '#C6FF32', 'iiqTrLime', '10 8')
-          }
-          {renderFooty(
-            toB ? (stepIndex === 0 ? 280 : 575) : (stepIndex === 2 ? 620 : 325),
-            toB ? (stepIndex === 0 ? 215 : 205) : (stepIndex === 2 ? 300 : 315)
-          )}
-        </>
-      );
-    } else if (key.includes('criss') || key.includes('cross')) {
-      content = (
-        <>
-          {renderBaseField()}
-          {renderCone(170, 390, 'c1')}
-          {renderCone(730, 105, 'c2')}
-          {renderCone(170, 105, 'c3')}
-          {renderCone(730, 390, 'c4')}
-          {renderPlayer('A', 170, 390)}
-          {renderPlayer('B', 730, 105)}
-          {renderPlayer('C', 170, 105, 'opp')}
-          {renderPlayer('D', 730, 390, 'opp')}
-          {renderArrow('M190 372 C340 260,540 210,710 120', '#1D4ED8', 'iiqTrLime', '12 8')}
-          {renderArrow('M190 122 C350 235,545 285,710 372', '#A3E635', 'iiqTrLime', '12 8')}
-          <circle cx="450" cy="250" r="45" fill="none" stroke="#F97316" strokeWidth="5" strokeDasharray="8 8" />
-          {renderFooty(stepIndex % 2 !== 0 ? 550 : 335, stepIndex % 2 !== 0 ? 205 : 295)}
-        </>
-      );
-    } else if (key.includes('mark') || key.includes('contest')) {
-      content = (
-        <>
-          {renderBaseField()}
-          {renderPlayer('C', 450, 400, 'coach')}
-          {renderPlayer('A', 410, 235)}
-          {renderPlayer('B', 495, 235, 'opp')}
-          {renderArrow('M450 385 C445 325,450 285,455 245', '#DC2626', 'iiqTrRed')}
-          {renderFooty(
-            stepIndex === 0 ? 450 : stepIndex === 1 ? 455 : 450,
-            stepIndex === 0 ? 380 : stepIndex === 1 ? 300 : 235
-          )}
-          {renderCone(350, 285, 'c1')}
-          {renderCone(560, 285, 'c2')}
-          {renderCone(450, 420, 'c3')}
-        </>
-      );
-    } else if (key.includes('weave')) {
-      content = (
-        <>
-          {renderBaseField()}
-          {renderPlayer('A', 455, 400)}
-          {renderPlayer('B', 310, 260)}
-          {renderPlayer('C', 600, 260)}
-          {renderPlayer('A2', 455, 90)}
-          {renderArrow('M455 386 C400 332,360 287,320 268', '#1D4ED8', 'iiqTrLime', '12 8')}
-          {renderArrow('M320 260 C420 190,500 190,590 255', '#A3E635', 'iiqTrLime', '9 8')}
-          {renderArrow('M590 250 C540 180,500 130,460 105', '#1D4ED8', 'iiqTrLime', '12 8')}
-          {renderArrow('M455 392 C385 370,340 320,320 280', '#A3E635', 'iiqTrLime', '5 8')}
-          {renderFooty(
-            stepIndex === 0 ? 430 : stepIndex === 1 ? 388 : stepIndex === 2 ? 505 : 455,
-            stepIndex === 0 ? 365 : stepIndex === 1 ? 285 : stepIndex === 2 ? 245 : 105
-          )}
-        </>
-      );
-    } else if (key.includes('soccer')) {
-      const fieldStripes = [];
-      for (let i = 0; i < 12; i++) {
-        fieldStripes.push(
-          <rect
-            key={i}
-            x={i * 75}
-            y="0"
-            width="75"
-            height="520"
-            fill={i % 2 !== 0 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}
-          />
-        );
-      }
-      content = (
-        <>
-          <rect width="900" height="520" fill="#477D28" />
-          {fieldStripes}
-          <rect x="80" y="85" width="740" height="350" rx="18" fill="none" stroke="#DDEAF8" strokeWidth="5" />
-          <line x1="80" y1="215" x2="80" y2="305" stroke="#FBBF24" strokeWidth="12" />
-          <line x1="820" y1="215" x2="820" y2="305" stroke="#FBBF24" strokeWidth="12" />
-          {renderPlayer('A', 230, 260)}
-          {renderPlayer('B', 335, 190)}
-          {renderPlayer('C', 335, 330)}
-          {renderPlayer('1', 520, 260, 'opp')}
-          {renderPlayer('2', 620, 190, 'opp')}
-          {renderPlayer('3', 635, 330, 'opp')}
-          {renderArrow('M235 260 C395 120,565 145,780 255', '#1D4ED8', 'iiqTrLime', '12 7')}
-          {renderFooty(
-            stepIndex === 0 ? 255 : stepIndex === 1 ? 420 : stepIndex === 2 ? 570 : 775,
-            stepIndex === 0 ? 250 : stepIndex === 1 ? 175 : stepIndex === 2 ? 235 : 255
-          )}
-        </>
-      );
-    } else {
-      // Default Drill Diagram
-      content = (
-        <>
-          {renderBaseField()}
-          {renderPlayer('A', 355, 75)}
-          {renderPlayer('B', 300, 115)}
-          {renderPlayer('C', 295, 250)}
-          {renderPlayer('D', 400, 410)}
-          {renderPlayer('E', 695, 255)}
-          {renderPlayer('F', 455, 115)}
-          {renderArrow('M385 72 C455 75,525 90,575 115', '#DC2626', 'iiqTrLime', '8 6')}
-          {renderArrow('M300 115 C390 105,455 105,525 110', '#A3E635', 'iiqTrLime', '8 8')}
-          {renderArrow('M292 250 C390 240,460 245,525 245', '#A3E635', 'iiqTrLime', '8 8')}
-          {renderArrow('M397 410 C430 340,470 300,520 280', '#A3E635', 'iiqTrLime', '8 8')}
-          {renderArrow('M565 105 C620 140,628 195,618 225', '#1D4ED8', 'iiqTrLime')}
-          {renderArrow('M568 240 C538 235,520 250,506 270', '#7C3AED', 'iiqTrLime', '8 6')}
-          {renderArrow('M700 255 C655 252,630 250,606 245', '#A3E635', 'iiqTrLime', '8 8')}
-          {renderFooty(
-            stepIndex === 0 ? 385 : stepIndex === 1 ? 520 : stepIndex === 2 ? 610 : 700,
-            stepIndex === 0 ? 72 : stepIndex === 1 ? 105 : stepIndex === 2 ? 230 : 255
-          )}
-        </>
-      );
-    }
+    const renderContestCircle = (c: { x: number; y: number; r: number; color?: string; label?: string }) => (
+      <>
+        <circle cx={c.x} cy={c.y} r={c.r} fill="none" stroke={c.color || '#F97316'} strokeWidth="5" strokeDasharray="8 8" />
+        {c.label && (
+          <text x={c.x} y={c.y - c.r - 12} textAnchor="middle" fill="#fff" fontSize="16" fontWeight="950">{c.label}</text>
+        )}
+      </>
+    );
+
+    // Fallback used only when a drill has no authored diagram spec (e.g. brand-new custom drills).
+    const defaultSpec: DiagramSpec = {
+      cones: [],
+      players: [
+        { label: 'A', x: 355, y: 75 },
+        { label: 'B', x: 300, y: 115 },
+        { label: 'C', x: 295, y: 250 },
+        { label: 'D', x: 400, y: 410 },
+        { label: 'E', x: 695, y: 255, kind: 'opp' },
+        { label: 'F', x: 455, y: 115 },
+      ],
+      arrows: [
+        { path: 'M385 72 C455 75,525 90,575 115', color: '#DC2626', dash: '8 6' },
+        { path: 'M300 115 C390 105,455 105,525 110', color: '#A3E635', dash: '8 8' },
+        { path: 'M292 250 C390 240,460 245,525 245', color: '#A3E635', dash: '8 8' },
+        { path: 'M397 410 C430 340,470 300,520 280', color: '#A3E635', dash: '8 8' },
+      ],
+      ballPositions: [
+        { x: 385, y: 72 },
+        { x: 520, y: 105 },
+        { x: 610, y: 230 },
+        { x: 700, y: 255 },
+      ],
+    };
+
+    const spec: DiagramSpec = drill.diagram || defaultSpec;
+    const ball = spec.ballPositions.length > 0
+      ? spec.ballPositions[stepIndex % spec.ballPositions.length]
+      : { x: 450, y: 260 };
+
+    const content = (
+      <>
+        {spec.surface === 'soccer' ? renderSoccerField() : renderAussieField()}
+        {(spec.zones || []).map((z) => renderZone(z))}
+        {spec.contestCircle && renderContestCircle(spec.contestCircle)}
+        {(spec.cones || []).map((c, i) => renderCone(c.x, c.y, `cone-${i}`))}
+        {(spec.players || []).map((p) => renderPlayer(p.label, p.x, p.y, p.kind === 'own' ? undefined : p.kind))}
+        {(spec.arrows || []).map((a, i) => (
+          <React.Fragment key={i}>{renderArrow(a.path, a.color, a.dash)}</React.Fragment>
+        ))}
+        {renderFooty(ball.x, ball.y)}
+      </>
+    );
 
     return (
       <svg
@@ -305,6 +259,7 @@ export default function TrainingScreen({
       ['Reset', 'Rotate players and repeat.'],
     ]);
     setFormError('');
+    handleOpenImportModal();
     setShowAddEditModal(true);
   };
 
@@ -317,6 +272,7 @@ export default function TrainingScreen({
     setFormOverview(drill.overview || '');
     setFormSteps(drill.steps && drill.steps.length > 0 ? [...drill.steps] : [['Step 1', '']]);
     setFormError('');
+    handleOpenImportModal();
     setShowAddEditModal(true);
   };
 
@@ -324,6 +280,55 @@ export default function TrainingScreen({
     const updated = [...formSteps];
     updated[index][fieldIndex] = value;
     setFormSteps(updated);
+  };
+
+  const handleOpenImportModal = () => {
+    setImportRawText('');
+    setImportError('');
+  };
+
+  const handleAiExtractDrill = async () => {
+    if (!importRawText.trim()) {
+      setImportError('Paste the drill notes you want to import first.');
+      return;
+    }
+    setIsImporting(true);
+    setImportError('');
+
+    try {
+      const res = await fetch('/api/import-drill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawText: importRawText }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.drill) {
+        setImportError(data.details || data.error || 'Could not extract a drill from that text.');
+        setIsImporting(false);
+        return;
+      }
+
+      const extracted = data.drill;
+
+      // Fill the form fields below with the AI's extraction so the coach can
+      // review and tweak everything before actually saving the drill.
+      setFormTitle(extracted.title || '');
+      setFormCat(extracted.cat || 'General');
+      setFormMins(Number(extracted.mins) > 0 ? Number(extracted.mins) : 10);
+      setFormPlayers(extracted.players || 'Custom');
+      setFormOverview(extracted.overview || '');
+      setFormSteps(
+        Array.isArray(extracted.steps) && extracted.steps.length > 0
+          ? extracted.steps.map((s: any) => [String(s[0] || 'Step'), String(s[1] || '')])
+          : [['Setup', '']]
+      );
+      setFormError('');
+    } catch (err: any) {
+      setImportError(err.message || 'Import request failed. Please try again.');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleAddStepRow = () => {
@@ -573,6 +578,14 @@ export default function TrainingScreen({
               <span>Plans</span>
             </button>
           )}
+
+          <button
+            onClick={handleOpenAddDrill}
+            className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Import with AI</span>
+          </button>
 
           <button
             onClick={handleOpenAddDrill}
@@ -1008,31 +1021,48 @@ export default function TrainingScreen({
               </p>
             )}
 
-            {/* Quick Paste / Import Section */}
+            {/* AI-Powered Paste / Import Section */}
             <div className="mb-4 p-3 bg-indigo-50/80 border border-indigo-100 rounded-2xl">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Quick Paste / Import Drill Text</span>
+                  <span>Import with AI</span>
                 </span>
-                <span className="text-[10px] text-indigo-600 font-semibold">Paste text from Rookie Me Coach or drill notes</span>
+                <span className="text-[10px] text-indigo-600 font-semibold">Paste drill notes from anywhere and let AI fill the form</span>
               </div>
               <textarea
-                placeholder="Paste drill description, session text, or notes here to auto-fill form..."
-                rows={2}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val.trim()) return;
-                  const lines = val.split('\n').filter((l) => l.trim());
-                  if (lines.length > 0 && !formTitle) setFormTitle(lines[0].replace(/^#+|\*+/g, '').trim());
-                  if (lines.length > 1 && !formOverview) setFormOverview(lines.slice(1, 3).join(' '));
-                  if (lines.length > 2) {
-                    const stepLines = lines.slice(2).map((l, i) => [`Step ${i + 1}`, l.trim()] as [string, string]);
-                    if (stepLines.length > 0) setFormSteps(stepLines);
-                  }
-                }}
+                value={importRawText}
+                onChange={(e) => setImportRawText(e.target.value)}
+                placeholder="Paste a drill's objective, setup, and steps here (e.g. from a coaching website or your own notes)..."
+                rows={4}
                 className="w-full p-2 text-xs border border-indigo-200 bg-white rounded-xl text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"
               />
+              {importError && (
+                <p className="mt-2 text-[11px] font-bold text-red-600">{importError}</p>
+              )}
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={handleAiExtractDrill}
+                  disabled={isImporting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Extracting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Extract Drill Details</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="mt-2 text-[10px] text-indigo-500 font-semibold">
+                This fills in the fields below - review and edit them, then save as usual. The diagram will use a generic layout until you customise it.
+              </p>
             </div>
 
             <div className="space-y-4">
