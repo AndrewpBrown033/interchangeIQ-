@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Player, AuditLogEntry } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet } from 'lucide-react';
+import { Player, AuditLogEntry, TeamProfile } from '../types';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark } from 'lucide-react';
 import CsvImportGuide from './CsvImportGuide';
 
 interface SettingsScreenProps {
@@ -27,6 +27,13 @@ interface SettingsScreenProps {
   players?: Player[];
   onUpdatePlayers?: (players: Player[]) => void;
   onUpdateLineup?: (lineup: Record<string, string>) => void;
+  teams?: TeamProfile[];
+  activeTeamId?: string | null;
+  onSelectTeam?: (teamId: string) => void;
+  onNavigateTab?: (tab: string) => void;
+  currentUserRole?: string;
+  userTeamIds?: string[];
+  onUpdateTeams?: (teams: TeamProfile[]) => void;
 }
 
 export default function SettingsScreen({
@@ -53,7 +60,30 @@ export default function SettingsScreen({
   players = [],
   onUpdatePlayers,
   onUpdateLineup,
+  teams = [],
+  activeTeamId,
+  onSelectTeam,
+  onNavigateTab,
+  currentUserRole = 'Coach',
+  userTeamIds = [],
+  onUpdateTeams,
 }: SettingsScreenProps) {
+  // Filter teams to only show those the manager/user has access to
+  const accessibleTeams = React.useMemo(() => {
+    if (!teams || teams.length === 0) return [];
+    if (currentUserRole === 'Admin') return teams;
+    if (!userTeamIds || userTeamIds.length === 0) return teams;
+    const filtered = teams.filter((t) => userTeamIds.includes(t.id));
+    return filtered.length > 0 ? filtered : teams;
+  }, [teams, currentUserRole, userTeamIds]);
+
+  const handleRenameTeamInSettings = (teamId: string) => {
+    if (!onUpdateTeams || !teams) return;
+    const currentTeam = teams.find((t) => t.id === teamId);
+    const newName = prompt('Enter new team / club name:', currentTeam?.name || '');
+    if (!newName || !newName.trim()) return;
+    onUpdateTeams(teams.map((t) => (t.id === teamId ? { ...t, name: newName.trim() } : t)));
+  };
   // CSV Import state
   const [csvStatus, setCsvStatus] = useState<{ type: 'ok' | 'warn' | 'err'; text: string } | null>(null);
   const [csvMode, setCsvMode] = useState<'replace' | 'append'>('replace');
@@ -419,6 +449,101 @@ export default function SettingsScreen({
               <span className="text-[10px] font-semibold text-[var(--muted)] block mt-1">
                 All changes on this device will be attributed to this name in the log.
               </span>
+            </div>
+          </div>
+
+          {/* Teams & Clubs Access section */}
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
+                <Landmark className="w-4 h-4 text-[var(--blue)]" />
+                <span>Teams &amp; Clubs ({accessibleTeams.length})</span>
+              </h3>
+              {currentUserRole && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                  {currentUserRole} Access
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+              {currentUserRole === 'Admin'
+                ? 'As System Administrator, you have full access to all registered clubs and teams.'
+                : 'Clubs and teams assigned to your manager profile. Select a squad to make it your active view.'}
+            </p>
+
+            <div className="space-y-2 pt-1">
+              {accessibleTeams.map((t, index) => {
+                const isActive = activeTeamId === t.id;
+                const isInactive = !!t.isInactive;
+                return (
+                  <div
+                    key={`setting-team-${t.id || index}`}
+                    className={`p-3.5 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
+                      isInactive
+                        ? 'border-amber-200 bg-amber-50/30'
+                        : isActive
+                        ? 'border-[var(--green)] bg-green-50/50'
+                        : 'border-gray-100 bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <b className={`text-xs font-extrabold truncate ${isInactive ? 'text-gray-500 line-through' : 'text-[var(--ink)]'}`}>
+                          {t.name}
+                        </b>
+                        {isActive && (
+                          <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200">
+                            Active Selection
+                          </span>
+                        )}
+                        {isInactive && (
+                          <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-amber-100 text-amber-800 rounded-md border border-amber-200">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-bold block truncate">
+                        Squad ID: {t.id}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {onSelectTeam && (
+                        <button
+                          onClick={() => {
+                            onSelectTeam(t.id);
+                            if (onNavigateTab) onNavigateTab('team');
+                          }}
+                          className={`px-3 py-1.5 text-[11px] font-extrabold rounded-lg border transition cursor-pointer flex items-center gap-1 ${
+                            isActive
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
+                              : 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-2xs'
+                          }`}
+                          title="Select squad and open Team View"
+                        >
+                          <span>{isActive ? 'View Team View →' : 'Switch Team →'}</span>
+                        </button>
+                      )}
+                      {onUpdateTeams && (
+                        <button
+                          onClick={() => handleRenameTeamInSettings(t.id)}
+                          className="px-2.5 py-1.5 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200"
+                        >
+                          Rename
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {accessibleTeams.length === 0 && (
+                <div className="p-4 border border-dashed border-gray-200 rounded-xl text-center">
+                  <p className="text-xs text-gray-400 font-semibold">
+                    No clubs or teams currently assigned to your manager profile.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

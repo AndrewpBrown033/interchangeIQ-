@@ -2082,6 +2082,13 @@ export default function App() {
             players={players}
             onUpdatePlayers={setPlayers}
             onUpdateLineup={setLineup}
+            teams={teams}
+            activeTeamId={activeTeamId}
+            onSelectTeam={handleSwitchTeam}
+            onNavigateTab={handleSelectTab}
+            currentUserRole={currentUserRole}
+            userTeamIds={matchedUserProfile?.teamIds || []}
+            onUpdateTeams={handleUpdateTeams}
           />
         )}
       </main>

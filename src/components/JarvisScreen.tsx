@@ -505,19 +505,6 @@ export default function JarvisScreen({
                 <span className="text-xs font-black uppercase tracking-wider text-[var(--navy)]">
                   {activeThread.title}
                 </span>
-                <span className="text-[10px] font-semibold text-gray-400">
-                  ({messages.length} messages)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCreateNewThread}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-extrabold flex items-center gap-1 transition cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>New Conversation</span>
-                </button>
               </div>
             </div>
 
