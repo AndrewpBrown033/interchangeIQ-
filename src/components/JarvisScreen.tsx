@@ -132,6 +132,7 @@ export default function JarvisScreen({
     }));
   };
   const [editingTitleText, setEditingTitleText] = useState('');
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [historySearch, setHistorySearch] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);

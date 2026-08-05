@@ -37,6 +37,7 @@ import {
   Download,
   TrendingUp,
   Terminal,
+  Cpu,
   Loader2,
   Key,
   Eye,
@@ -862,7 +863,6 @@ export default function AdminScreen({
     status: 'success' | 'warning' | 'error';
     text: string;
     details?: string;
-    link?: string;
     transport?: string;
   } | null>(null);
 
@@ -918,12 +918,11 @@ export default function AdminScreen({
 
     setResettingPasswordUid(null);
 
-    if (result.ok && (result.transport === 'smtp' || result.transport === 'smtp-override' || result.transport === 'mailersend' || result.transport === 'mailersend-api' || result.transport === 'resend')) {
+    if (result.ok && (result.transport === 'smtp' || result.transport === 'smtp-override' || result.transport === 'mailersend' || result.transport === 'mailersend-api' || result.transport === 'resend' || result.transport === 'firebase+smtp')) {
       setPasswordResetNotice({
         uid: u.uid,
         status: 'success',
         text: `Password reset email dispatched via ${result.transport} to ${u.email}.`,
-        link: result.resetLink,
         transport: result.transport,
       });
     } else if (result.ok) {
@@ -931,8 +930,7 @@ export default function AdminScreen({
         uid: u.uid,
         status: 'success',
         text: `Password reset email sent directly via Firebase Auth to ${u.email}!`,
-        details: 'Firebase Authentication manages email delivery automatically. Users should check their inbox and spam folders. A direct reset link is also available below as a backup.',
-        link: result.resetLink,
+        details: 'Firebase Authentication manages email delivery automatically — ask them to check their inbox and spam folder for the secure reset link.',
         transport: 'firebase',
       });
     } else {
@@ -941,7 +939,6 @@ export default function AdminScreen({
         status: 'error',
         text: result.error || 'Password reset email delivery failed.',
         details: result.details || 'To deliver automatic emails to inboxes, enter your mail server credentials in Admin > Notification Settings.',
-        link: result.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(u.email)}`,
       });
     }
   };
@@ -2150,28 +2147,6 @@ export default function AdminScreen({
 
                           {passwordResetNotice.details && (
                             <p className="text-[11px] leading-relaxed opacity-90">{passwordResetNotice.details}</p>
-                          )}
-
-                          {passwordResetNotice.link && (
-                            <div className="pt-1.5 border-t border-black/10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                              <input
-                                type="text"
-                                readOnly
-                                value={passwordResetNotice.link}
-                                onFocus={(e) => e.currentTarget.select()}
-                                className="flex-1 min-w-0 bg-white/80 px-2 py-1 border border-black/10 rounded text-[10px] font-mono font-bold text-gray-700 focus:outline-none"
-                              />
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(passwordResetNotice.link!);
-                                  alert('Direct Password Reset link copied to clipboard!');
-                                }}
-                                className="px-2.5 py-1 text-[11px] font-bold bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 rounded flex items-center justify-center gap-1 shrink-0 cursor-pointer"
-                              >
-                                <Copy className="w-3 h-3" />
-                                <span>Copy Reset Link</span>
-                              </button>
-                            </div>
                           )}
                         </div>
                       )}
