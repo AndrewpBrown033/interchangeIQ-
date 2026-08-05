@@ -444,6 +444,7 @@ app.post("/api/send-password-reset", async (req, res) => {
         return res.status(502).json({
           error: "Failed to send password reset email via SMTP",
           details: smtpErr.message || "SMTP send failed. Check the settings in Admin > Notification Settings.",
+          resetLink: linkToUse,
         });
       }
     }
@@ -460,24 +461,59 @@ app.post("/api/send-password-reset", async (req, res) => {
           html,
           text,
         });
-        return res.json({ success: true, id: info.messageId, transport: "smtp" });
+        return res.json({ success: true, id: info.messageId, transport: "smtp", resetLink: linkToUse });
       } catch (smtpErr: any) {
         console.error("SMTP reset send error:", smtpErr);
         return res.status(502).json({
           error: "Failed to send password reset email via SMTP",
           details: smtpErr.message || "SMTP send failed. Check server SMTP credentials.",
+          resetLink: linkToUse,
         });
       }
     }
 
-    // 3. Resend HTTP API
+    // 3. MailerSend REST API
+    const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY || process.env.MAILERSEND_API_TOKEN || "";
+    if (MAILERSEND_API_KEY) {
+      try {
+        const msFromEmail = process.env.MAILERSEND_FROM_EMAIL || process.env.SMTP_FROM || "info@interchangeiq.app";
+        const msRes = await fetch("https://api.mailersend.com/v1/email", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${MAILERSEND_API_KEY}`,
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: JSON.stringify({
+            from: { email: msFromEmail, name: "InterchangeIQ" },
+            to: [{ email: toEmail, name: toName || "Coach" }],
+            subject,
+            html,
+            text,
+          }),
+        });
+
+        if (msRes.ok) {
+          const msData = await msRes.json().catch(() => ({}));
+          return res.json({ success: true, id: msData.id || "mailersend-ok", transport: "mailersend", resetLink: linkToUse });
+        } else {
+          const msErrText = await msRes.text();
+          console.error("MailerSend API error:", msRes.status, msErrText);
+        }
+      } catch (msErr: any) {
+        console.error("MailerSend dispatch exception:", msErr);
+      }
+    }
+
+    // 4. Resend HTTP API
     const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
     const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
 
-    if (!RESEND_API_KEY) {
+    if (!RESEND_API_KEY && !MAILERSEND_API_KEY) {
       return res.status(503).json({
-        error: "Email provider not configured",
-        details: "Set SMTP details in Admin > Notification Settings (recommended), or configure SMTP_HOST / RESEND_API_KEY on the server.",
+        error: "Email server (SMTP) not configured",
+        details: "To deliver automatic emails directly to inboxes, enter your SMTP details in Admin > Notification Settings. In the meantime, use the direct reset link below.",
+        resetLink: linkToUse,
       });
     }
 
@@ -502,16 +538,65 @@ app.post("/api/send-password-reset", async (req, res) => {
       return res.status(502).json({
         error: "Failed to send password reset email via Resend",
         details: errBody,
+        resetLink: linkToUse,
       });
     }
 
     const data = await resendRes.json();
-    return res.json({ success: true, id: data.id, transport: "resend" });
+    return res.json({ success: true, id: data.id, transport: "resend", resetLink: linkToUse });
   } catch (err: any) {
     console.error("Send password reset error:", err);
     return res.status(500).json({
       error: "Send password reset processing error",
       details: err.message || "An error occurred while sending the password reset email.",
+      resetLink: req.body?.resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`,
+    });
+  }
+});
+
+// Test SMTP connection endpoint
+app.post("/api/test-smtp", async (req, res) => {
+  try {
+    const { host, port, user, pass, from, testTo } = req.body;
+
+    if (!host || !user || !pass) {
+      return res.status(400).json({
+        error: "Host, username, and password are required to test SMTP settings.",
+      });
+    }
+
+    const smtpPort = Number(port) || 587;
+    const transporter = nodemailer.createTransport({
+      host,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user, pass },
+      connectionTimeout: 10000,
+    });
+
+    // Verify SMTP connection
+    await transporter.verify();
+
+    const targetAddress = testTo || user;
+    const info = await transporter.sendMail({
+      from: from || user,
+      to: targetAddress,
+      subject: "InterchangeIQ — SMTP Connection Test",
+      text: "Congratulations! Your SMTP settings are correctly configured and ready to send emails for InterchangeIQ.",
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px;">
+          <h3 style="color: #065f46; margin-top: 0;">SMTP Test Successful!</h3>
+          <p style="color: #374151;">Your mail server credentials in <b>Admin > Notification Settings</b> are verified and working properly.</p>
+        </div>
+      `,
+    });
+
+    return res.json({ success: true, messageId: info.messageId, recipient: targetAddress });
+  } catch (err: any) {
+    console.error("SMTP test connection error:", err);
+    return res.status(502).json({
+      error: "SMTP Connection Test Failed",
+      details: err.message || "Unable to connect or authenticate with the specified SMTP host.",
     });
   }
 });

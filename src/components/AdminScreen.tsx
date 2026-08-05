@@ -262,6 +262,43 @@ export default function AdminScreen({
     }
   };
 
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+
+  const handleTestSmtpConnection = async () => {
+    const host = smtpHostInput.trim() || notificationSettings?.smtpHost || '';
+    const user = smtpUserInput.trim() || notificationSettings?.smtpUser || '';
+    const pass = smtpPassInput.trim() || notificationSettings?.smtpPass || '';
+    const port = Number(smtpPortInput) || notificationSettings?.smtpPort || 587;
+    const from = smtpFromInput.trim() || notificationSettings?.smtpFrom || user;
+
+    if (!host || !user) {
+      setNotifSavedNotice('Error: Enter at least SMTP Host and Username to test connection.');
+      setTimeout(() => setNotifSavedNotice(''), 5000);
+      return;
+    }
+
+    setIsTestingSmtp(true);
+    setNotifSavedNotice('Testing SMTP server connection...');
+    try {
+      const res = await fetch('/api/test-smtp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host, port, user, pass, from }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setNotifSavedNotice(`SMTP Connection Test Successful! Verification email sent to ${data.recipient}.`);
+      } else {
+        setNotifSavedNotice(`SMTP Test Failed: ${data.error || 'Connection failed'} (${data.details || 'Check host, port, or password'})`);
+      }
+    } catch (err: any) {
+      setNotifSavedNotice(`SMTP Test Error: ${err.message || 'Network error'}`);
+    } finally {
+      setIsTestingSmtp(false);
+      setTimeout(() => setNotifSavedNotice(''), 8000);
+    }
+  };
+
   const handleClearSmtpSettings = async () => {
     if (!onUpdateNotificationSettings) return;
     if (!window.confirm('Clear the saved SMTP configuration? Email invitations will fall back to the server\'s own SMTP/Resend setup (if any), or stop sending until reconfigured.')) return;
@@ -745,7 +782,14 @@ export default function AdminScreen({
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [resettingPasswordUid, setResettingPasswordUid] = useState<string | null>(null);
-  const [passwordResetNotice, setPasswordResetNotice] = useState<{ uid: string; text: string } | null>(null);
+  const [passwordResetNotice, setPasswordResetNotice] = useState<{
+    uid: string;
+    status: 'success' | 'warning' | 'error';
+    text: string;
+    details?: string;
+    link?: string;
+    transport?: string;
+  } | null>(null);
 
   const handleStartEditUser = (u: UserProfile) => {
     setEditingUserUid(u.uid);
@@ -798,17 +842,30 @@ export default function AdminScreen({
 
     setResettingPasswordUid(null);
 
-    if (result.ok) {
+    if (result.ok && (result.transport === 'smtp' || result.transport === 'smtp-override' || result.transport === 'resend')) {
       setPasswordResetNotice({
         uid: u.uid,
-        text: `Password reset email sent successfully to ${u.email}.`,
+        status: 'success',
+        text: `Password reset email dispatched via ${result.transport} to ${u.email}.`,
+        link: result.resetLink,
+        transport: result.transport,
+      });
+    } else if (result.ok) {
+      setPasswordResetNotice({
+        uid: u.uid,
+        status: 'warning',
+        text: `Password reset issued for ${u.email}.`,
+        details: result.details || 'If no email arrives, your SMTP mail server is not configured in Admin > Notification Settings. You can copy the direct reset link below to share manually.',
+        link: result.resetLink,
+        transport: 'firebase',
       });
     } else {
       setPasswordResetNotice({
         uid: u.uid,
-        text: `Could not send reset email: ${result.error}${
-          result.details ? ` (${result.details})` : ''
-        }`,
+        status: 'error',
+        text: result.error || 'Password reset email delivery failed.',
+        details: result.details || 'To deliver automatic emails to inboxes, enter your mail server credentials in Admin > Notification Settings.',
+        link: result.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(u.email)}`,
       });
     }
   };
@@ -1981,6 +2038,55 @@ export default function AdminScreen({
                         </div>
                       </div>
 
+                      {passwordResetNotice && passwordResetNotice.uid === u.uid && (
+                        <div className={`p-3 rounded-xl border text-xs font-semibold space-y-2 mt-2 ${
+                          passwordResetNotice.status === 'success'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                            : passwordResetNotice.status === 'warning'
+                            ? 'bg-amber-50 border-amber-200 text-amber-900'
+                            : 'bg-red-50 border-red-200 text-red-900'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-1.5 font-extrabold text-xs">
+                              <Mail className="w-4 h-4 shrink-0" />
+                              <span>{passwordResetNotice.text}</span>
+                            </div>
+                            <button
+                              onClick={() => setPasswordResetNotice(null)}
+                              className="text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {passwordResetNotice.details && (
+                            <p className="text-[11px] leading-relaxed opacity-90">{passwordResetNotice.details}</p>
+                          )}
+
+                          {passwordResetNotice.link && (
+                            <div className="pt-1.5 border-t border-black/10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <input
+                                type="text"
+                                readOnly
+                                value={passwordResetNotice.link}
+                                onFocus={(e) => e.currentTarget.select()}
+                                className="flex-1 min-w-0 bg-white/80 px-2 py-1 border border-black/10 rounded text-[10px] font-mono font-bold text-gray-700 focus:outline-none"
+                              />
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(passwordResetNotice.link!);
+                                  alert('Direct Password Reset link copied to clipboard!');
+                                }}
+                                className="px-2.5 py-1 text-[11px] font-bold bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 rounded flex items-center justify-center gap-1 shrink-0 cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>Copy Reset Link</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex justify-end gap-2 pt-2">
                         <button
                           onClick={() => handleResetUserPassword(u)}
@@ -2689,11 +2795,61 @@ export default function AdminScreen({
             <div>
               <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
                 <Key className="w-4 h-4 text-blue-500" />
-                <span>Email (SMTP) Server</span>
+                <span>Email (SMTP) Server Setup</span>
               </h3>
               <p className="text-xs text-gray-500 font-semibold mt-1">
-                Configure the mail server used to send invitations, instead of editing SMTP_* values in the server's .env file. Works with Gmail/Office365 SMTP, your own mail server, or an SMTP relay from SendGrid/Mailgun/Postmark, etc.
+                Configure your mail server (MailerSend, Gmail, SendGrid, Mailgun, Postmark, etc.) so password resets and coach invitations are sent directly to user inboxes.
               </p>
+            </div>
+
+            {/* Provider Quick Presets */}
+            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                Quick Setup Presets
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSmtpHostInput('smtp.mailersend.net');
+                    setSmtpPortInput('587');
+                    setSmtpSecureInput(false);
+                    setNotifSavedNotice('Applied MailerSend SMTP preset. Enter your MailerSend Username, Password/Token, and verified From Address.');
+                    setTimeout(() => setNotifSavedNotice(''), 6000);
+                  }}
+                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>MailerSend</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSmtpHostInput('smtp.gmail.com');
+                    setSmtpPortInput('587');
+                    setSmtpSecureInput(false);
+                    setNotifSavedNotice('Applied Gmail SMTP preset. Make sure to use a Gmail App Password, not your regular password.');
+                    setTimeout(() => setNotifSavedNotice(''), 6000);
+                  }}
+                  className="px-2.5 py-1.5 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Gmail SMTP</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSmtpHostInput('smtp.sendgrid.net');
+                    setSmtpPortInput('587');
+                    setSmtpUserInput('apikey');
+                    setSmtpSecureInput(false);
+                    setNotifSavedNotice('Applied SendGrid preset. Username set to "apikey". Enter your SendGrid API key as the password.');
+                    setTimeout(() => setNotifSavedNotice(''), 6000);
+                  }}
+                  className="px-2.5 py-1.5 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>SendGrid</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2772,6 +2928,14 @@ export default function AdminScreen({
               >
                 {isSavingNotifications ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 <span>Save SMTP Settings</span>
+              </button>
+              <button
+                onClick={handleTestSmtpConnection}
+                disabled={isTestingSmtp || (!smtpHostInput.trim() && !notificationSettings?.smtpHost)}
+                className="px-3.5 py-2 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {isTestingSmtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5 text-emerald-600" />}
+                <span>Test Connection</span>
               </button>
               {notificationSettings?.smtpHost && (
                 <button

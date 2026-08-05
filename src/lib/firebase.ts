@@ -97,7 +97,7 @@ export interface SendPasswordResetOptions {
 export async function sendPasswordReset(
   email: string,
   options?: SendPasswordResetOptions
-): Promise<{ ok: boolean; error?: string; details?: string }> {
+): Promise<{ ok: boolean; error?: string; details?: string; resetLink?: string; transport?: string }> {
   const trimmedEmail = email.trim().toLowerCase();
   if (!trimmedEmail || !trimmedEmail.includes('@')) {
     return { ok: false, error: 'Enter a valid email address.' };
@@ -129,34 +129,44 @@ export async function sendPasswordReset(
       body: JSON.stringify({
         toEmail: trimmedEmail,
         toName: options?.name,
-        resetLink: options?.resetLink || `${window.location.origin}/`,
+        resetLink: options?.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`,
         smtpOverride: options?.smtpOverride,
       }),
     });
 
     const data = await res.json().catch(() => ({}));
+    const fallbackLink = data.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`;
 
     if (res.ok && data.success) {
-      return { ok: true };
+      return { ok: true, transport: data.transport || 'smtp', resetLink: fallbackLink };
     }
 
     if (firebaseOk) {
-      return { ok: true };
+      return {
+        ok: true,
+        transport: 'firebase',
+        resetLink: fallbackLink,
+        error: data.error,
+        details: data.details,
+      };
     }
 
     return {
       ok: false,
       error: data.error || firebaseError || 'Failed to send password reset email.',
-      details: data.details,
+      details: data.details || 'Check Admin > Notification Settings to configure SMTP mail server credentials.',
+      resetLink: fallbackLink,
     };
   } catch (err: any) {
     console.warn('Server password reset request failed:', err);
+    const fallbackLink = `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`;
     if (firebaseOk) {
-      return { ok: true };
+      return { ok: true, transport: 'firebase', resetLink: fallbackLink };
     }
     return {
       ok: false,
       error: err.message || firebaseError || 'Network error sending password reset.',
+      resetLink: fallbackLink,
     };
   }
 }
