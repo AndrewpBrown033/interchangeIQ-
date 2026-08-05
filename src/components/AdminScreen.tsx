@@ -223,6 +223,8 @@ export default function AdminScreen({
   const [showGeminiInput, setShowGeminiInput] = useState(false);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
   const [keysSavedNotice, setKeysSavedNotice] = useState('');
+  const [showSavedAnthropicKey, setShowSavedAnthropicKey] = useState(false);
+  const [showSavedGeminiKey, setShowSavedGeminiKey] = useState(false);
 
   const maskKey = (key?: string) => {
     if (!key) return '';
@@ -2433,14 +2435,26 @@ export default function AdminScreen({
 
                 {apiKeys?.anthropicApiKey && (
                   <div className="flex items-center justify-between gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                    <span className="font-mono text-xs text-gray-600 truncate">{maskKey(apiKeys.anthropicApiKey)}</span>
-                    <button
-                      onClick={() => handleRemoveApiKey('anthropic')}
-                      disabled={isSavingKeys}
-                      className="text-[11px] font-bold text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50 shrink-0"
-                    >
-                      Remove
-                    </button>
+                    <span className="font-mono text-xs text-gray-600 truncate">
+                      {showSavedAnthropicKey ? apiKeys.anthropicApiKey : maskKey(apiKeys.anthropicApiKey)}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowSavedAnthropicKey((v) => !v)}
+                        className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                        title={showSavedAnthropicKey ? 'Hide key' : 'Show full key'}
+                      >
+                        {showSavedAnthropicKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => handleRemoveApiKey('anthropic')}
+                        disabled={isSavingKeys}
+                        className="text-[11px] font-bold text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2508,14 +2522,26 @@ export default function AdminScreen({
 
                 {apiKeys?.geminiApiKey && (
                   <div className="flex items-center justify-between gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                    <span className="font-mono text-xs text-gray-600 truncate">{maskKey(apiKeys.geminiApiKey)}</span>
-                    <button
-                      onClick={() => handleRemoveApiKey('gemini')}
-                      disabled={isSavingKeys}
-                      className="text-[11px] font-bold text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50 shrink-0"
-                    >
-                      Remove
-                    </button>
+                    <span className="font-mono text-xs text-gray-600 truncate">
+                      {showSavedGeminiKey ? apiKeys.geminiApiKey : maskKey(apiKeys.geminiApiKey)}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowSavedGeminiKey((v) => !v)}
+                        className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                        title={showSavedGeminiKey ? 'Hide key' : 'Show full key'}
+                      >
+                        {showSavedGeminiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => handleRemoveApiKey('gemini')}
+                        disabled={isSavingKeys}
+                        className="text-[11px] font-bold text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 )}
 
