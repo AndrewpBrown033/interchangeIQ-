@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, AuditLogEntry, TeamProfile } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, KeyRound, Lock, ShieldAlert, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark } from 'lucide-react';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark } from 'lucide-react';
 import CsvImportGuide from './CsvImportGuide';
 
 interface SettingsScreenProps {
@@ -68,14 +68,14 @@ export default function SettingsScreen({
   userTeamIds = [],
   onUpdateTeams,
 }: SettingsScreenProps) {
-  // Filter teams to only show those the manager/user has access to
+  // Filter teams to only show those this coach actually belongs to. No role-based
+  // bypass and no "fall back to everything if the filter comes up empty" — a coach
+  // with no assigned teams should see an empty state, not every club in the system.
   const accessibleTeams = React.useMemo(() => {
     if (!teams || teams.length === 0) return [];
-    if (currentUserRole === 'Admin') return teams;
-    if (!userTeamIds || userTeamIds.length === 0) return teams;
-    const filtered = teams.filter((t) => userTeamIds.includes(t.id));
-    return filtered.length > 0 ? filtered : teams;
-  }, [teams, currentUserRole, userTeamIds]);
+    if (!userTeamIds || userTeamIds.length === 0) return [];
+    return teams.filter((t) => userTeamIds.includes(t.id));
+  }, [teams, userTeamIds]);
 
   const handleRenameTeamInSettings = (teamId: string) => {
     if (!onUpdateTeams || !teams) return;
@@ -577,34 +577,39 @@ export default function SettingsScreen({
             </div>
           </div>
 
-          {/* Account Security & Timeout */}
+          {/* Data Export & Backup Restore — moved here to balance the two columns
+              now that the Session Security card has been removed. */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
             <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
-              <KeyRound className="w-4 h-4 text-[var(--blue)]" />
-              <span>Session Security & Timeout</span>
+              <Download className="w-4 h-4 text-[var(--blue)]" />
+              <span>Data Export & Backup Restore</span>
             </h3>
             <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-              Manage your dashboard session security. You can log out/lock the screen manually, or test the secure inactivity timeout.
+              Safeguard your data. Download a complete snapshot (.json file) of your players, lineup slots, match scoreboards, and plan templates.
             </p>
 
             <div className="flex flex-wrap gap-2.5">
               <button
-                onClick={onLockSystem}
-                className="px-4 py-2.5 text-xs font-black bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer"
+                onClick={onExportData}
+                className="px-4 py-2 text-xs font-bold bg-[#FAFBFF] border border-blue-100 hover:bg-blue-50 text-[var(--blue)] rounded-xl transition flex items-center gap-1.5"
               >
-                <Lock className="w-4 h-4 text-emerald-400" />
-                <span>Lock Screen & Log Out</span>
+                <Download className="w-3.5 h-3.5" />
+                <span>Export JSON Backup</span>
               </button>
 
-              <button
-                onClick={onSimulateTimeout}
-                className="px-4 py-2.5 text-xs font-black bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition flex items-center gap-2 cursor-pointer"
-              >
-                <ShieldAlert className="w-4 h-4 text-white" />
-                <span>Simulate Inactivity Timeout</span>
-              </button>
+              <label className="px-4 py-2 text-xs font-bold bg-[#F0F1F5] hover:bg-gray-200 text-gray-700 rounded-xl border border-[var(--line)] transition flex items-center gap-1.5 cursor-pointer text-center">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Import Backup</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={onImportData}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
+
         </div>
 
         {/* Backups & Activity Audit logs */}
@@ -769,37 +774,6 @@ export default function SettingsScreen({
             onUpdateLineup={onUpdateLineup}
           />
 
-          {/* Backup Restore Card */}
-          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
-            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
-              <Download className="w-4 h-4 text-[var(--blue)]" />
-              <span>Data Export & Backup Restore</span>
-            </h3>
-            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-              Safeguard your data. Download a complete snapshot (.json file) of your players, lineup slots, match scoreboards, and plan templates.
-            </p>
-
-            <div className="flex flex-wrap gap-2.5">
-              <button
-                onClick={onExportData}
-                className="px-4 py-2 text-xs font-bold bg-[#FAFBFF] border border-blue-100 hover:bg-blue-50 text-[var(--blue)] rounded-xl transition flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export JSON Backup</span>
-              </button>
-
-              <label className="px-4 py-2 text-xs font-bold bg-[#F0F1F5] hover:bg-gray-200 text-gray-700 rounded-xl border border-[var(--line)] transition flex items-center gap-1.5 cursor-pointer text-center">
-                <Upload className="w-3.5 h-3.5" />
-                <span>Import Backup</span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={onImportData}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          </div>
 
           {/* Activity Logs */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">

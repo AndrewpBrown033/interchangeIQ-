@@ -1698,11 +1698,14 @@ export default function App() {
 
   const activeTeamProfile = teams.find((t) => t.id === activeTeamId) || teams[0];
 
+  // NOTE: this must never fall back to "any Admin" or "the first user" — that silently
+  // hands a coach someone else's identity (and their teams) whenever the lookup misses,
+  // which is what was causing coaches to see squads they weren't assigned to.
   const matchedUserProfile = users.find(
     (u) =>
       (currentUser?.uid && u.uid === currentUser.uid) ||
       (currentUser?.email && u.email.toLowerCase() === currentUser.email.toLowerCase())
-  ) || users.find((u) => u.role === 'Admin') || users[0];
+  ) || null;
 
   const currentUserRole = matchedUserProfile?.role === 'Head Coach' ? 'Coach' : (matchedUserProfile?.role || 'Coach');
 
@@ -2235,6 +2238,12 @@ export default function App() {
             players={players}
             onUpdatePlayers={setPlayers}
             onUpdateLineup={setLineup}
+            teams={teams}
+            activeTeamId={activeTeamId}
+            onSelectTeam={handleSwitchTeam}
+            currentUserRole={currentUserRole}
+            userTeamIds={matchedUserProfile?.teamIds || []}
+            onUpdateTeams={handleUpdateTeams}
           />
         )}
       </main>

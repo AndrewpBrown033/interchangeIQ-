@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory, ApiKeySettings, NotificationSettings } from '../types';
 import { DEFAULT_PLAYERS, DEMO_TEAM_ID } from '../constants';
+import { sendPasswordReset } from '../lib/firebase';
 import {
   Plus,
   Trash,
@@ -737,6 +738,56 @@ export default function AdminScreen({
   const handleDeleteUser = (uid: string) => {
     if (!window.confirm('Remove this user or invitation from the system?')) return;
     onUpdateUsers(users.filter((u) => u.uid !== uid));
+  };
+
+  // Inline "Edit coach details" state for the Coaches & Roles list
+  const [editingUserUid, setEditingUserUid] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [resettingPasswordUid, setResettingPasswordUid] = useState<string | null>(null);
+  const [passwordResetNotice, setPasswordResetNotice] = useState<{ uid: string; text: string } | null>(null);
+
+  const handleStartEditUser = (u: UserProfile) => {
+    setEditingUserUid(u.uid);
+    setEditName(u.name);
+    setEditEmail(u.email);
+    setPasswordResetNotice(null);
+  };
+
+  const handleCancelEditUser = () => {
+    setEditingUserUid(null);
+    setEditName('');
+    setEditEmail('');
+  };
+
+  const handleSaveUserEdit = (uid: string) => {
+    const trimmedName = editName.trim();
+    const trimmedEmail = editEmail.trim().toLowerCase();
+    if (!trimmedName || !trimmedEmail) {
+      alert('Name and email cannot be empty.');
+      return;
+    }
+    onUpdateUsers(
+      users.map((u) => (u.uid === uid ? { ...u, name: trimmedName, email: trimmedEmail } : u))
+    );
+    setEditingUserUid(null);
+  };
+
+  // Sends a Firebase password reset email to this coach's sign-in address. Note: this
+  // is the email they actually sign in with (their Firebase Auth account) — if their
+  // profile email was just edited above but not yet saved, use the original email.
+  const handleResetUserPassword = async (u: UserProfile) => {
+    if (!window.confirm(`Send a password reset email to ${u.email}?`)) return;
+    setResettingPasswordUid(u.uid);
+    setPasswordResetNotice(null);
+    const result = await sendPasswordReset(u.email);
+    setResettingPasswordUid(null);
+    setPasswordResetNotice({
+      uid: u.uid,
+      text: result.ok
+        ? `Reset link sent to ${u.email}.`
+        : `Could not send reset email: ${result.error || 'unknown error'}`,
+    });
   };
 
   // A Provisional user's Demo Team access is a placeholder — the moment they have any
@@ -1719,19 +1770,65 @@ export default function AdminScreen({
                       className="p-4 border border-gray-100 bg-white rounded-xl space-y-3 shadow-xs"
                     >
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                          <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
-                            {u.name}
-                            {u.role === 'Admin' && <Shield className="w-3.5 h-3.5 text-red-500" />}
-                            {u.role === 'Provisional' && (
-                              <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-100 text-amber-700 rounded uppercase">
-                                Provisional
-                              </span>
-                            )}
-                          </b>
-                          <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
-                        </div>
+                        {editingUserUid === u.uid ? (
+                          <div className="flex-1 min-w-[200px] space-y-1.5">
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="Full name"
+                              className="w-full px-2.5 py-1.5 text-xs font-extrabold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <input
+                              type="email"
+                              value={editEmail}
+                              onChange={(e) => setEditEmail(e.target.value)}
+                              placeholder="Email"
+                              className="w-full px-2.5 py-1.5 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <p className="text-[9px] text-gray-400 font-semibold leading-tight">
+                              This updates their profile record. It doesn't change the email/password they sign in with.
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
+                              {u.name}
+                              {u.role === 'Admin' && <Shield className="w-3.5 h-3.5 text-red-500" />}
+                              {u.role === 'Provisional' && (
+                                <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-100 text-amber-700 rounded uppercase">
+                                  Provisional
+                                </span>
+                              )}
+                            </b>
+                            <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
+                          {editingUserUid === u.uid ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveUserEdit(u.uid)}
+                                className="px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={handleCancelEditUser}
+                                className="px-2.5 py-1.5 text-[11px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleStartEditUser(u)}
+                              className="p-1.5 text-gray-500 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg cursor-pointer"
+                              title="Edit coach details"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <label className="text-[10px] font-black uppercase text-gray-400">Role:</label>
                           <select
                             value={u.role}
@@ -1746,6 +1843,12 @@ export default function AdminScreen({
                           </select>
                         </div>
                       </div>
+
+                      {passwordResetNotice && passwordResetNotice.uid === u.uid && (
+                        <p className="text-[10px] font-bold text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+                          {passwordResetNotice.text}
+                        </p>
+                      )}
 
                       {/* Team assignments — compact preview, edit via the searchable widget above */}
                       {u.role !== 'Admin' && (
@@ -1843,7 +1946,14 @@ export default function AdminScreen({
                         </div>
                       </div>
 
-                      <div className="flex justify-end pt-2">
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          onClick={() => handleResetUserPassword(u)}
+                          disabled={resettingPasswordUid === u.uid}
+                          className="px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg cursor-pointer disabled:opacity-50"
+                        >
+                          {resettingPasswordUid === u.uid ? 'Sending...' : 'Reset Password'}
+                        </button>
                         <button
                           onClick={() => handleDeleteUser(u.uid)}
                           className="px-2.5 py-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer"

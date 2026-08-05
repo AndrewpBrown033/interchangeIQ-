@@ -237,7 +237,7 @@ ${drillsSummary}`;
 // Send invitation email endpoint
 app.post("/api/send-invite", async (req, res) => {
   try {
-    const { toEmail, toName, inviterName, role, inviteLink, teamName } = req.body;
+    const { toEmail, toName, inviterName, role, inviteLink, teamName, smtpOverride } = req.body;
 
     if (!toEmail || !inviteLink) {
       return res.status(400).json({ error: "toEmail and inviteLink are required." });
@@ -264,9 +264,45 @@ app.post("/api/send-invite", async (req, res) => {
         </p>
       </div>
     `;
+    // Plain-text alternative — some mail clients/security gateways render only this
+    // part, or strip anchor tags from the HTML part entirely. Without this, the
+    // activation link can silently disappear even though the send "succeeds".
+    const text =
+      `You've been invited to InterchangeIQ${teamName ? ` (${teamName})` : ""}\n\n` +
+      `Hi ${toName || "there"},\n\n` +
+      `${inviterName || "An administrator"} has invited you to join ${teamName || "InterchangeIQ"} as a ${role || "Coach"}.\n\n` +
+      `Accept your invitation here:\n${inviteLink}\n`;
 
-    // 1. Prefer a direct SMTP relay if one is configured — your own mail server,
-    //    Gmail/Office365 SMTP, or an SMTP relay from SendGrid/Mailgun/Postmark/etc.
+    // 1. Prefer SMTP credentials entered in Admin > Notification Settings for this
+    //    request, so admins don't have to edit the server's .env file directly.
+    if (smtpOverride?.host && smtpOverride?.user && smtpOverride?.pass) {
+      try {
+        const port = Number(smtpOverride.port) || 587;
+        const overrideTransporter = nodemailer.createTransport({
+          host: smtpOverride.host,
+          port,
+          secure: !!smtpOverride.secure || port === 465,
+          auth: { user: smtpOverride.user, pass: smtpOverride.pass },
+        });
+        const info = await overrideTransporter.sendMail({
+          from: smtpOverride.from || smtpOverride.user,
+          to: toEmail,
+          subject,
+          html,
+          text,
+        });
+        return res.json({ success: true, id: info.messageId, transport: "smtp-override" });
+      } catch (smtpErr: any) {
+        console.error("SMTP override send error:", smtpErr);
+        return res.status(502).json({
+          error: "Failed to send invite email via SMTP",
+          details: smtpErr.message || "SMTP send failed. Check the SMTP settings in Admin > Notification Settings.",
+        });
+      }
+    }
+
+    // 2. Fall back to a direct SMTP relay configured on the server itself via
+    //    SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS env vars.
     const smtpTransporter = getSmtpTransporter();
     if (smtpTransporter) {
       const SMTP_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || "";
@@ -276,6 +312,7 @@ app.post("/api/send-invite", async (req, res) => {
           to: toEmail,
           subject,
           html,
+          text,
         });
         return res.json({ success: true, id: info.messageId, transport: "smtp" });
       } catch (smtpErr: any) {
@@ -287,16 +324,16 @@ app.post("/api/send-invite", async (req, res) => {
       }
     }
 
-    // 2. Fall back to the Resend HTTP API if SMTP isn't configured.
+    // 3. Fall back to the Resend HTTP API if neither is configured.
     const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
     const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
 
     if (!RESEND_API_KEY) {
-      // Neither SMTP nor Resend configured — tell the caller explicitly so the UI
+      // Nothing configured — tell the caller explicitly so the UI
       // can fall back to "copy link" instead of silently pretending to succeed.
       return res.status(503).json({
         error: "Email provider not configured",
-        details: "Set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS on the server (recommended), or RESEND_API_KEY as an alternative. Use the Copy Invite Link fallback for now.",
+        details: "Set SMTP details in Admin > Notification Settings (recommended), SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS on the server, or RESEND_API_KEY as an alternative. Use the Copy Invite Link fallback for now.",
       });
     }
 
@@ -311,6 +348,7 @@ app.post("/api/send-invite", async (req, res) => {
         to: [toEmail],
         subject,
         html,
+        text,
       }),
     });
 
