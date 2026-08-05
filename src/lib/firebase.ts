@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User, sendEmailVerification } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -75,5 +75,26 @@ export async function sendEmailVerificationToCurrentUser(): Promise<boolean> {
   } catch (err) {
     console.warn('Error sending verification email:', err);
     return false;
+  }
+}
+
+// Sends a "reset your password" email via Firebase Auth. Works for both the
+// login screen's "Forgot password?" link and the Admin > Coaches & Roles
+// "Reset Password" action — Firebase handles the reset flow entirely, so
+// there's no separate server endpoint needed.
+export async function sendPasswordReset(email: string): Promise<{ ok: boolean; error?: string }> {
+  const trimmedEmail = email.trim().toLowerCase();
+  if (!trimmedEmail || !trimmedEmail.includes('@')) {
+    return { ok: false, error: 'Enter a valid email address.' };
+  }
+  try {
+    await sendPasswordResetEmail(auth, trimmedEmail);
+    return { ok: true };
+  } catch (err: any) {
+    console.warn('Error sending password reset email:', err);
+    // Firebase deliberately returns the same generic error for "no account with
+    // this email" as for other failures, to avoid leaking which emails are
+    // registered — so we surface a generic message either way.
+    return { ok: false, error: err.message || 'Could not send reset email. Please try again.' };
   }
 }
