@@ -65,6 +65,7 @@ app.get("/api/health", (_req, res) => {
 
 // Jarvis AI Assistant endpoint
 app.post("/api/jarvis", async (req, res) => {
+  const debugLogs: string[] = [];
   try {
     const { message, history, squad, drills, growthRecords, apiKeyOverride } = req.body;
     const provider: "claude" | "gemini" = req.body.provider === "gemini" ? "gemini" : "claude";
@@ -143,7 +144,6 @@ CURRENT DRILL LIBRARY IN SYSTEM:
 ${drillsSummary}`;
 
     // Build debug logs collector for Jarvis AI executions
-    const debugLogs: string[] = [];
     const logTrace = (msg: string) => {
       const ts = new Date().toISOString().slice(11, 23);
       const line = `[${ts}] ${msg}`;
