@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User, sendEmailVerification } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -33,6 +33,13 @@ export async function ensureFirebaseAuthSession(email?: string, password?: strin
     } catch (_signInErr: any) {
       try {
         const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, pwdToUse);
+        // Send verification email for newly created users
+        try {
+          await sendEmailVerification(cred.user);
+          console.log('Verification email sent to', trimmedEmail);
+        } catch (emailErr) {
+          console.warn('Failed to send verification email:', emailErr);
+        }
         return cred.user;
       } catch (_createErr: any) {
         console.warn('Firebase Auth email sync notice:', _createErr.code || _createErr.message);
@@ -60,3 +67,13 @@ export async function ensureFirebaseAuthSession(email?: string, password?: strin
   }
 }
 
+export async function sendEmailVerificationToCurrentUser(): Promise<boolean> {
+  try {
+    if (!auth.currentUser) return false;
+    await sendEmailVerification(auth.currentUser);
+    return true;
+  } catch (err) {
+    console.warn('Error sending verification email:', err);
+    return false;
+  }
+}
