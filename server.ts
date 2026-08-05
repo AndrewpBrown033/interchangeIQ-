@@ -416,7 +416,7 @@ app.post("/api/send-invite", async (req, res) => {
       });
     }
 
-    const data = await resendRes.json();
+    const data = (await resendRes.json()) as any;
     return res.json({ success: true, id: data.id, transport: "resend" });
   } catch (err: any) {
     console.error("Send invite error:", err);
@@ -498,7 +498,7 @@ app.post("/api/send-password-reset", async (req, res) => {
         });
 
         if (msRes.ok) {
-          const msData = await msRes.json().catch(() => ({}));
+          const msData = (await msRes.json().catch(() => ({}))) as any;
           return res.json({ success: true, id: msData.id || "mailersend-ok", transport: "mailersend-api", resetLink: linkToUse });
         } else {
           const msErrText = await msRes.text();
@@ -582,7 +582,7 @@ app.post("/api/send-password-reset", async (req, res) => {
         });
 
         if (msRes.ok) {
-          const msData = await msRes.json().catch(() => ({}));
+          const msData = (await msRes.json().catch(() => ({}))) as any;
           return res.json({ success: true, id: msData.id || "mailersend-ok", transport: "mailersend", resetLink: linkToUse });
         } else {
           const msErrText = await msRes.text();
@@ -630,7 +630,7 @@ app.post("/api/send-password-reset", async (req, res) => {
       });
     }
 
-    const data = await resendRes.json();
+    const data = (await resendRes.json()) as any;
     return res.json({ success: true, id: data.id, transport: "resend", resetLink: linkToUse });
   } catch (err: any) {
     console.error("Send password reset error:", err);
