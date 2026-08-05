@@ -231,6 +231,7 @@ export default function AdminScreen({
   const [smtpUserInput, setSmtpUserInput] = useState(notificationSettings?.smtpUser || '');
   const [smtpPassInput, setSmtpPassInput] = useState('');
   const [smtpFromInput, setSmtpFromInput] = useState(notificationSettings?.smtpFrom || '');
+  const [mailerSendApiKeyInput, setMailerSendApiKeyInput] = useState(notificationSettings?.mailerSendApiKey || '');
   const [isSavingNotifications, setIsSavingNotifications] = useState(false);
   const [notifSavedNotice, setNotifSavedNotice] = useState('');
 
@@ -249,11 +250,12 @@ export default function AdminScreen({
         smtpSecure: smtpSecureInput,
         smtpUser: smtpUserInput.trim(),
         smtpFrom: smtpFromInput.trim(),
+        mailerSendApiKey: mailerSendApiKeyInput.trim(),
       };
       if (smtpPassInput.trim()) updates.smtpPass = smtpPassInput.trim();
       await onUpdateNotificationSettings(updates);
       setSmtpPassInput('');
-      setNotifSavedNotice('Saved! Email invitations will now send through this SMTP server.');
+      setNotifSavedNotice('Saved! Email invitations and resets will now send through this server / MailerSend API.');
     } catch (err: any) {
       setNotifSavedNotice(`Save failed: ${err.message || 'Unknown error'}`);
     } finally {
@@ -271,9 +273,10 @@ export default function AdminScreen({
     const pass = smtpPassInput.trim() || notificationSettings?.smtpPass || '';
     const port = Number(smtpPortInput) || notificationSettings?.smtpPort || 587;
     const from = smtpFromInput.trim() || notificationSettings?.smtpFrom || user;
+    const mailerSendApiKey = mailerSendApiKeyInput.trim() || notificationSettings?.mailerSendApiKey || '';
 
-    if (!host && !pass.startsWith('mlsn.') && !user.startsWith('mlsn.')) {
-      setNotifSavedNotice('Error: Enter at least SMTP Host or a MailerSend API Token (starts with mlsn.) to test connection.');
+    if (!host && !mailerSendApiKey && !pass.startsWith('mlsn.') && !user.startsWith('mlsn.')) {
+      setNotifSavedNotice('Error: Enter an SMTP Host or a MailerSend API Key / Token (starts with mlsn.) to test connection.');
       setTimeout(() => setNotifSavedNotice(''), 5000);
       return;
     }
@@ -285,7 +288,7 @@ export default function AdminScreen({
       const res = await fetch('/api/test-smtp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host, port, user, pass, from }),
+        body: JSON.stringify({ host, port, user, pass, from, mailerSendApiKey }),
       });
       const data = await res.json().catch(() => ({}));
       if (Array.isArray(data.debugLogs)) {
@@ -829,7 +832,7 @@ export default function AdminScreen({
     setResettingPasswordUid(u.uid);
     setPasswordResetNotice(null);
 
-    const smtpOverride = notificationSettings?.smtpHost
+    const smtpOverride = (notificationSettings?.smtpHost || notificationSettings?.mailerSendApiKey)
       ? {
           host: notificationSettings.smtpHost,
           port: notificationSettings.smtpPort,
@@ -837,6 +840,7 @@ export default function AdminScreen({
           user: notificationSettings.smtpUser,
           pass: notificationSettings.smtpPass,
           from: notificationSettings.smtpFrom,
+          mailerSendApiKey: notificationSettings.mailerSendApiKey,
         }
       : undefined;
 
@@ -2857,6 +2861,29 @@ export default function AdminScreen({
               </div>
             </div>
 
+            {/* MailerSend Direct REST API Card */}
+            <div className="p-3 bg-emerald-50/80 border border-emerald-200/90 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <Mail className="w-4 h-4 text-emerald-600" />
+                  <span>MailerSend REST API Token</span>
+                </label>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-mono uppercase tracking-wide">
+                  HTTPS Port 443 Direct
+                </span>
+              </div>
+              <input
+                type="password"
+                value={mailerSendApiKeyInput}
+                onChange={(e) => setMailerSendApiKeyInput(e.target.value)}
+                placeholder={notificationSettings?.mailerSendApiKey ? '•••••••• (MailerSend API Token Saved — enter new to replace)' : 'mlsn.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
+                className="w-full px-3 py-2 text-sm font-mono bg-white border border-emerald-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-xs"
+              />
+              <p className="text-[11px] text-emerald-800 leading-snug">
+                Paste your MailerSend API Token (<code className="font-mono bg-emerald-100 px-1 py-0.5 rounded text-emerald-900 font-bold">mlsn....</code>) to send emails directly over HTTPS API. Bypasses outbound TCP port restrictions in cloud container environments.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">SMTP Host</label>
@@ -2951,15 +2978,15 @@ export default function AdminScreen({
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 onClick={handleSaveSmtpSettings}
-                disabled={isSavingNotifications || !smtpHostInput.trim()}
+                disabled={isSavingNotifications || (!smtpHostInput.trim() && !mailerSendApiKeyInput.trim())}
                 className="px-4 py-2 text-xs font-bold bg-[var(--blue)] text-white rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {isSavingNotifications ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                <span>Save SMTP Settings</span>
+                <span>Save Mail & SMTP Settings</span>
               </button>
               <button
                 onClick={handleTestSmtpConnection}
-                disabled={isTestingSmtp || (!smtpHostInput.trim() && !notificationSettings?.smtpHost && !smtpPassInput.startsWith('mlsn.'))}
+                disabled={isTestingSmtp || (!smtpHostInput.trim() && !notificationSettings?.smtpHost && !mailerSendApiKeyInput.trim() && !notificationSettings?.mailerSendApiKey && !smtpPassInput.startsWith('mlsn.'))}
                 className="px-3.5 py-2 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {isTestingSmtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5 text-emerald-600" />}

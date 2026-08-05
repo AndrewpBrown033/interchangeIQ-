@@ -421,6 +421,39 @@ app.post("/api/send-password-reset", async (req, res) => {
       `Reset your password or sign in here:\n${linkToUse}\n\n` +
       `If you did not request this, you can safely ignore this email.\n`;
 
+    // 0. MailerSend API Key override entered in Admin > Notification Settings
+    const msOverrideKey = smtpOverride?.mailerSendApiKey || (smtpOverride?.pass?.startsWith("mlsn.") ? smtpOverride?.pass : (smtpOverride?.user?.startsWith("mlsn.") ? smtpOverride?.user : undefined));
+    if (msOverrideKey) {
+      try {
+        const msFromEmail = smtpOverride?.from || "info@interchangeiq.app";
+        const msRes = await fetch("https://api.mailersend.com/v1/email", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${msOverrideKey}`,
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: JSON.stringify({
+            from: { email: msFromEmail, name: "InterchangeIQ" },
+            to: [{ email: toEmail, name: toName || "Coach" }],
+            subject,
+            html,
+            text,
+          }),
+        });
+
+        if (msRes.ok) {
+          const msData = await msRes.json().catch(() => ({}));
+          return res.json({ success: true, id: msData.id || "mailersend-ok", transport: "mailersend-api", resetLink: linkToUse });
+        } else {
+          const msErrText = await msRes.text();
+          console.error("MailerSend API override error:", msRes.status, msErrText);
+        }
+      } catch (msErr: any) {
+        console.error("MailerSend override exception:", msErr);
+      }
+    }
+
     // 1. Prefer SMTP credentials entered in Admin > Notification Settings
     if (smtpOverride?.host && smtpOverride?.user && smtpOverride?.pass) {
       try {
@@ -564,7 +597,7 @@ app.post("/api/test-smtp", async (req, res) => {
   };
 
   try {
-    const { host, port, user, pass, from, testTo } = req.body;
+    const { host, port, user, pass, from, testTo, mailerSendApiKey } = req.body;
     log(`Initiating SMTP / Email diagnostics...`);
 
     const cleanedUser = (user || "").trim();
@@ -575,12 +608,13 @@ app.post("/api/test-smtp", async (req, res) => {
 
     log(`Target host: "${cleanedHost}", port: ${smtpPort}, user: "${cleanedUser}", target: "${targetAddress}"`);
 
-    // 1. Check if user or pass is a MailerSend API Token (starts with mlsn.)
-    const isMailerSendToken = cleanedPass.startsWith("mlsn.") || cleanedUser.startsWith("mlsn.");
-    const tokenToUse = cleanedPass.startsWith("mlsn.") ? cleanedPass : (cleanedUser.startsWith("mlsn.") ? cleanedUser : null);
+    // 1. Check if explicit MailerSend API Key or token (starts with mlsn.) is provided
+    const explicitMsKey = (mailerSendApiKey || "").trim();
+    const isMailerSendToken = explicitMsKey || cleanedPass.startsWith("mlsn.") || cleanedUser.startsWith("mlsn.");
+    const tokenToUse = explicitMsKey || (cleanedPass.startsWith("mlsn.") ? cleanedPass : (cleanedUser.startsWith("mlsn.") ? cleanedUser : null));
 
     if (isMailerSendToken && tokenToUse) {
-      log(`Detected MailerSend API token (starts with mlsn.). Routing test via MailerSend REST API (HTTPS port 443)...`);
+      log(`Detected MailerSend API key / token. Routing test via MailerSend REST API (HTTPS port 443)...`);
       const senderEmail = from || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "info@interchangeiq.app");
       
       const msRes = await fetch("https://api.mailersend.com/v1/email", {

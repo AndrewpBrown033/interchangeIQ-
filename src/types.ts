@@ -152,6 +152,7 @@ export interface NotificationSettings {
   smtpUser?: string;
   smtpPass?: string;
   smtpFrom?: string;
+  mailerSendApiKey?: string;
   updatedAt?: number;
   updatedBy?: string;
 }
