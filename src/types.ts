@@ -139,6 +139,23 @@ export interface ApiKeySettings {
   updatedBy?: string;
 }
 
+export interface NotificationSettings {
+  // Channel toggles
+  emailEnabled?: boolean;
+  pulseEnabled?: boolean;
+  pushEnabled?: boolean;
+  // SMTP transport used for the Email channel (moved here from server .env so
+  // it can be managed in-app instead of editing files on the server)
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpFrom?: string;
+  updatedAt?: number;
+  updatedBy?: string;
+}
+
 export interface Drill {
   id: string;
   title: string;

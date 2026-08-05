@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
-  Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment, ApiKeySettings
+  Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment, ApiKeySettings, NotificationSettings
 } from './types';
 import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers, DEMO_TEAM, DEMO_TEAM_ID } from './constants';
 
@@ -234,6 +234,19 @@ export default function App() {
       console.warn("Failed to parse apiKeys:", e);
     }
     return {};
+  });
+
+  // Notification channel + SMTP settings (entered via Admin > Notification Settings,
+  // replaces editing SMTP_* values directly in the server's .env file)
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => {
+    try {
+      const saved = localStorage.getItem('iiq_notification_settings');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) {
+      console.warn("Failed to parse notificationSettings:", e);
+    }
+    return { emailEnabled: true, pulseEnabled: true, pushEnabled: false };
   });
 
   const [trainingState, setTrainingState] = useState<TrainingState>(() => {
@@ -720,6 +733,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('iiq_drills', JSON.stringify(drills)); }, [drills]);
   useEffect(() => { localStorage.setItem('iiq_growth_records', JSON.stringify(growthRecords)); }, [growthRecords]);
   useEffect(() => { localStorage.setItem('iiq_api_keys', JSON.stringify(apiKeys)); }, [apiKeys]);
+  useEffect(() => { localStorage.setItem('iiq_notification_settings', JSON.stringify(notificationSettings)); }, [notificationSettings]);
 
   // Pull API keys from Firestore once on mount (best-effort) - fills in any
   // key set from another device/browser without clobbering a locally-set one.
@@ -756,6 +770,38 @@ export default function App() {
       await setDoc(doc(db, 'settings', 'apiKeys'), merged, { merge: true });
     } catch (err) {
       console.warn('Error saving API keys to Firestore:', err);
+    }
+  };
+
+  // Pull notification/SMTP settings from Firestore once on mount (best-effort) -
+  // fills in anything set from another device/browser without clobbering local edits.
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'notifications'));
+        if (snap.exists()) {
+          const remote = snap.data() as NotificationSettings;
+          setNotificationSettings((prev) => ({ ...prev, ...remote }));
+        }
+      } catch (err) {
+        console.warn('Could not fetch notification settings from Firestore:', err);
+      }
+    })();
+  }, []);
+
+  // Save notification/SMTP settings locally and push (best-effort) to Firestore.
+  const handleUpdateNotificationSettings = async (updates: NotificationSettings) => {
+    const merged: NotificationSettings = {
+      ...notificationSettings,
+      ...updates,
+      updatedAt: Date.now(),
+      updatedBy: userEmail || 'Administrator',
+    };
+    setNotificationSettings(merged);
+    try {
+      await setDoc(doc(db, 'settings', 'notifications'), merged, { merge: true });
+    } catch (err) {
+      console.warn('Error saving notification settings to Firestore:', err);
     }
   };
   useEffect(() => { localStorage.setItem('iiq_training_state', JSON.stringify(trainingState)); }, [trainingState]);
@@ -2155,6 +2201,8 @@ export default function App() {
             onOpenDebugModal={() => setIsDebugModalOpen(true)}
             apiKeys={apiKeys}
             onUpdateApiKeys={handleUpdateApiKeys}
+            notificationSettings={notificationSettings}
+            onUpdateNotificationSettings={handleUpdateNotificationSettings}
           />
         )}
         {activeTab === 'settings' && (

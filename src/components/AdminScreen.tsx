@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory, ApiKeySettings } from '../types';
+import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory, ApiKeySettings, NotificationSettings } from '../types';
 import { DEFAULT_PLAYERS, DEMO_TEAM_ID } from '../constants';
 import {
   Plus,
@@ -39,7 +39,10 @@ import {
   Loader2,
   Key,
   Eye,
-  EyeOff
+  EyeOff,
+  Bell,
+  Smartphone,
+  Radio
 } from 'lucide-react';
 
 interface AdminScreenProps {
@@ -62,6 +65,8 @@ interface AdminScreenProps {
   onOpenDebugModal?: () => void;
   apiKeys?: ApiKeySettings;
   onUpdateApiKeys?: (keys: ApiKeySettings) => void;
+  notificationSettings?: NotificationSettings;
+  onUpdateNotificationSettings?: (settings: NotificationSettings) => void;
 }
 
 export const DEFAULT_TACTICAL_PROMPTS: TacticalPrompt[] = [
@@ -195,8 +200,10 @@ export default function AdminScreen({
   onOpenDebugModal,
   apiKeys,
   onUpdateApiKeys,
+  notificationSettings,
+  onUpdateNotificationSettings,
 }: AdminScreenProps) {
-  const [adminSection, setAdminSection] = useState<'access' | 'prompts'>('access');
+  const [adminSection, setAdminSection] = useState<'access' | 'prompts' | 'notifications'>('access');
   const [jarvisSubTab, setJarvisSubTab] = useState<'keys' | 'prompts'>('keys');
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [teamSyncMsg, setTeamSyncMsg] = useState<string | null>(null);
@@ -213,6 +220,64 @@ export default function AdminScreen({
     if (!key) return '';
     if (key.length <= 10) return '•'.repeat(key.length);
     return `${key.slice(0, 6)}${'•'.repeat(8)}${key.slice(-4)}`;
+  };
+
+  // Notification Settings panel state (Email/Pulse/Push channels + SMTP transport,
+  // moved in-app instead of editing SMTP_* values in the server's .env file)
+  const [smtpHostInput, setSmtpHostInput] = useState(notificationSettings?.smtpHost || '');
+  const [smtpPortInput, setSmtpPortInput] = useState(String(notificationSettings?.smtpPort || 587));
+  const [smtpSecureInput, setSmtpSecureInput] = useState(!!notificationSettings?.smtpSecure);
+  const [smtpUserInput, setSmtpUserInput] = useState(notificationSettings?.smtpUser || '');
+  const [smtpPassInput, setSmtpPassInput] = useState('');
+  const [smtpFromInput, setSmtpFromInput] = useState(notificationSettings?.smtpFrom || '');
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+  const [notifSavedNotice, setNotifSavedNotice] = useState('');
+
+  const handleToggleNotificationChannel = (channel: 'emailEnabled' | 'pulseEnabled' | 'pushEnabled') => {
+    if (!onUpdateNotificationSettings) return;
+    onUpdateNotificationSettings({ [channel]: !notificationSettings?.[channel] });
+  };
+
+  const handleSaveSmtpSettings = async () => {
+    if (!onUpdateNotificationSettings) return;
+    setIsSavingNotifications(true);
+    try {
+      const updates: NotificationSettings = {
+        smtpHost: smtpHostInput.trim(),
+        smtpPort: Number(smtpPortInput) || 587,
+        smtpSecure: smtpSecureInput,
+        smtpUser: smtpUserInput.trim(),
+        smtpFrom: smtpFromInput.trim(),
+      };
+      if (smtpPassInput.trim()) updates.smtpPass = smtpPassInput.trim();
+      await onUpdateNotificationSettings(updates);
+      setSmtpPassInput('');
+      setNotifSavedNotice('Saved! Email invitations will now send through this SMTP server.');
+    } catch (err: any) {
+      setNotifSavedNotice(`Save failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSavingNotifications(false);
+      setTimeout(() => setNotifSavedNotice(''), 5000);
+    }
+  };
+
+  const handleClearSmtpSettings = async () => {
+    if (!onUpdateNotificationSettings) return;
+    if (!window.confirm('Clear the saved SMTP configuration? Email invitations will fall back to the server\'s own SMTP/Resend setup (if any), or stop sending until reconfigured.')) return;
+    setIsSavingNotifications(true);
+    try {
+      await onUpdateNotificationSettings({ smtpHost: '', smtpPort: 587, smtpSecure: false, smtpUser: '', smtpPass: '', smtpFrom: '' });
+      setSmtpHostInput('');
+      setSmtpPortInput('587');
+      setSmtpSecureInput(false);
+      setSmtpUserInput('');
+      setSmtpFromInput('');
+      setSmtpPassInput('');
+      setNotifSavedNotice('SMTP configuration cleared.');
+    } finally {
+      setIsSavingNotifications(false);
+      setTimeout(() => setNotifSavedNotice(''), 3000);
+    }
   };
 
   const handleSaveApiKeys = async () => {
@@ -577,6 +642,18 @@ export default function AdminScreen({
       ? teams.find((t) => t.id === inviteSelectedTeams[0])?.name
       : undefined;
 
+    // Respect the Email channel toggle in Admin > Notification Settings
+    if (notificationSettings?.emailEnabled === false) {
+      setIsSendingInvite(false);
+      setShowInviteModal(false);
+      setActiveUserSubTab('pending');
+      alert(
+        `${trimmedName} was added to Pending Invites, but the Email notification channel is turned off ` +
+        `(Admin > Notification Settings). Use "Copy Link" on their pending invite row to share it manually.`
+      );
+      return;
+    }
+
     try {
       const res = await fetch('/api/send-invite', {
         method: 'POST',
@@ -588,6 +665,18 @@ export default function AdminScreen({
           role: inviteRole,
           inviteLink,
           teamName,
+          // Admin-entered SMTP config from Notification Settings, used in place
+          // of the server's own SMTP_*/RESEND_API_KEY env vars for this send.
+          smtpOverride: notificationSettings?.smtpHost
+            ? {
+                host: notificationSettings.smtpHost,
+                port: notificationSettings.smtpPort,
+                secure: notificationSettings.smtpSecure,
+                user: notificationSettings.smtpUser,
+                pass: notificationSettings.smtpPass,
+                from: notificationSettings.smtpFrom,
+              }
+            : undefined,
         }),
       });
 
@@ -865,6 +954,17 @@ export default function AdminScreen({
             }`}>
               {prompts.length}
             </span>
+          </button>
+          <button
+            onClick={() => setAdminSection('notifications')}
+            className={`py-2 px-4 rounded-xl font-black text-xs transition flex items-center gap-2 cursor-pointer ${
+              adminSection === 'notifications'
+                ? 'bg-amber-500 text-white shadow-xs'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <Bell className="w-4 h-4 text-amber-400" />
+            <span>Notification Settings</span>
           </button>
         </div>
       </div>
@@ -2334,6 +2434,221 @@ export default function AdminScreen({
           </div>
         </>
           )}
+        </div>
+      )}
+
+      {/* SECTION 3: Notification Settings */}
+      {adminSection === 'notifications' && (
+        <div className="space-y-6">
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs">
+            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-500" />
+              <span>Notification Channels</span>
+            </h3>
+            <p className="text-xs text-gray-500 font-semibold mt-1 mb-4">
+              Turn each notification channel on or off for the whole club.
+            </p>
+
+            <div className="space-y-3">
+              {/* Email channel */}
+              <div className="flex items-start justify-between gap-4 p-3.5 border border-gray-100 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                    <Mail className="w-4.5 h-4.5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-[var(--ink)]">Email</p>
+                    <p className="text-[11px] text-gray-500 font-semibold leading-relaxed">
+                      Coach invitations are sent by email through the SMTP server configured below. This is fully wired up and live.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleToggleNotificationChannel('emailEnabled')}
+                  className={`shrink-0 w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                    notificationSettings?.emailEnabled !== false ? 'bg-blue-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      notificationSettings?.emailEnabled !== false ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Pulse channel */}
+              <div className="flex items-start justify-between gap-4 p-3.5 border border-gray-100 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+                    <Radio className="w-4.5 h-4.5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-[var(--ink)] flex items-center gap-1.5">
+                      Pulse
+                      <span className="px-1.5 py-0.5 text-[8px] font-black bg-gray-100 text-gray-500 rounded uppercase">Preference only</span>
+                    </p>
+                    <p className="text-[11px] text-gray-500 font-semibold leading-relaxed">
+                      In-app weekly activity digest (roster changes, upcoming games, pending invites). This toggle saves your preference now — the digest itself isn't generated yet, so nothing will be delivered until that's built.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleToggleNotificationChannel('pulseEnabled')}
+                  className={`shrink-0 w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                    notificationSettings?.pulseEnabled !== false ? 'bg-purple-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      notificationSettings?.pulseEnabled !== false ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Push channel */}
+              <div className="flex items-start justify-between gap-4 p-3.5 border border-gray-100 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                    <Smartphone className="w-4.5 h-4.5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-[var(--ink)] flex items-center gap-1.5">
+                      Push
+                      <span className="px-1.5 py-0.5 text-[8px] font-black bg-gray-100 text-gray-500 rounded uppercase">Preference only</span>
+                    </p>
+                    <p className="text-[11px] text-gray-500 font-semibold leading-relaxed">
+                      Mobile push notifications on iOS/Android. This toggle saves your preference now, but actually sending pushes needs Firebase Cloud Messaging / Apple Push credentials wired into the app first — not set up yet.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleToggleNotificationChannel('pushEnabled')}
+                  className={`shrink-0 w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                    notificationSettings?.pushEnabled ? 'bg-emerald-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      notificationSettings?.pushEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* SMTP configuration — moved in from the server .env file */}
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+            <div>
+              <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
+                <Key className="w-4 h-4 text-blue-500" />
+                <span>Email (SMTP) Server</span>
+              </h3>
+              <p className="text-xs text-gray-500 font-semibold mt-1">
+                Configure the mail server used to send invitations, instead of editing SMTP_* values in the server's .env file. Works with Gmail/Office365 SMTP, your own mail server, or an SMTP relay from SendGrid/Mailgun/Postmark, etc.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">SMTP Host</label>
+                <input
+                  type="text"
+                  value={smtpHostInput}
+                  onChange={(e) => setSmtpHostInput(e.target.value)}
+                  placeholder="smtp.yourprovider.com"
+                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Port</label>
+                <input
+                  type="number"
+                  value={smtpPortInput}
+                  onChange={(e) => setSmtpPortInput(e.target.value)}
+                  placeholder="587"
+                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">SMTP Username</label>
+                <input
+                  type="text"
+                  value={smtpUserInput}
+                  onChange={(e) => setSmtpUserInput(e.target.value)}
+                  placeholder="mailer@yourdomain.com"
+                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">SMTP Password</label>
+                <input
+                  type="password"
+                  value={smtpPassInput}
+                  onChange={(e) => setSmtpPassInput(e.target.value)}
+                  placeholder={notificationSettings?.smtpPass ? '•••••••• (saved — enter a new one to replace it)' : 'App password or SMTP password'}
+                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">From Address</label>
+                <input
+                  type="text"
+                  value={smtpFromInput}
+                  onChange={(e) => setSmtpFromInput(e.target.value)}
+                  placeholder="InterchangeIQ <mailer@yourdomain.com>"
+                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <label className="flex items-center gap-2 sm:col-span-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={smtpSecureInput}
+                  onChange={(e) => setSmtpSecureInput(e.target.checked)}
+                  className="cursor-pointer"
+                />
+                <span className="text-xs font-bold text-gray-600">Use implicit TLS (only for port 465 — leave unchecked for 587/STARTTLS)</span>
+              </label>
+            </div>
+
+            {notifSavedNotice && (
+              <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold">
+                {notifSavedNotice}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                onClick={handleSaveSmtpSettings}
+                disabled={isSavingNotifications || !smtpHostInput.trim()}
+                className="px-4 py-2 text-xs font-bold bg-[var(--blue)] text-white rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {isSavingNotifications ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                <span>Save SMTP Settings</span>
+              </button>
+              {notificationSettings?.smtpHost && (
+                <button
+                  onClick={handleClearSmtpSettings}
+                  disabled={isSavingNotifications}
+                  className="px-4 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer disabled:opacity-40"
+                >
+                  Clear
+                </button>
+              )}
+              {notificationSettings?.updatedAt && (
+                <span className="text-[10px] text-gray-400 font-semibold ml-auto">
+                  Last updated {new Date(notificationSettings.updatedAt).toLocaleString()}
+                  {notificationSettings.updatedBy ? ` by ${notificationSettings.updatedBy}` : ''}
+                </span>
+              )}
+            </div>
+
+            <p className="text-[10px] text-gray-400 font-semibold border-t border-gray-100 pt-3">
+              These settings are shared with every coach who has Admin access on this club and are sent to the server only when an invite email is triggered — the password is stored, not displayed, once saved. If left blank, the server falls back to its own SMTP_* / RESEND_API_KEY environment configuration (if any).
+            </p>
+          </div>
         </div>
       )}
 
