@@ -495,26 +495,22 @@ export default function App() {
           console.warn("Error reading iiq_teams from localStorage:", e);
         }
 
+        // Firestore is the source of truth whenever a team already exists
+        // there — local cache / in-memory state must NEVER override a name
+        // that just arrived from the server, since that cache can be stale
+        // (a different device may have renamed the team since this tab last
+        // wrote to localStorage). Local data is only used to fill in teams
+        // that haven't made it to Firestore yet (e.g. created while offline).
         const teamMap = new Map<string, TeamProfile>();
-        // 1. Remote cloud teams
+        // 1. Remote cloud teams (authoritative)
         remoteTeams.forEach(t => teamMap.set(t.id, t));
-        // 2. Cached local teams
+        // 2. Cached local teams — only add ones NOT already known to Firestore
         (Array.isArray(cachedLocalTeams) ? cachedLocalTeams : []).forEach(t => {
-          const existing = teamMap.get(t.id);
-          if (existing) {
-            teamMap.set(t.id, { ...existing, name: t.name || existing.name });
-          } else {
-            teamMap.set(t.id, t);
-          }
+          if (!teamMap.has(t.id)) teamMap.set(t.id, t);
         });
-        // 3. Existing state teams (current in-memory state overrides)
+        // 3. Existing in-memory state — only add ones NOT already known
         (Array.isArray(prevTeams) ? prevTeams : []).forEach(t => {
-          const existing = teamMap.get(t.id);
-          if (existing) {
-            teamMap.set(t.id, { ...existing, name: t.name || existing.name });
-          } else {
-            teamMap.set(t.id, t);
-          }
+          if (!teamMap.has(t.id)) teamMap.set(t.id, t);
         });
 
         const merged = Array.from(teamMap.values());
@@ -559,19 +555,21 @@ export default function App() {
     }
   }, [teams, activeTeamId]);
 
-  // Sync team updates and deletions to Firestore
+  // Sync team additions/renames to Firestore.
+  // IMPORTANT: this is upsert-only. It never deletes a team based on it being
+  // "missing" from newTeamsList, because newTeamsList is derived from this
+  // client's local `teams` state, which can be briefly stale relative to the
+  // shared Firestore collection (e.g. another device just added a team and the
+  // realtime listener hasn't delivered it to this tab yet). Diffing against a
+  // stale local snapshot to decide what to delete was destructive — it could,
+  // and did, silently delete other people's teams out of Firestore whenever a
+  // client happened to act on out-of-date local state. Explicit deletion is
+  // handled separately by handleDeleteTeam, which only ever removes the exact
+  // team id the user chose.
   const handleUpdateTeams = async (newTeamsList: TeamProfile[]) => {
     if (!Array.isArray(newTeamsList)) return;
-    const currentTeamIds = new Set(newTeamsList.map(t => t.id));
-    const previousTeams = Array.isArray(teams) ? teams : [];
-    
-    // 1. Delete removed team documents from Firestore
-    const deletedTeams = previousTeams.filter(t => !currentTeamIds.has(t.id));
-    for (const deleted of deletedTeams) {
-      await deleteDoc(doc(db, 'teams', deleted.id)).catch(err => console.warn("Error deleting team doc from Firestore:", err));
-    }
 
-    // 2. Unconditionally set/merge each team in newTeamsList to Firestore
+    // Upsert each team in newTeamsList to Firestore (merge, never overwrite the whole doc)
     for (const t of newTeamsList) {
       const teamDocRef = doc(db, 'teams', t.id);
       await setDoc(teamDocRef, {
@@ -585,14 +583,33 @@ export default function App() {
 
     setTeams(newTeamsList);
     localStorage.setItem('iiq_teams', JSON.stringify(newTeamsList));
+  };
 
-    // If active team was deleted, select the first remaining team
-    if (activeTeamId && !currentTeamIds.has(activeTeamId)) {
-      const nextActiveId = newTeamsList.length > 0 ? newTeamsList[0].id : null;
-      if (nextActiveId) {
-        handleSwitchTeam(nextActiveId);
+  // Explicit, single-team delete. Only ever removes the exact id the user
+  // confirmed deleting — never derived by diffing arrays, so a stale local
+  // team list can no longer take out an unrelated team.
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!teamId) return;
+
+    await deleteDoc(doc(db, 'teams', teamId)).catch(err => console.warn("Error deleting team doc from Firestore:", err));
+
+    setTeams((prevTeams) => {
+      const list = Array.isArray(prevTeams) ? prevTeams : [];
+      const nextList = list.filter(t => t.id !== teamId);
+      localStorage.setItem('iiq_teams', JSON.stringify(nextList));
+
+      // If active team was deleted, select the first remaining team
+      if (activeTeamId === teamId) {
+        const nextActiveId = nextList.length > 0 ? nextList[0].id : null;
+        if (nextActiveId) {
+          handleSwitchTeam(nextActiveId);
+        }
       }
-    }
+
+      return nextList;
+    });
+
+    localStorage.removeItem(`iiq_team_data_${teamId}`);
   };
 
   // Dedicated Admin Team Sync: pushes local teams & pulls all remote teams from Firestore
@@ -908,23 +925,16 @@ export default function App() {
     }
   }, [activeTeamId, players, lineup, score, gameInfo, rotations, plans, activePlanIds, history, savedLineups, drills, growthRecords, trainingState]);
 
-  // Automatically keep team list name in sync with gameInfo.team ONLY when user explicitly changes team name in UI
-  useEffect(() => {
-    if (!activeTeamId || !gameInfo.team || isSyncingFromServer || isSyncingFromServerRef.current) return;
-    setTeams((prevTeams) => {
-      const list = Array.isArray(prevTeams) ? prevTeams : [];
-      const idx = list.findIndex(t => t.id === activeTeamId);
-      if (idx !== -1 && list[idx].name !== gameInfo.team) {
-        const updated = [...list];
-        updated[idx] = { ...updated[idx], name: gameInfo.team };
-        localStorage.setItem('iiq_teams', JSON.stringify(updated));
-        // Push updated name to Firestore
-        setDoc(doc(db, 'teams', activeTeamId), { name: gameInfo.team, updatedAt: Date.now() }, { merge: true }).catch(() => {});
-        return updated;
-      }
-      return prevTeams;
-    });
-  }, [activeTeamId, gameInfo.team, isSyncingFromServer]);
+  // NOTE: gameInfo.team is the scoreboard label on the Scoring screen for a
+  // single match — it is intentionally NOT wired back into the shared team
+  // roster name anymore. It previously was (via a useEffect keyed on any
+  // gameInfo.team change), which meant editing that one text field, or even
+  // loading a stale cached gameInfo.team during a team switch/resync, would
+  // silently rewrite the team's name in the shared Firestore 'teams'
+  // collection for every device. That's what caused team names to change on
+  // their own. Renaming a team is now only ever done explicitly via
+  // Admin > Teams (handleRenameTeam -> handleUpdateTeams), which is the single
+  // source of truth for the roster name.
 
   // Sync sound & haptic preferences to localStorage
   useEffect(() => { localStorage.setItem('iiq_sound_enabled', String(soundEnabled)); }, [soundEnabled]);
@@ -2262,6 +2272,7 @@ export default function App() {
           <AdminScreen
             teams={teams}
             onUpdateTeams={handleUpdateTeams}
+            onDeleteTeam={handleDeleteTeam}
             users={users}
             onUpdateUsers={handleUpdateUsers}
             activeTeamId={activeTeamId}

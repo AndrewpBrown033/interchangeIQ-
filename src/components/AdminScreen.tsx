@@ -52,6 +52,7 @@ import {
 interface AdminScreenProps {
   teams: TeamProfile[];
   onUpdateTeams: (teams: TeamProfile[]) => void;
+  onDeleteTeam: (teamId: string) => void;
   users: UserProfile[];
   onUpdateUsers: (users: UserProfile[]) => void;
   activeTeamId: string | null;
@@ -188,6 +189,7 @@ export const DEFAULT_TACTICAL_PROMPTS: TacticalPrompt[] = [
 export default function AdminScreen({
   teams,
   onUpdateTeams,
+  onDeleteTeam,
   users,
   onUpdateUsers,
   activeTeamId,
@@ -682,7 +684,10 @@ export default function AdminScreen({
 
   const handleDeleteTeam = (teamId: string) => {
     if (!window.confirm('Delete this team? All its lineup, roster and matches will be deleted.')) return;
-    onUpdateTeams(teams.filter((t) => t.id !== teamId));
+    // Deletes exactly this team by id — never derived by diffing the local
+    // teams array, so a stale/out-of-date local list can't take another
+    // team down with it.
+    onDeleteTeam(teamId);
   };
 
   const handleOpenInviteModal = (teamId?: string) => {
