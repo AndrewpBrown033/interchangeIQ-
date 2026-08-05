@@ -397,6 +397,14 @@ export default function App() {
   const handleSwitchTeam = (teamId: string) => {
     if (!teamId || teamId === activeTeamId) return;
 
+    // Immediately lock sync ref during team transition
+    isSyncingFromServerRef.current = true;
+    currentTeamSyncedIdRef.current = teamId;
+    setIsSyncingFromServer(true);
+
+    const currentTeams = Array.isArray(teams) ? teams : [];
+    const targetTeam = currentTeams.find(t => t.id === teamId);
+
     // Persist current team data to local cache before switching
     if (activeTeamId) {
       const currentCache = {
@@ -422,6 +430,8 @@ export default function App() {
     // Load target team cached data immediately for instant offline/responsive switching
     try {
       const cached = localStorage.getItem(`iiq_team_data_${teamId}`);
+      const canonicalName = targetTeam?.name || 'My Squad';
+
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed.players) && parsed.players.length > 0) {
@@ -431,20 +441,31 @@ export default function App() {
         }
         if (parsed.lineup) setLineup(parsed.lineup);
         if (parsed.score) setScore(parsed.score);
-        if (parsed.gameInfo) setGameInfo(parsed.gameInfo);
+        
+        // Preserve target team profile name
+        const baseGameInfo = parsed.gameInfo || { round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' };
+        setGameInfo({ ...baseGameInfo, team: canonicalName });
+
         if (Array.isArray(parsed.rotations)) setRotations(parsed.rotations);
         if (Array.isArray(parsed.plans)) setPlans(parsed.plans);
         if (Array.isArray(parsed.activePlanIds)) setActivePlanIds(parsed.activePlanIds);
         if (Array.isArray(parsed.history)) setHistory(parsed.history);
         if (Array.isArray(parsed.savedLineups)) setSavedLineups(parsed.savedLineups);
       } else {
-        // First time switching to this team: give it default 22 players template
+        // First time switching to this team: give it default 22 players template and canonical name
         setPlayers(normalizePlayers(DEFAULT_PLAYERS));
+        setGameInfo({ team: canonicalName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' });
       }
     } catch (e) {
       console.warn("Failed to parse cached team data:", e);
       setPlayers(normalizePlayers(DEFAULT_PLAYERS));
     }
+
+    // Release sync ref after state update settles
+    setTimeout(() => {
+      isSyncingFromServerRef.current = false;
+      setIsSyncingFromServer(false);
+    }, 600);
   };
 
   // Real-time Firestore teams collection subscriber with local preservation & merging
@@ -475,12 +496,26 @@ export default function App() {
         }
 
         const teamMap = new Map<string, TeamProfile>();
-        // 1. Existing state teams
-        (Array.isArray(prevTeams) ? prevTeams : []).forEach(t => teamMap.set(t.id, t));
-        // 2. Cached local teams
-        (Array.isArray(cachedLocalTeams) ? cachedLocalTeams : []).forEach(t => teamMap.set(t.id, t));
-        // 3. Remote cloud teams
+        // 1. Remote cloud teams
         remoteTeams.forEach(t => teamMap.set(t.id, t));
+        // 2. Cached local teams
+        (Array.isArray(cachedLocalTeams) ? cachedLocalTeams : []).forEach(t => {
+          const existing = teamMap.get(t.id);
+          if (existing) {
+            teamMap.set(t.id, { ...existing, name: t.name || existing.name });
+          } else {
+            teamMap.set(t.id, t);
+          }
+        });
+        // 3. Existing state teams (current in-memory state overrides)
+        (Array.isArray(prevTeams) ? prevTeams : []).forEach(t => {
+          const existing = teamMap.get(t.id);
+          if (existing) {
+            teamMap.set(t.id, { ...existing, name: t.name || existing.name });
+          } else {
+            teamMap.set(t.id, t);
+          }
+        });
 
         const merged = Array.from(teamMap.values());
         if (merged.length === 0) {
@@ -835,9 +870,9 @@ export default function App() {
     }
   }, [activeTeamId, players, lineup, score, gameInfo, rotations, plans, activePlanIds, history, savedLineups, drills, growthRecords, trainingState]);
 
-  // Automatically keep team list name in sync with gameInfo.team
+  // Automatically keep team list name in sync with gameInfo.team ONLY when user explicitly changes team name in UI
   useEffect(() => {
-    if (!activeTeamId || !gameInfo.team) return;
+    if (!activeTeamId || !gameInfo.team || isSyncingFromServer || isSyncingFromServerRef.current) return;
     setTeams((prevTeams) => {
       const list = Array.isArray(prevTeams) ? prevTeams : [];
       const idx = list.findIndex(t => t.id === activeTeamId);
@@ -845,11 +880,13 @@ export default function App() {
         const updated = [...list];
         updated[idx] = { ...updated[idx], name: gameInfo.team };
         localStorage.setItem('iiq_teams', JSON.stringify(updated));
+        // Push updated name to Firestore
+        setDoc(doc(db, 'teams', activeTeamId), { name: gameInfo.team, updatedAt: Date.now() }, { merge: true }).catch(() => {});
         return updated;
       }
       return prevTeams;
     });
-  }, [activeTeamId, gameInfo.team]);
+  }, [activeTeamId, gameInfo.team, isSyncingFromServer]);
 
   // Sync sound & haptic preferences to localStorage
   useEffect(() => { localStorage.setItem('iiq_sound_enabled', String(soundEnabled)); }, [soundEnabled]);
@@ -1220,9 +1257,9 @@ export default function App() {
         setIsSyncingFromServer(true);
 
         const remoteTeamName = data.name || data.gameInfo?.team;
-        const bestTeamName = (remoteTeamName && !['Unnamed Squad', 'New Team'].includes(remoteTeamName))
-          ? remoteTeamName
-          : (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name) ? activeTeamObj.name : 'My Squad');
+        const bestTeamName = (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name))
+          ? activeTeamObj.name
+          : ((remoteTeamName && !['Unnamed Squad', 'New Team'].includes(remoteTeamName)) ? remoteTeamName : 'My Squad');
 
         const activePlayers = (data.players && Array.isArray(data.players) && data.players.length > 0)
           ? normalizePlayers(data.players)

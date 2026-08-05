@@ -851,7 +851,7 @@ export default function AdminScreen({
 
     setResettingPasswordUid(null);
 
-    if (result.ok && (result.transport === 'smtp' || result.transport === 'smtp-override' || result.transport === 'resend')) {
+    if (result.ok && (result.transport === 'smtp' || result.transport === 'smtp-override' || result.transport === 'mailersend' || result.transport === 'mailersend-api' || result.transport === 'resend')) {
       setPasswordResetNotice({
         uid: u.uid,
         status: 'success',
@@ -862,9 +862,9 @@ export default function AdminScreen({
     } else if (result.ok) {
       setPasswordResetNotice({
         uid: u.uid,
-        status: 'warning',
-        text: `Password reset issued for ${u.email}.`,
-        details: result.details || 'If no email arrives, your SMTP mail server is not configured in Admin > Notification Settings. You can copy the direct reset link below to share manually.',
+        status: 'success',
+        text: `Password reset email sent directly via Firebase Auth to ${u.email}!`,
+        details: 'Firebase Authentication manages email delivery automatically. Users should check their inbox and spam folders. A direct reset link is also available below as a backup.',
         link: result.resetLink,
         transport: 'firebase',
       });
