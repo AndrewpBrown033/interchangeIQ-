@@ -142,24 +142,53 @@ ${squadSummary}
 CURRENT DRILL LIBRARY IN SYSTEM:
 ${drillsSummary}`;
 
+    // Build debug logs collector for Jarvis AI executions
+    const debugLogs: string[] = [];
+    const logTrace = (msg: string) => {
+      const ts = new Date().toISOString().slice(11, 23);
+      const line = `[${ts}] ${msg}`;
+      debugLogs.push(line);
+      console.log(`[JARVIS TRACE] ${line}`);
+    };
+
+    logTrace(`Request received for Jarvis AI | Provider: ${provider.toUpperCase()}`);
+
     // Check if a usable API key exists for the selected provider (env var OR an
     // admin-entered override from Admin > Jarvis Settings > API Keys)
     const effectiveKey = provider === "gemini"
       ? (apiKeyOverride || process.env.GEMINI_API_KEY)
       : (apiKeyOverride || process.env.ANTHROPIC_API_KEY);
 
+    const keySource = apiKeyOverride
+      ? "Admin Override (Admin > Jarvis Settings)"
+      : (provider === "gemini" ? "process.env.GEMINI_API_KEY" : "process.env.ANTHROPIC_API_KEY");
+
+    const maskedKey = effectiveKey
+      ? (effectiveKey.length > 10 ? `${effectiveKey.slice(0, 6)}...${effectiveKey.slice(-4)}` : "PRESENT")
+      : "MISSING";
+
+    logTrace(`API Key Source: ${keySource} | Status: ${maskedKey}`);
+    logTrace(`Input Prompt (${message.length} chars): "${message.slice(0, 120)}${message.length > 120 ? '...' : ''}"`);
+    logTrace(`History Context: ${Array.isArray(history) ? history.length : 0} prior turn(s)`);
+    logTrace(`Squad Context: ${Array.isArray(squad) ? squad.length : 0} players | Drills: ${Array.isArray(drills) ? drills.length : 0} items | Growth: ${Array.isArray(growthRecords) ? growthRecords.length : 0} records`);
+    logTrace(`System Prompt Size: ${systemInstruction.length} chars`);
+
     if (!effectiveKey) {
       const missingKeyName = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
       const providerLabel = provider === "gemini" ? "Gemini" : "Claude";
+      logTrace(`WARNING: No API key found for ${provider.toUpperCase()}. Returning fallback prompt notice.`);
       return res.json({
         reply: `G'day Coach! I'm **Jarvis**, your agentic AFL Coaching & Performance Agent.\n\n*Note: To enable live ${providerLabel} AI generation, please add a ${providerLabel} API key in Admin > Jarvis Settings > API Keys, or set ${missingKeyName} in your platform Secrets panel.* \n\nI have scanned your squad data (${Array.isArray(squad) ? squad.length : 0} players) and drill library (${Array.isArray(drills) ? drills.length : 0} drills).\n\nHere are top recommended drills for your session:\n\n` +
-          (Array.isArray(drills) ? drills.slice(0, 3).map((d: any) => `• **${d.title}** (${d.mins} mins) - ${d.overview}`).join('\n\n') : 'No drills found.')
+          (Array.isArray(drills) ? drills.slice(0, 3).map((d: any) => `• **${d.title}** (${d.mins} mins) - ${d.overview}`).join('\n\n') : 'No drills found.'),
+        provider,
+        debugLogs,
       });
     }
 
     let replyText: string;
 
     if (provider === "gemini") {
+      logTrace(`[Gemini] Initializing GoogleGenAI SDK with model: gemini-3.6-flash`);
       // Format chat contents for the Gemini API
       const geminiContents: any[] = [];
       if (Array.isArray(history) && history.length > 0) {
@@ -173,6 +202,7 @@ ${drillsSummary}`;
         }
       }
       geminiContents.push({ role: 'user', parts: [{ text: message }] });
+      logTrace(`[Gemini] Payload formatted with ${geminiContents.length} content turn(s). Calling Gemini API...`);
 
       // Use a one-off client with the admin-entered key if one was supplied,
       // otherwise fall back to the shared server-configured client.
@@ -180,17 +210,28 @@ ${drillsSummary}`;
         ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
         : ai;
 
-      const geminiResponse = await geminiClient.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: geminiContents,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        }
-      });
+      const geminiStart = Date.now();
+      try {
+        const geminiResponse = await geminiClient.models.generateContent({
+          model: "gemini-3.6-flash",
+          contents: geminiContents,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+          }
+        });
 
-      replyText = geminiResponse.text || "I was unable to generate a response. Please try again.";
+        const elapsedMs = Date.now() - geminiStart;
+        replyText = geminiResponse.text || "I was unable to generate a response. Please try again.";
+        logTrace(`[Gemini SUCCESS] API call completed in ${elapsedMs}ms (${replyText.length} chars generated)`);
+        logTrace(`[Gemini PREVIEW] "${replyText.slice(0, 140).replace(/\n/g, ' ')}${replyText.length > 140 ? '...' : ''}"`);
+      } catch (geminiErr: any) {
+        const elapsedMs = Date.now() - geminiStart;
+        logTrace(`[Gemini ERROR] Call failed after ${elapsedMs}ms: ${geminiErr.message || String(geminiErr)}`);
+        throw geminiErr;
+      }
     } else {
+      logTrace(`[Claude] Initializing Anthropic SDK with model: claude-sonnet-5`);
       // Format chat contents for the Claude Messages API
       const claudeContents: { role: 'user' | 'assistant'; content: string }[] = [];
       if (Array.isArray(history) && history.length > 0) {
@@ -204,32 +245,46 @@ ${drillsSummary}`;
         }
       }
       claudeContents.push({ role: 'user', content: message });
+      logTrace(`[Claude] Payload formatted with ${claudeContents.length} message turn(s). Calling Anthropic API...`);
 
       // Use a one-off client with the admin-entered key if one was supplied,
       // otherwise fall back to the shared server-configured client.
       const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
 
-      const claudeResponse = await claudeClient.messages.create({
-        model: "claude-sonnet-5",
-        max_tokens: 2048,
-        system: systemInstruction,
-        temperature: 0.7,
-        messages: claudeContents,
-      });
+      const claudeStart = Date.now();
+      try {
+        const claudeResponse = await claudeClient.messages.create({
+          model: "claude-sonnet-5",
+          max_tokens: 2048,
+          system: systemInstruction,
+          temperature: 0.7,
+          messages: claudeContents,
+        });
 
-      replyText = claudeResponse.content
-        .map((block: any) => (block.type === 'text' ? block.text : ''))
-        .join('\n')
-        .trim()
-        || "I was unable to generate a response. Please try again.";
+        const elapsedMs = Date.now() - claudeStart;
+        replyText = claudeResponse.content
+          .map((block: any) => (block.type === 'text' ? block.text : ''))
+          .join('\n')
+          .trim()
+          || "I was unable to generate a response. Please try again.";
+
+        const usageStr = claudeResponse.usage ? `Tokens: [Input: ${claudeResponse.usage.input_tokens}, Output: ${claudeResponse.usage.output_tokens}]` : '';
+        logTrace(`[Claude SUCCESS] API call completed in ${elapsedMs}ms (${replyText.length} chars generated) | ${usageStr}`);
+        logTrace(`[Claude PREVIEW] "${replyText.slice(0, 140).replace(/\n/g, ' ')}${replyText.length > 140 ? '...' : ''}"`);
+      } catch (claudeErr: any) {
+        const elapsedMs = Date.now() - claudeStart;
+        logTrace(`[Claude ERROR] Call failed after ${elapsedMs}ms: ${claudeErr.message || String(claudeErr)}`);
+        throw claudeErr;
+      }
     }
 
-    return res.json({ reply: replyText, provider });
+    return res.json({ reply: replyText, provider, debugLogs });
   } catch (err: any) {
     console.error("Jarvis API error:", err);
     return res.status(500).json({
       error: "Jarvis processing error",
-      details: err.message || "An error occurred while communicating with the AI provider."
+      details: err.message || "An error occurred while communicating with the AI provider.",
+      debugLogs: typeof debugLogs !== 'undefined' ? [...debugLogs, `[FATAL EXCEPTION] ${err.message || String(err)}`] : [`[FATAL EXCEPTION] ${err.message || String(err)}`]
     });
   }
 });
@@ -617,11 +672,30 @@ app.post("/api/test-smtp", async (req, res) => {
     log(`Target host: "${cleanedHost}", port: ${smtpPort}, user: "${cleanedUser}", target recipient: "${targetAddress}"`);
 
     if (isMailerSendToken && tokenToUse) {
-      log(`Detected MailerSend API key / token. Routing test via MailerSend REST API (HTTPS port 443)...`);
+      const maskedKey = tokenToUse.length > 10 ? `${tokenToUse.slice(0, 7)}...${tokenToUse.slice(-4)}` : "mlsn.****";
+      log(`Detected MailerSend API key/token: ${maskedKey}.`);
+      log(`Routing test via MailerSend REST API (HTTPS POST https://api.mailersend.com/v1/email)...`);
       
       const rawFrom = (from || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "")).trim();
       const senderEmail = rawFrom.includes("@") ? rawFrom : "info@interchangeiq.app";
-      log(`MailerSend sender email: "${senderEmail}", recipient: "${targetAddress}"`);
+      log(`Configured Sender: "${senderEmail}" | Target Recipient: "${targetAddress}"`);
+
+      const requestPayload = {
+        from: { email: senderEmail, name: "InterchangeIQ Admin Test" },
+        to: [{ email: targetAddress, name: "Admin" }],
+        subject: "InterchangeIQ — MailerSend REST API Test",
+        text: "MailerSend API integration verified! Emails can be delivered directly over HTTPS.",
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
+            <h3 style="color: #065f46; margin-top: 0;">MailerSend REST API Connected!</h3>
+            <p style="color: #374151;">Your MailerSend API Token was verified over HTTPS port 443.</p>
+            <p style="color: #6b7280; font-size: 12px;">Sent to ${targetAddress} via ${senderEmail}</p>
+          </div>
+        `,
+      };
+
+      log(`[API REQUEST] Headers: { "Authorization": "Bearer ${maskedKey}", "Content-Type": "application/json" }`);
+      log(`[API REQUEST BODY] ${JSON.stringify({ from: requestPayload.from, to: requestPayload.to, subject: requestPayload.subject })}`);
 
       const msRes = await fetch("https://api.mailersend.com/v1/email", {
         method: "POST",
@@ -630,22 +704,14 @@ app.post("/api/test-smtp", async (req, res) => {
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify({
-          from: { email: senderEmail, name: "InterchangeIQ Admin Test" },
-          to: [{ email: targetAddress, name: "Admin" }],
-          subject: "InterchangeIQ — MailerSend REST API Test",
-          text: "MailerSend API integration verified! Emails can be delivered directly over HTTPS.",
-          html: `
-            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
-              <h3 style="color: #065f46; margin-top: 0;">MailerSend REST API Connected!</h3>
-              <p style="color: #374151;">Your MailerSend API Token was verified over HTTPS port 443.</p>
-              <p style="color: #6b7280; font-size: 12px;">Sent to ${targetAddress} via ${senderEmail}</p>
-            </div>
-          `,
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
+      log(`[API RESPONSE] HTTP Status: ${msRes.status} ${msRes.statusText}`);
+
       if (msRes.ok || msRes.status === 200 || msRes.status === 202) {
+        const resText = await msRes.text().catch(() => "");
+        log(`[API RESPONSE BODY] ${resText || "(Empty Success Response)"}`);
         log(`MailerSend REST API test succeeded! HTTP ${msRes.status}`);
         return res.json({
           success: true,
@@ -657,6 +723,8 @@ app.post("/api/test-smtp", async (req, res) => {
         });
       } else {
         const msErrText = await msRes.text();
+        log(`[API RESPONSE RAW BODY] ${msErrText}`);
+
         let msErrorSummary = msErrText;
         try {
           const jsonErr = JSON.parse(msErrText);

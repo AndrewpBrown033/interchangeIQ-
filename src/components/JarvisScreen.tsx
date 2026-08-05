@@ -25,6 +25,8 @@ interface Message {
   content: string;
   timestamp: Date;
   matchedDrillIds?: string[];
+  debugLogs?: string[];
+  provider?: 'claude' | 'gemini';
 }
 
 interface ConversationThread {
@@ -121,7 +123,14 @@ export default function JarvisScreen({
   };
 
 
-  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [expandedDebugMsgIds, setExpandedDebugMsgIds] = useState<Record<string, boolean>>({});
+
+  const toggleDebugLogs = (msgId: string) => {
+    setExpandedDebugMsgIds((prev) => ({
+      ...prev,
+      [msgId]: !prev[msgId],
+    }));
+  };
   const [editingTitleText, setEditingTitleText] = useState('');
   const [historySearch, setHistorySearch] = useState('');
 
@@ -293,6 +302,8 @@ export default function JarvisScreen({
         content: reply,
         timestamp: new Date(),
         matchedDrillIds: matchedIds,
+        debugLogs: Array.isArray(data.debugLogs) ? data.debugLogs : undefined,
+        provider: data.provider || aiProvider,
       };
 
       updateActiveThreadMessages([...newMessages, assistantMessage]);
@@ -302,6 +313,8 @@ export default function JarvisScreen({
         role: 'assistant',
         content: `⚠️ Communication error: ${err.message || 'Could not reach Jarvis API server.'}`,
         timestamp: new Date(),
+        debugLogs: (err as any)?.debugLogs || undefined,
+        provider: aiProvider,
       };
       updateActiveThreadMessages([...newMessages, errMessage]);
     } finally {
@@ -542,6 +555,37 @@ export default function JarvisScreen({
                         >
                           {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
+
+                        {/* Collapsible AI Debug Trace */}
+                        {isAssistant && msg.debugLogs && msg.debugLogs.length > 0 && (
+                          <div className="mt-2.5 pt-2 border-t border-gray-100">
+                            <button
+                              type="button"
+                              onClick={() => toggleDebugLogs(msg.id)}
+                              className="text-[10px] font-mono font-bold text-slate-500 hover:text-indigo-600 flex items-center gap-1.5 cursor-pointer bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 rounded-lg transition"
+                            >
+                              <Cpu className="w-3 h-3 text-indigo-500" />
+                              <span>{expandedDebugMsgIds[msg.id] ? 'Hide AI Debug Trace' : `Show AI Debug Trace (${(msg.provider || 'AI').toUpperCase()})`}</span>
+                              <span className="text-[9px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded font-bold">
+                                {msg.debugLogs.length} logs
+                              </span>
+                            </button>
+
+                            {expandedDebugMsgIds[msg.id] && (
+                              <div className="mt-2 p-3 bg-slate-950 text-emerald-400 font-mono text-[10px] rounded-xl space-y-1 overflow-x-auto shadow-inner border border-slate-800 leading-relaxed max-h-60">
+                                <div className="text-slate-400 font-bold border-b border-slate-800 pb-1 mb-1.5 flex items-center justify-between">
+                                  <span>⚡ JARVIS DEBUG TRACE — PROVIDER: {(msg.provider || 'AI').toUpperCase()}</span>
+                                  <span>{msg.timestamp.toLocaleTimeString()}</span>
+                                </div>
+                                {msg.debugLogs.map((logLine, lIdx) => (
+                                  <div key={lIdx} className="whitespace-pre-wrap break-all">
+                                    {logLine}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Matched Drills Action Box */}

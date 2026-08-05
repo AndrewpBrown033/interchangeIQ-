@@ -43,7 +43,9 @@ import {
   EyeOff,
   Bell,
   Smartphone,
-  Radio
+  Radio,
+  Flame,
+  ExternalLink
 } from 'lucide-react';
 
 interface AdminScreenProps {
@@ -221,6 +223,65 @@ export default function AdminScreen({
     if (!key) return '';
     if (key.length <= 10) return '•'.repeat(key.length);
     return `${key.slice(0, 6)}${'•'.repeat(8)}${key.slice(-4)}`;
+  };
+
+  // Jarvis AI Testing & Debug Trace state
+  const [testingJarvisProvider, setTestingJarvisProvider] = useState<'claude' | 'gemini' | null>(null);
+  const [jarvisTestResult, setJarvisTestResult] = useState<{
+    success: boolean;
+    provider: string;
+    reply?: string;
+    debugLogs?: string[];
+    error?: string;
+  } | null>(null);
+
+  const handleTestJarvisAI = async (provider: 'claude' | 'gemini') => {
+    setTestingJarvisProvider(provider);
+    setJarvisTestResult(null);
+
+    const apiKey = provider === 'gemini'
+      ? (geminiInput.trim() || apiKeys?.geminiApiKey)
+      : (anthropicInput.trim() || apiKeys?.anthropicApiKey);
+
+    try {
+      const res = await fetch('/api/jarvis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Hello Jarvis, run a quick diagnostic test and confirm your AI connection.',
+          provider,
+          apiKeyOverride: apiKey,
+          squad: [],
+          drills: [],
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.reply) {
+        setJarvisTestResult({
+          success: true,
+          provider,
+          reply: data.reply,
+          debugLogs: data.debugLogs || [],
+        });
+      } else {
+        setJarvisTestResult({
+          success: false,
+          provider,
+          error: data.details || data.error || 'Test call failed.',
+          debugLogs: data.debugLogs || [],
+        });
+      }
+    } catch (err: any) {
+      setJarvisTestResult({
+        success: false,
+        provider,
+        error: err.message || 'Failed to communicate with /api/jarvis',
+        debugLogs: ['[CLIENT ERROR] ' + (err.message || String(err))],
+      });
+    } finally {
+      setTestingJarvisProvider(null);
+    }
   };
 
   // Notification Settings panel state (Email/Pulse/Push channels + SMTP transport,
@@ -2406,9 +2467,29 @@ export default function AdminScreen({
                     </button>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-400 font-semibold">
-                  Create a key at <span className="font-mono">console.anthropic.com</span>
-                </p>
+                <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+                  <p className="text-[10px] text-gray-400 font-semibold">
+                    Create key at <span className="font-mono">console.anthropic.com</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleTestJarvisAI('claude')}
+                    disabled={testingJarvisProvider !== null}
+                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-[11px] transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingJarvisProvider === 'claude' ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
+                        <span>Testing Claude...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3 fill-current text-indigo-600" />
+                        <span>Test Claude & Debug</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Gemini Key */}
@@ -2461,10 +2542,77 @@ export default function AdminScreen({
                     </button>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-400 font-semibold">
-                  Create a key at <span className="font-mono">aistudio.google.com/app/apikey</span>
-                </p>
+                <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+                  <p className="text-[10px] text-gray-400 font-semibold">
+                    Create key at <span className="font-mono">aistudio.google.com/app/apikey</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleTestJarvisAI('gemini')}
+                    disabled={testingJarvisProvider !== null}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-[11px] transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingJarvisProvider === 'gemini' ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                        <span>Testing Gemini...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3 fill-current text-blue-600" />
+                        <span>Test Gemini & Debug</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+
+              {/* Jarvis Diagnostic Output Box */}
+              {jarvisTestResult && (
+                <div className={`p-4 rounded-2xl border ${
+                  jarvisTestResult.success ? 'bg-slate-950 border-emerald-500/40 text-emerald-400' : 'bg-slate-950 border-red-500/40 text-red-400'
+                } space-y-2.5 font-mono text-xs shadow-lg animate-fadeIn`}>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-slate-300 font-sans">
+                    <div className="flex items-center gap-2 font-black text-xs">
+                      <Cpu className="w-4 h-4 text-indigo-400" />
+                      <span>JARVIS AI DIAGNOSTIC TEST: {jarvisTestResult.provider.toUpperCase()}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      jarvisTestResult.success ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                    }`}>
+                      {jarvisTestResult.success ? 'SUCCESS (200 OK)' : 'FAILED'}
+                    </span>
+                  </div>
+
+                  {jarvisTestResult.reply && (
+                    <div className="p-3 bg-slate-900 rounded-xl text-slate-200 text-xs font-sans leading-relaxed border border-slate-800">
+                      <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1 font-bold">AI Sample Reply:</span>
+                      <div className="prose prose-invert prose-xs max-w-none">
+                        {jarvisTestResult.reply}
+                      </div>
+                    </div>
+                  )}
+
+                  {jarvisTestResult.error && (
+                    <div className="p-3 bg-red-950/60 border border-red-800/80 rounded-xl text-red-300 font-sans text-xs">
+                      <strong>Error Details:</strong> {jarvisTestResult.error}
+                    </div>
+                  )}
+
+                  {jarvisTestResult.debugLogs && jarvisTestResult.debugLogs.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Server & API Debug Traces:</span>
+                      <div className="p-3 bg-black/80 rounded-xl border border-slate-800 space-y-1 text-[11px] leading-relaxed overflow-x-auto max-h-56">
+                        {jarvisTestResult.debugLogs.map((log, lIdx) => (
+                          <div key={lIdx} className="whitespace-pre-wrap break-all text-emerald-400">
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end">
                 <button
@@ -3061,6 +3209,54 @@ export default function AdminScreen({
             <p className="text-[10px] text-gray-400 font-semibold border-t border-gray-100 pt-3">
               These settings are shared with every coach who has Admin access on this club and are sent to the server only when an invite email is triggered — the password is stored, not displayed, once saved. If left blank, the server falls back to its own SMTP_* / RESEND_API_KEY environment configuration (if any).
             </p>
+          </div>
+
+          {/* Firebase Trigger Email Extension Card */}
+          <div className="bg-gradient-to-br from-amber-50/60 to-orange-50/60 p-5 rounded-2xl border border-amber-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-500/10 text-amber-600 rounded-lg">
+                  <Flame className="w-5 h-5 text-amber-600 fill-amber-500/30" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs text-amber-950">Firebase Extension: Trigger Email from Firestore</h4>
+                  <p className="text-[11px] text-amber-800 font-medium">
+                    Native cloud queue dispatch compatible with <code className="bg-amber-100/80 text-amber-900 px-1 py-0.5 rounded font-mono text-[10px]">firestore-send-email</code>
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://extensions.dev/extensions/firebase/firestore-send-email"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition shadow-xs cursor-pointer"
+              >
+                <span>Extension Docs</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            <p className="text-xs text-amber-900/90 leading-relaxed font-sans">
+              InterchangeIQ is pre-built to write directly to the Firestore <code className="font-mono font-bold bg-amber-100/90 px-1 rounded text-amber-950">mail</code> collection when password reset or user notifications are queued. If you install the official Firebase <strong>Trigger Email from Firestore</strong> extension on your Firebase project, emails will be automatically dispatched directly from Google Cloud Platform using your configured SMTP or MailerSend credentials.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] font-semibold text-amber-900">
+              <div className="p-2.5 bg-white/80 rounded-xl border border-amber-200/60 space-y-0.5">
+                <span className="font-bold text-amber-950 block text-[10px] uppercase tracking-wider">1. Firestore Collection</span>
+                <span className="text-[11px] text-gray-600 font-mono">mail</span>
+              </div>
+              <div className="p-2.5 bg-white/80 rounded-xl border border-amber-200/60 space-y-0.5">
+                <span className="font-bold text-amber-950 block text-[10px] uppercase tracking-wider">2. Delivery Transport</span>
+                <span className="text-[11px] text-gray-600 font-mono">SMTP / MailerSend / SendGrid</span>
+              </div>
+              <div className="p-2.5 bg-white/80 rounded-xl border border-amber-200/60 space-y-0.5">
+                <span className="font-bold text-amber-950 block text-[10px] uppercase tracking-wider">3. App Status</span>
+                <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Integrated & Enabled</span>
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}

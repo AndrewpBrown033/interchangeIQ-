@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase
@@ -78,6 +78,36 @@ export async function sendEmailVerificationToCurrentUser(): Promise<boolean> {
   }
 }
 
+/**
+ * Queue an email directly into Firestore's 'mail' collection.
+ * Compatible with the official Firebase Extension "Trigger Email from Firestore" (firestore-send-email).
+ * @see https://extensions.dev/extensions/firebase/firestore-send-email
+ */
+export async function sendEmailViaFirestoreExtension(
+  toEmail: string,
+  subject: string,
+  htmlContent: string,
+  textContent?: string
+): Promise<{ ok: boolean; docId?: string; error?: string }> {
+  try {
+    const docRef = await addDoc(collection(db, 'mail'), {
+      to: [toEmail],
+      message: {
+        subject: subject,
+        text: textContent || subject,
+        html: htmlContent,
+      },
+      createdAt: new Date().toISOString(),
+      source: 'InterchangeIQ Application',
+    });
+    console.log(`[Firestore Mail Extension] Queued document in 'mail/${docRef.id}' for ${toEmail}`);
+    return { ok: true, docId: docRef.id };
+  } catch (err: any) {
+    console.warn('[Firestore Mail Extension] Queue failed:', err.message || String(err));
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
 export interface SendPasswordResetOptions {
   name?: string;
   resetLink?: string;
@@ -121,7 +151,26 @@ export async function sendPasswordReset(
     firebaseError = err.message || err.code || 'Firebase Auth reset error';
   }
 
-  // 3. Send via custom server endpoint (/api/send-password-reset) using Admin SMTP / server transport
+  // 3. Queue to Firestore 'mail' collection (Triggers 'Trigger Email from Firestore' extension if installed on Firebase)
+  const resetUrl = options?.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`;
+  try {
+    await sendEmailViaFirestoreExtension(
+      trimmedEmail,
+      'Reset Your InterchangeIQ Password',
+      `<div style="font-family: sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+        <h2>InterchangeIQ Password Reset Request</h2>
+        <p>Hello ${options?.name || 'Coach'},</p>
+        <p>A password reset was requested for your account (<strong>${trimmedEmail}</strong>).</p>
+        <p><a href="${resetUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold;">Reset Password Now</a></p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">Link: ${resetUrl}</p>
+      </div>`,
+      `Reset your InterchangeIQ password: ${resetUrl}`
+    );
+  } catch (_extErr) {
+    // Ignore if collection write is prevented or extension isn't active
+  }
+
+  // 4. Send via custom server endpoint (/api/send-password-reset) using Admin SMTP / server transport
   try {
     const res = await fetch('/api/send-password-reset', {
       method: 'POST',
