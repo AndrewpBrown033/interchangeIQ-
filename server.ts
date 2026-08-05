@@ -372,6 +372,150 @@ app.post("/api/send-invite", async (req, res) => {
   }
 });
 
+// Send password reset email endpoint
+app.post("/api/send-password-reset", async (req, res) => {
+  try {
+    const { toEmail, toName, resetLink, smtpOverride } = req.body;
+
+    if (!toEmail) {
+      return res.status(400).json({ error: "toEmail is required." });
+    }
+
+    const subject = "Password Reset Request — InterchangeIQ";
+    const linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color:#0f172a; margin: 0; font-size: 20px; font-weight: 800;">InterchangeIQ Password Reset</h2>
+          <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Coaching & AFL Match Operations Platform</p>
+        </div>
+        <p style="color:#334155; font-size:14px; line-height:1.6;">
+          Hi ${toName || "Coach"},<br/><br/>
+          An administrator has issued a password reset request for your InterchangeIQ account (<b>${toEmail}</b>).
+        </p>
+        <p style="color:#334155; font-size:14px; line-height:1.6;">
+          Click the button below to access your account or set your updated password:
+        </p>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="${linkToUse}"
+             style="background:#2563eb; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; font-size:14px; display:inline-block;">
+            Reset Password / Sign In
+          </a>
+        </p>
+        <p style="color:#94a3b8; font-size:12px; line-height:1.5;">
+          Or copy this link into your browser:<br/>
+          <a href="${linkToUse}" style="color:#2563eb; word-break: break-all;">${linkToUse}</a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+        <p style="color:#94a3b8; font-size:11px; text-align: center; margin: 0;">
+          If you did not request a password reset, you can safely ignore this email.
+        </p>
+      </div>
+    `;
+
+    const text =
+      `InterchangeIQ Password Reset\n\n` +
+      `Hi ${toName || "Coach"},\n\n` +
+      `An administrator has issued a password reset request for your InterchangeIQ account (${toEmail}).\n\n` +
+      `Reset your password or sign in here:\n${linkToUse}\n\n` +
+      `If you did not request this, you can safely ignore this email.\n`;
+
+    // 1. Prefer SMTP credentials entered in Admin > Notification Settings
+    if (smtpOverride?.host && smtpOverride?.user && smtpOverride?.pass) {
+      try {
+        const port = Number(smtpOverride.port) || 587;
+        const overrideTransporter = nodemailer.createTransport({
+          host: smtpOverride.host,
+          port,
+          secure: !!smtpOverride.secure || port === 465,
+          auth: { user: smtpOverride.user, pass: smtpOverride.pass },
+        });
+        const info = await overrideTransporter.sendMail({
+          from: smtpOverride.from || smtpOverride.user,
+          to: toEmail,
+          subject,
+          html,
+          text,
+        });
+        return res.json({ success: true, id: info.messageId, transport: "smtp-override" });
+      } catch (smtpErr: any) {
+        console.error("SMTP override reset send error:", smtpErr);
+        return res.status(502).json({
+          error: "Failed to send password reset email via SMTP",
+          details: smtpErr.message || "SMTP send failed. Check the settings in Admin > Notification Settings.",
+        });
+      }
+    }
+
+    // 2. Direct SMTP configured on server
+    const smtpTransporter = getSmtpTransporter();
+    if (smtpTransporter) {
+      const SMTP_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || "";
+      try {
+        const info = await smtpTransporter.sendMail({
+          from: SMTP_FROM,
+          to: toEmail,
+          subject,
+          html,
+          text,
+        });
+        return res.json({ success: true, id: info.messageId, transport: "smtp" });
+      } catch (smtpErr: any) {
+        console.error("SMTP reset send error:", smtpErr);
+        return res.status(502).json({
+          error: "Failed to send password reset email via SMTP",
+          details: smtpErr.message || "SMTP send failed. Check server SMTP credentials.",
+        });
+      }
+    }
+
+    // 3. Resend HTTP API
+    const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+    const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
+
+    if (!RESEND_API_KEY) {
+      return res.status(503).json({
+        error: "Email provider not configured",
+        details: "Set SMTP details in Admin > Notification Settings (recommended), or configure SMTP_HOST / RESEND_API_KEY on the server.",
+      });
+    }
+
+    const resendRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [toEmail],
+        subject,
+        html,
+        text,
+      }),
+    });
+
+    if (!resendRes.ok) {
+      const errBody = await resendRes.text();
+      console.error("Resend API reset error:", resendRes.status, errBody);
+      return res.status(502).json({
+        error: "Failed to send password reset email via Resend",
+        details: errBody,
+      });
+    }
+
+    const data = await resendRes.json();
+    return res.json({ success: true, id: data.id, transport: "resend" });
+  } catch (err: any) {
+    console.error("Send password reset error:", err);
+    return res.status(500).json({
+      error: "Send password reset processing error",
+      details: err.message || "An error occurred while sending the password reset email.",
+    });
+  }
+});
+
 // AI-powered drill import: converts raw pasted drill notes into a structured Drill object
 app.post("/api/import-drill", async (req, res) => {
   try {

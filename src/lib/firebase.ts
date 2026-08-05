@@ -78,23 +78,85 @@ export async function sendEmailVerificationToCurrentUser(): Promise<boolean> {
   }
 }
 
-// Sends a "reset your password" email via Firebase Auth. Works for both the
-// login screen's "Forgot password?" link and the Admin > Coaches & Roles
-// "Reset Password" action — Firebase handles the reset flow entirely, so
-// there's no separate server endpoint needed.
-export async function sendPasswordReset(email: string): Promise<{ ok: boolean; error?: string }> {
+export interface SendPasswordResetOptions {
+  name?: string;
+  resetLink?: string;
+  smtpOverride?: {
+    host?: string;
+    port?: number;
+    secure?: boolean;
+    user?: string;
+    pass?: string;
+    from?: string;
+  };
+}
+
+// Sends a "reset your password" email using Firebase Auth and/or custom SMTP/Resend
+// server endpoints. Works for both the login screen's "Forgot password?" link and the
+// Admin > Coaches & Roles "Reset Password" action.
+export async function sendPasswordReset(
+  email: string,
+  options?: SendPasswordResetOptions
+): Promise<{ ok: boolean; error?: string; details?: string }> {
   const trimmedEmail = email.trim().toLowerCase();
   if (!trimmedEmail || !trimmedEmail.includes('@')) {
     return { ok: false, error: 'Enter a valid email address.' };
   }
+
+  // 1. Ensure a Firebase Auth session exists for this user so Firebase Auth reset can function
+  try {
+    await ensureFirebaseAuthSession(trimmedEmail);
+  } catch (_e) {
+    // Proceed even if sync fails
+  }
+
+  // 2. Try Firebase Auth client sendPasswordResetEmail
+  let firebaseOk = false;
+  let firebaseError = '';
   try {
     await sendPasswordResetEmail(auth, trimmedEmail);
-    return { ok: true };
+    firebaseOk = true;
   } catch (err: any) {
-    console.warn('Error sending password reset email:', err);
-    // Firebase deliberately returns the same generic error for "no account with
-    // this email" as for other failures, to avoid leaking which emails are
-    // registered — so we surface a generic message either way.
-    return { ok: false, error: err.message || 'Could not send reset email. Please try again.' };
+    console.warn('Firebase sendPasswordResetEmail warning:', err);
+    firebaseError = err.message || err.code || 'Firebase Auth reset error';
+  }
+
+  // 3. Send via custom server endpoint (/api/send-password-reset) using Admin SMTP / server transport
+  try {
+    const res = await fetch('/api/send-password-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        toEmail: trimmedEmail,
+        toName: options?.name,
+        resetLink: options?.resetLink || `${window.location.origin}/`,
+        smtpOverride: options?.smtpOverride,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
+      return { ok: true };
+    }
+
+    if (firebaseOk) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      error: data.error || firebaseError || 'Failed to send password reset email.',
+      details: data.details,
+    };
+  } catch (err: any) {
+    console.warn('Server password reset request failed:', err);
+    if (firebaseOk) {
+      return { ok: true };
+    }
+    return {
+      ok: false,
+      error: err.message || firebaseError || 'Network error sending password reset.',
+    };
   }
 }

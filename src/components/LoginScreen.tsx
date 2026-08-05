@@ -12,7 +12,7 @@ import {
   UserPlus,
   Terminal
 } from 'lucide-react';
-import { auth, db, signInAnonymously, ensureFirebaseAuthSession, sendEmailVerificationToCurrentUser } from '../lib/firebase';
+import { auth, db, signInAnonymously, ensureFirebaseAuthSession, sendEmailVerificationToCurrentUser, sendPasswordReset } from '../lib/firebase';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { FirebaseDebugModal } from './FirebaseDebug';
 
@@ -43,6 +43,28 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
   const [checkingVerification, setCheckingVerification] = useState(false);
   const [isResending, setIsResending] = useState(false);
+
+  const [isSendingReset, setIsSendingReset] = useState(false);
+
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      setErrorMessage('Please enter your email address in the field above first.');
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsSendingReset(true);
+
+    const result = await sendPasswordReset(trimmedEmail);
+    setIsSendingReset(false);
+
+    if (result.ok) {
+      setSuccessMessage(`Password reset link sent to ${trimmedEmail}. Please check your inbox or spam folder.`);
+    } else {
+      setErrorMessage(`Could not send reset email: ${result.error}${result.details ? ` (${result.details})` : ''}`);
+    }
+  };
 
   // Email and Password Registration Handler
   const handleRegistration = async (e: React.FormEvent) => {
@@ -319,10 +341,20 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-gray-400" />
-                <span>Password</span>
-              </label>
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Password</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isSendingReset}
+                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer disabled:opacity-50"
+                >
+                  {isSendingReset ? 'Sending Reset...' : 'Forgot password?'}
+                </button>
+              </div>
               <input
                 type="password"
                 required

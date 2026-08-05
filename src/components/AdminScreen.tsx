@@ -773,21 +773,44 @@ export default function AdminScreen({
     setEditingUserUid(null);
   };
 
-  // Sends a Firebase password reset email to this coach's sign-in address. Note: this
-  // is the email they actually sign in with (their Firebase Auth account) — if their
-  // profile email was just edited above but not yet saved, use the original email.
+  // Sends a password reset email to this coach's sign-in address. Uses both
+  // Firebase Auth and custom SMTP/Resend endpoints configured in Admin > Notification Settings.
   const handleResetUserPassword = async (u: UserProfile) => {
     if (!window.confirm(`Send a password reset email to ${u.email}?`)) return;
     setResettingPasswordUid(u.uid);
     setPasswordResetNotice(null);
-    const result = await sendPasswordReset(u.email);
-    setResettingPasswordUid(null);
-    setPasswordResetNotice({
-      uid: u.uid,
-      text: result.ok
-        ? `Reset link sent to ${u.email}.`
-        : `Could not send reset email: ${result.error || 'unknown error'}`,
+
+    const smtpOverride = notificationSettings?.smtpHost
+      ? {
+          host: notificationSettings.smtpHost,
+          port: notificationSettings.smtpPort,
+          secure: notificationSettings.smtpSecure,
+          user: notificationSettings.smtpUser,
+          pass: notificationSettings.smtpPass,
+          from: notificationSettings.smtpFrom,
+        }
+      : undefined;
+
+    const result = await sendPasswordReset(u.email, {
+      name: u.name,
+      smtpOverride,
     });
+
+    setResettingPasswordUid(null);
+
+    if (result.ok) {
+      setPasswordResetNotice({
+        uid: u.uid,
+        text: `Password reset email sent successfully to ${u.email}.`,
+      });
+    } else {
+      setPasswordResetNotice({
+        uid: u.uid,
+        text: `Could not send reset email: ${result.error}${
+          result.details ? ` (${result.details})` : ''
+        }`,
+      });
+    }
   };
 
   // A Provisional user's Demo Team access is a placeholder — the moment they have any
@@ -1209,6 +1232,80 @@ export default function AdminScreen({
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Turn On / Off Features by Role Group Card */}
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-emerald-600" />
+                  <span>Turn On / Off Features by Role Group</span>
+                </h3>
+                <p className="text-xs text-gray-500 font-semibold mt-0.5">
+                  Batch toggle module access (Training, Growth, JARVIS) for all coaches assigned to a specific role group across the platform.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              {[
+                { role: 'Coach', label: 'Coaches' },
+                { role: 'Assistant Coach', label: 'Assistant Coaches' },
+                { role: 'Manager', label: 'Managers' },
+              ].map((roleGroup) => (
+                <div key={`role-group-${roleGroup.role}`} className="p-3.5 bg-gray-50/70 rounded-xl border border-gray-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-gray-900 uppercase tracking-wide">{roleGroup.label}</span>
+                    <span className="text-[10px] font-bold text-gray-400">
+                      {users.filter((u) => u.role === roleGroup.role).length} user(s)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { key: 'training', label: 'Train', icon: <BookOpen className="w-3 h-3 text-indigo-600" /> },
+                      { key: 'growth', label: 'Growth', icon: <TrendingUp className="w-3 h-3 text-emerald-600" /> },
+                      { key: 'jarvis', label: 'JARVIS', icon: <Bot className="w-3 h-3 text-purple-600" /> },
+                    ].map((feat) => {
+                      const usersInRole = users.filter((u) => u.role === roleGroup.role);
+                      const enabledCount = usersInRole.filter((u) => {
+                        const current = u.allowedFeatures ?? (
+                          u.role === 'Coach' ? ['training', 'growth', 'jarvis'] : u.role === 'Assistant Coach' ? ['training', 'growth'] : []
+                        );
+                        return current.includes(feat.key);
+                      }).length;
+                      const isAllEnabled = usersInRole.length > 0 && enabledCount === usersInRole.length;
+
+                      return (
+                        <button
+                          key={`role-feat-${roleGroup.role}-${feat.key}`}
+                          type="button"
+                          onClick={() => handleToggleRoleFeature(roleGroup.role, feat.key)}
+                          className={`px-2 py-2 rounded-lg text-xs font-bold border transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                            isAllEnabled
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                              : enabledCount > 0
+                              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                              : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                          }`}
+                          title={`Toggle ${feat.label} for all ${roleGroup.label}`}
+                        >
+                          <div className="flex items-center gap-1">
+                            {feat.icon}
+                            <span className="text-[11px] font-bold">{feat.label}</span>
+                          </div>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                            isAllEnabled ? 'bg-emerald-200 text-emerald-900' : enabledCount > 0 ? 'bg-amber-200 text-amber-900' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {isAllEnabled ? 'ON' : enabledCount > 0 ? `${enabledCount} ON` : 'OFF'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -1697,68 +1794,6 @@ export default function AdminScreen({
                       />
                     </div>
                   )}
-                  {/* Quick Role Feature Access Matrix */}
-                  <div className="p-3 bg-gray-50 border border-gray-200/80 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between flex-wrap gap-1">
-                      <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                        Turn On / Off Features by Role Group
-                      </span>
-                      <span className="text-[9px] text-gray-400 font-semibold">Batch toggle feature access for all coaches in a role</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {[
-                        { role: 'Coach', label: 'Coaches' },
-                        { role: 'Assistant Coach', label: 'Assistant Coaches' },
-                        { role: 'Manager', label: 'Managers' },
-                      ].map((roleGroup) => (
-                        <div key={`role-group-${roleGroup.role}`} className="p-2 bg-white rounded-lg border border-gray-200 space-y-1">
-                          <span className="text-[10px] font-black text-gray-800 uppercase block">{roleGroup.label}</span>
-                          <div className="flex gap-1">
-                            {[
-                              { key: 'training', label: 'Train', icon: <BookOpen className="w-2.5 h-2.5 text-indigo-600" /> },
-                              { key: 'growth', label: 'Growth', icon: <TrendingUp className="w-2.5 h-2.5 text-emerald-600" /> },
-                              { key: 'jarvis', label: 'JARVIS', icon: <Bot className="w-2.5 h-2.5 text-purple-600" /> },
-                            ].map((feat) => {
-                              const usersInRole = users.filter((u) => u.role === roleGroup.role);
-                              const enabledCount = usersInRole.filter((u) => {
-                                const current = u.allowedFeatures ?? (
-                                  u.role === 'Coach' ? ['training', 'growth', 'jarvis'] : u.role === 'Assistant Coach' ? ['training', 'growth'] : []
-                                );
-                                return current.includes(feat.key);
-                              }).length;
-                              const isAllEnabled = usersInRole.length > 0 && enabledCount === usersInRole.length;
-                              
-                              return (
-                                <button
-                                  key={`role-feat-${roleGroup.role}-${feat.key}`}
-                                  type="button"
-                                  onClick={() => handleToggleRoleFeature(roleGroup.role, feat.key)}
-                                  className={`flex-1 px-1.5 py-1 rounded text-[9px] font-bold border transition flex items-center justify-between cursor-pointer ${
-                                    isAllEnabled
-                                      ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                                      : enabledCount > 0
-                                      ? 'bg-amber-50 text-amber-900 border-amber-300'
-                                      : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
-                                  }`}
-                                  title={`Toggle ${feat.label} for all ${roleGroup.label}`}
-                                >
-                                  <div className="flex items-center gap-0.5">
-                                    {feat.icon}
-                                    <span>{feat.label}</span>
-                                  </div>
-                                  <span className={`text-[8px] font-black px-1 rounded ${
-                                    isAllEnabled ? 'bg-emerald-200 text-emerald-900' : enabledCount > 0 ? 'bg-amber-200 text-amber-900' : 'bg-gray-200 text-gray-500'
-                                  }`}>
-                                    {isAllEnabled ? 'ON' : enabledCount > 0 ? `${enabledCount}` : 'OFF'}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
                   {coachListSearch.trim() && filteredCoachListForCards.length === 0 && (
                     <p className="text-xs text-gray-400 font-semibold text-center py-6">No coaches match "{coachListSearch}".</p>
