@@ -232,6 +232,9 @@ export default function AdminScreen({
   const [smtpPassInput, setSmtpPassInput] = useState('');
   const [smtpFromInput, setSmtpFromInput] = useState(notificationSettings?.smtpFrom || '');
   const [mailerSendApiKeyInput, setMailerSendApiKeyInput] = useState(notificationSettings?.mailerSendApiKey || '');
+  const [showMailerSendKey, setShowMailerSendKey] = useState(false);
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [testRecipientInput, setTestRecipientInput] = useState(users.find(u => u.role === 'admin')?.email || users[0]?.email || 'coach@interchangeiq.app');
   const [isSavingNotifications, setIsSavingNotifications] = useState(false);
   const [notifSavedNotice, setNotifSavedNotice] = useState('');
 
@@ -274,6 +277,7 @@ export default function AdminScreen({
     const port = Number(smtpPortInput) || notificationSettings?.smtpPort || 587;
     const from = smtpFromInput.trim() || notificationSettings?.smtpFrom || user;
     const mailerSendApiKey = mailerSendApiKeyInput.trim() || notificationSettings?.mailerSendApiKey || '';
+    const testTo = testRecipientInput.trim() || users[0]?.email || 'coach@interchangeiq.app';
 
     if (!host && !mailerSendApiKey && !pass.startsWith('mlsn.') && !user.startsWith('mlsn.')) {
       setNotifSavedNotice('Error: Enter an SMTP Host or a MailerSend API Key / Token (starts with mlsn.) to test connection.');
@@ -288,7 +292,7 @@ export default function AdminScreen({
       const res = await fetch('/api/test-smtp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host, port, user, pass, from, mailerSendApiKey }),
+        body: JSON.stringify({ host, port, user, pass, from, mailerSendApiKey, testTo }),
       });
       const data = await res.json().catch(() => ({}));
       if (Array.isArray(data.debugLogs)) {
@@ -296,7 +300,7 @@ export default function AdminScreen({
       }
 
       if (res.ok && data.success) {
-        setNotifSavedNotice(`SMTP / MailerSend Test Successful! Verified via ${data.transport || 'SMTP'}. Test message sent to ${data.recipient}.`);
+        setNotifSavedNotice(`SMTP / MailerSend Test Successful! Verified via ${data.transport || 'SMTP'}. Test message sent from ${data.sender || from} to ${data.recipient || testTo}.`);
       } else {
         setNotifSavedNotice(`SMTP Test Failed: ${data.error || 'Connection failed'}. ${data.details || ''}`);
       }
@@ -2868,12 +2872,23 @@ export default function AdminScreen({
                   <Mail className="w-4 h-4 text-emerald-600" />
                   <span>MailerSend REST API Token</span>
                 </label>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-mono uppercase tracking-wide">
-                  HTTPS Port 443 Direct
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-mono uppercase tracking-wide">
+                    HTTPS Port 443 Direct
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMailerSendKey(!showMailerSendKey)}
+                    className="px-2 py-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition cursor-pointer flex items-center gap-1"
+                    title={showMailerSendKey ? 'Hide API Token' : 'Show API Token'}
+                  >
+                    {showMailerSendKey ? <EyeOff className="w-3 h-3 text-emerald-700" /> : <Eye className="w-3 h-3 text-emerald-700" />}
+                    <span>{showMailerSendKey ? 'Hide Key' : 'Reveal Key'}</span>
+                  </button>
+                </div>
               </div>
               <input
-                type="password"
+                type={showMailerSendKey ? 'text' : 'password'}
                 value={mailerSendApiKeyInput}
                 onChange={(e) => setMailerSendApiKeyInput(e.target.value)}
                 placeholder={notificationSettings?.mailerSendApiKey ? '•••••••• (MailerSend API Token Saved — enter new to replace)' : 'mlsn.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
@@ -2916,22 +2931,45 @@ export default function AdminScreen({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">SMTP Password</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">SMTP Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowSmtpPass(!showSmtpPass)}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition cursor-pointer"
+                  >
+                    {showSmtpPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    <span>{showSmtpPass ? 'Hide' : 'Reveal'}</span>
+                  </button>
+                </div>
                 <input
-                  type="password"
+                  type={showSmtpPass ? 'text' : 'password'}
                   value={smtpPassInput}
                   onChange={(e) => setSmtpPassInput(e.target.value)}
                   placeholder={notificationSettings?.smtpPass ? '•••••••• (saved — enter a new one to replace it)' : 'App password or SMTP password'}
-                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                 />
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">From Address</label>
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center justify-between">
+                  <span>From Address (Sender Email)</span>
+                  <span className="text-[10px] font-medium text-emerald-700 normal-case">Must match domain verified in MailerSend (e.g. MS_xxx@trial-xxx.mailersend.net or info@yourdomain.com)</span>
+                </label>
                 <input
                   type="text"
                   value={smtpFromInput}
                   onChange={(e) => setSmtpFromInput(e.target.value)}
-                  placeholder="InterchangeIQ <mailer@yourdomain.com>"
+                  placeholder="MS_xxxx@trial-xxxxx.mailersend.net or info@yourdomain.com"
+                  className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Test Email Recipient</label>
+                <input
+                  type="email"
+                  value={testRecipientInput}
+                  onChange={(e) => setTestRecipientInput(e.target.value)}
+                  placeholder="coach@example.com"
                   className="w-full px-3 py-2 text-sm font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>

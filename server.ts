@@ -604,19 +604,25 @@ app.post("/api/test-smtp", async (req, res) => {
     const cleanedPass = (pass || "").trim();
     const cleanedHost = (host || "").trim();
     const smtpPort = Number(port) || 587;
-    const targetAddress = (testTo || cleanedUser || "coach@interchangeiq.app").trim();
-
-    log(`Target host: "${cleanedHost}", port: ${smtpPort}, user: "${cleanedUser}", target: "${targetAddress}"`);
 
     // 1. Check if explicit MailerSend API Key or token (starts with mlsn.) is provided
     const explicitMsKey = (mailerSendApiKey || "").trim();
     const isMailerSendToken = explicitMsKey || cleanedPass.startsWith("mlsn.") || cleanedUser.startsWith("mlsn.");
     const tokenToUse = explicitMsKey || (cleanedPass.startsWith("mlsn.") ? cleanedPass : (cleanedUser.startsWith("mlsn.") ? cleanedUser : null));
 
+    // Ensure target recipient email is a valid email address
+    const rawTo = (testTo || req.body.userEmail || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "")).trim();
+    const targetAddress = rawTo.includes("@") ? rawTo : "coach@interchangeiq.app";
+
+    log(`Target host: "${cleanedHost}", port: ${smtpPort}, user: "${cleanedUser}", target recipient: "${targetAddress}"`);
+
     if (isMailerSendToken && tokenToUse) {
       log(`Detected MailerSend API key / token. Routing test via MailerSend REST API (HTTPS port 443)...`);
-      const senderEmail = from || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "info@interchangeiq.app");
       
+      const rawFrom = (from || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "")).trim();
+      const senderEmail = rawFrom.includes("@") ? rawFrom : "info@interchangeiq.app";
+      log(`MailerSend sender email: "${senderEmail}", recipient: "${targetAddress}"`);
+
       const msRes = await fetch("https://api.mailersend.com/v1/email", {
         method: "POST",
         headers: {
@@ -633,26 +639,48 @@ app.post("/api/test-smtp", async (req, res) => {
             <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
               <h3 style="color: #065f46; margin-top: 0;">MailerSend REST API Connected!</h3>
               <p style="color: #374151;">Your MailerSend API Token was verified over HTTPS port 443.</p>
+              <p style="color: #6b7280; font-size: 12px;">Sent to ${targetAddress} via ${senderEmail}</p>
             </div>
           `,
         }),
       });
 
-      if (msRes.ok) {
+      if (msRes.ok || msRes.status === 200 || msRes.status === 202) {
         log(`MailerSend REST API test succeeded! HTTP ${msRes.status}`);
         return res.json({
           success: true,
           transport: "mailersend-api",
           messageId: "ms-api-verified",
           recipient: targetAddress,
+          sender: senderEmail,
           debugLogs,
         });
       } else {
         const msErrText = await msRes.text();
-        log(`MailerSend REST API returned error ${msRes.status}: ${msErrText}`);
+        let msErrorSummary = msErrText;
+        try {
+          const jsonErr = JSON.parse(msErrText);
+          if (jsonErr.message) msErrorSummary = jsonErr.message;
+          if (jsonErr.errors) {
+            const fieldErrs = Object.entries(jsonErr.errors)
+              .map(([k, v]: [string, any]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+              .join("; ");
+            msErrorSummary += ` (${fieldErrs})`;
+          }
+        } catch (_) {}
+
+        log(`MailerSend REST API returned error ${msRes.status}: ${msErrorSummary}`);
+
+        let helpfulTip = msErrorSummary;
+        if (msRes.status === 422) {
+          helpfulTip += `. MailerSend requires your 'From Email' (${senderEmail}) to belong to a domain verified in your MailerSend dashboard (e.g. info@yourdomain.com or MS_xxxx@trial-xxxx.mailersend.net).`;
+        } else if (msRes.status === 401 || msRes.status === 403) {
+          helpfulTip += `. Please check that your MailerSend API Key is active and has 'Full Access' or 'Email' permissions.`;
+        }
+
         return res.status(502).json({
           error: `MailerSend API Error (${msRes.status})`,
-          details: msErrText || "Check that your MailerSend API token is active and the sender domain is verified.",
+          details: helpfulTip,
           debugLogs,
         });
       }
