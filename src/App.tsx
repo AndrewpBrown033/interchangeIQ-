@@ -2060,15 +2060,12 @@ export default function App() {
             players={players}
             gameInfo={gameInfo}
             historyCount={history.length}
-            cloudConnected={cloudConnected}
             cloudRoom={teams.find(t => t.id === activeTeamId)?.name || 'your squad'}
-            lastSyncedAt={lastSyncedAt}
             userName={userName}
             role="Admin"
             email={currentUser?.email || `${(userName || 'coach').toLowerCase().replace(/\s+/g, '.')}@interchangeiq.com`}
             onNavigate={handleSelectTab}
             onStartNewGame={handleStartNewGame}
-            onForceSync={handleForceSync}
             teams={teams}
             activeTeamId={activeTeamId}
             onSelectTeam={handleSwitchTeam}
