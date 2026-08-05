@@ -20,10 +20,10 @@ jobs:
           cache: 'npm'
 
       - name: Install root dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install functions dependencies
-        run: npm --prefix functions ci
+        run: npm --prefix functions install
 
       - name: Build production applet
         run: npm run build
