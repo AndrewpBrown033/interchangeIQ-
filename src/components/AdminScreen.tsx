@@ -631,8 +631,10 @@ export default function AdminScreen({
     setInviteSelectedTeams([]);
   };
 
+  const buildInviteLink = (code: string) => `${window.location.origin}/?invite=${code}`;
+
   const handleCopyLink = (code: string) => {
-    const link = `${window.location.origin}/?invite=${code}`;
+    const link = buildInviteLink(code);
     navigator.clipboard.writeText(link)
       .then(() => {
         setCopiedCode(code);
@@ -1868,31 +1870,42 @@ export default function AdminScreen({
                         </div>
 
                         {/* Quick copy invite actions */}
-                        <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                          <div className="bg-white px-2.5 py-1.5 border border-gray-200 rounded-lg flex items-center justify-between gap-2 text-[10px] font-mono font-bold text-gray-500 overflow-hidden">
-                            <span className="truncate">Code: <b className="text-[var(--navy)]">{inviteCodeStr}</b></span>
+                        <div className="pt-3 border-t border-gray-100 space-y-2">
+                          <span className="text-[9px] font-black uppercase text-gray-400 block">
+                            Registration Link
+                          </span>
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={buildInviteLink(inviteCodeStr)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              className="flex-1 min-w-0 bg-white px-2.5 py-1.5 border border-gray-200 rounded-lg text-[10px] font-mono font-bold text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-text"
+                            />
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                onClick={() => handleCopyLink(inviteCodeStr)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer ${
+                                  isCopied
+                                    ? 'bg-green-600 text-white border-green-700'
+                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                }`}
+                              >
+                                {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                <span>{isCopied ? 'Copied' : 'Copy Link'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u.uid)}
+                                className="px-2.5 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer"
+                                title="Revoke Invitation"
+                              >
+                                Revoke
+                              </button>
+                            </div>
                           </div>
-                          
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleCopyLink(inviteCodeStr)}
-                              className={`px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer ${
-                                isCopied
-                                  ? 'bg-green-600 text-white border-green-700'
-                                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                              }`}
-                            >
-                              {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                              <span>{isCopied ? 'Copied' : 'Copy Invite Link'}</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(u.uid)}
-                              className="px-2.5 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer"
-                              title="Revoke Invitation"
-                            >
-                              Revoke
-                            </button>
-                          </div>
+                          <p className="text-[9px] text-gray-400 font-semibold">
+                            Send this link to {u.name} directly (text, WhatsApp, etc.) if the invite email doesn't reach them — it registers them straight into this pending invite.
+                          </p>
                         </div>
                       </div>
                     );

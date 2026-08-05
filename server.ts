@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
+import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -27,6 +28,35 @@ const ai = new GoogleGenAI({
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || "",
 });
+
+// SMTP transport for outbound invite emails (Gmail/Office365, your own mail
+// server, or an SMTP relay from SendGrid/Mailgun/Postmark/etc all work here).
+// Built lazily and cached so a bad config surfaces as a clear send error
+// rather than crashing the server on boot.
+let smtpTransporter: nodemailer.Transporter | null = null;
+let smtpTransporterKey = "";
+
+function getSmtpTransporter(): nodemailer.Transporter | null {
+  const host = process.env.SMTP_HOST || "";
+  const user = process.env.SMTP_USER || "";
+  const pass = process.env.SMTP_PASS || "";
+  if (!host || !user || !pass) return null;
+
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+  const key = `${host}:${port}:${secure}:${user}`;
+
+  if (!smtpTransporter || smtpTransporterKey !== key) {
+    smtpTransporter = nodemailer.createTransport({
+      host,
+      port,
+      secure, // true for port 465 (implicit TLS), false for 587/25 (STARTTLS)
+      auth: { user, pass },
+    });
+    smtpTransporterKey = key;
+  }
+  return smtpTransporter;
+}
 
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
@@ -213,18 +243,6 @@ app.post("/api/send-invite", async (req, res) => {
       return res.status(400).json({ error: "toEmail and inviteLink are required." });
     }
 
-    const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-    const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
-
-    if (!RESEND_API_KEY) {
-      // No email provider configured - tell the caller explicitly so the UI
-      // can fall back to "copy link" instead of silently pretending to succeed.
-      return res.status(503).json({
-        error: "Email provider not configured",
-        details: "RESEND_API_KEY is not set on the server. Use the Copy Invite Link fallback for now.",
-      });
-    }
-
     const subject = `You're invited to join InterchangeIQ${teamName ? ` — ${teamName}` : ""}`;
     const html = `
       <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -246,6 +264,41 @@ app.post("/api/send-invite", async (req, res) => {
         </p>
       </div>
     `;
+
+    // 1. Prefer a direct SMTP relay if one is configured — your own mail server,
+    //    Gmail/Office365 SMTP, or an SMTP relay from SendGrid/Mailgun/Postmark/etc.
+    const smtpTransporter = getSmtpTransporter();
+    if (smtpTransporter) {
+      const SMTP_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || "";
+      try {
+        const info = await smtpTransporter.sendMail({
+          from: SMTP_FROM,
+          to: toEmail,
+          subject,
+          html,
+        });
+        return res.json({ success: true, id: info.messageId, transport: "smtp" });
+      } catch (smtpErr: any) {
+        console.error("SMTP send error:", smtpErr);
+        return res.status(502).json({
+          error: "Failed to send invite email via SMTP",
+          details: smtpErr.message || "SMTP send failed. Check SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS.",
+        });
+      }
+    }
+
+    // 2. Fall back to the Resend HTTP API if SMTP isn't configured.
+    const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+    const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
+
+    if (!RESEND_API_KEY) {
+      // Neither SMTP nor Resend configured — tell the caller explicitly so the UI
+      // can fall back to "copy link" instead of silently pretending to succeed.
+      return res.status(503).json({
+        error: "Email provider not configured",
+        details: "Set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS on the server (recommended), or RESEND_API_KEY as an alternative. Use the Copy Invite Link fallback for now.",
+      });
+    }
 
     const resendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -271,7 +324,7 @@ app.post("/api/send-invite", async (req, res) => {
     }
 
     const data = await resendRes.json();
-    return res.json({ success: true, id: data.id });
+    return res.json({ success: true, id: data.id, transport: "resend" });
   } catch (err: any) {
     console.error("Send invite error:", err);
     return res.status(500).json({
