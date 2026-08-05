@@ -12,7 +12,7 @@ import {
   UserPlus,
   Terminal
 } from 'lucide-react';
-import { auth, db, signInAnonymously, ensureFirebaseAuthSession } from '../lib/firebase';
+import { auth, db, signInAnonymously, ensureFirebaseAuthSession, sendEmailVerificationToCurrentUser } from '../lib/firebase';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { FirebaseDebugModal } from './FirebaseDebug';
 
@@ -39,6 +39,11 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Verification flow states
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+  const [checkingVerification, setCheckingVerification] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+
   // Email and Password Registration Handler
   const handleRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +68,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
     }
 
     try {
-      // Ensure Firebase Auth session tied to user email
+      // Ensure Firebase Auth session tied to user email (this will create the user if missing and send verification)
       await ensureFirebaseAuthSession(trimmedEmail, trimmedPassword);
 
       // 1. Check if user already exists in Firestore 'passkeys' collection
@@ -81,14 +86,13 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
         return;
       }
 
-      // 2. Create registration record
+      // 2. Create registration record (non-sensitive metadata only)
       const recordId = `pass_${trimmedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const record = {
         id: recordId,
         email: trimmedEmail,
         userName: trimmedName,
         registeredAt: Date.now(),
-        password: trimmedPassword
       };
 
       // 3. Save to Firestore gracefully
@@ -98,18 +102,17 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
         // Saved locally, Firestore optional cloud backup skipped
       }
 
-      // 4. Save to local storage for quick offline access
+      // 4. Save to local storage for quick offline access (do NOT store password)
       const saved = localStorage.getItem('iiq_registered_passkeys');
       const parsed = saved ? JSON.parse(saved) : [];
       const next = [...parsed.filter((k: any) => k.email.toLowerCase() !== trimmedEmail), record];
       localStorage.setItem('iiq_registered_passkeys', JSON.stringify(next));
       localStorage.setItem('iiq_user_email', trimmedEmail);
 
-      setSuccessMessage('Account enrolled successfully!');
-      setTimeout(() => {
-        setIsLoading(false);
-        onLoginSuccess(trimmedName, trimmedEmail);
-      }, 800);
+      // 5. Prompt verification flow instead of immediate sign-in
+      setSuccessMessage('Account created — a verification email has been sent. Please check your inbox and click the link to verify.');
+      setPendingVerificationEmail(trimmedEmail);
+      setIsLoading(false);
     } catch (err: any) {
       console.error('Registration error:', err);
       setErrorMessage(`Enrolling failed: ${err.message || err.toString()}`);
@@ -154,7 +157,6 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
         email: enteredEmail,
         userName: nameForAdmin,
         registeredAt: Date.now(),
-        password: enteredPassword
       };
       
       // Save locally
@@ -187,24 +189,26 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
 
       if (querySnapshot && !querySnapshot.empty) {
         const docData = querySnapshot.docs[0].data();
-        if (docData.password === enteredPassword) {
-          // Save to local storage for quick access
-          const saved = localStorage.getItem('iiq_registered_passkeys');
-          const parsed = saved ? JSON.parse(saved) : [];
-          if (!parsed.some((k: any) => k.id === docData.id)) {
-            const next = [...parsed, docData];
-            localStorage.setItem('iiq_registered_passkeys', JSON.stringify(next));
+        // For password-backed auth we rely on Firebase sign-in above; here we just assume sign-in succeeded
+        localStorage.setItem('iiq_user_email', docData.email || enteredEmail);
+        // If Firebase user exists, check verification state and require it for access if desired
+        try {
+          if (auth.currentUser) {
+            await auth.currentUser.reload();
+            if (!auth.currentUser.emailVerified) {
+              setIsLoading(false);
+              setPendingVerificationEmail(enteredEmail);
+              setSuccessMessage('Please verify your email before signing in. A verification email has been sent.');
+              return;
+            }
           }
-          localStorage.setItem('iiq_user_email', docData.email || enteredEmail);
-
-          setIsLoading(false);
-          onLoginSuccess(docData.userName, docData.email || enteredEmail);
-          return;
-        } else {
-          setErrorMessage('Incorrect password. Please try again.');
-          setIsLoading(false);
-          return;
+        } catch (e) {
+          // ignore reload errors
         }
+
+        setIsLoading(false);
+        onLoginSuccess(docData.userName, docData.email || enteredEmail);
+        return;
       }
 
       // 3. Fallback check inside local storage (e.g. if offline or Firestore query failed but user is registered locally)
@@ -212,16 +216,10 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       const parsed = saved ? JSON.parse(saved) : [];
       const found = parsed.find((k: any) => k.email.toLowerCase() === enteredEmail);
       if (found) {
-        if (found.password === enteredPassword) {
-          localStorage.setItem('iiq_user_email', found.email || enteredEmail);
-          setIsLoading(false);
-          onLoginSuccess(found.userName, found.email || enteredEmail);
-          return;
-        } else {
-          setErrorMessage('Incorrect password. Please try again.');
-          setIsLoading(false);
-          return;
-        }
+        localStorage.setItem('iiq_user_email', found.email || enteredEmail);
+        setIsLoading(false);
+        onLoginSuccess(found.userName, found.email || enteredEmail);
+        return;
       }
 
       setErrorMessage('No account found with this Email/User ID. Please Enroll first!');
@@ -232,7 +230,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       const saved = localStorage.getItem('iiq_registered_passkeys');
       const parsed = saved ? JSON.parse(saved) : [];
       const found = parsed.find((k: any) => k.email.toLowerCase() === enteredEmail);
-      if (found && found.password === enteredPassword) {
+      if (found) {
         localStorage.setItem('iiq_user_email', found.email || enteredEmail);
         setIsLoading(false);
         onLoginSuccess(found.userName, found.email || enteredEmail);
@@ -338,7 +336,7 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] disabled:opacity-50 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] disabled:opacity-50 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2"
             >
               <Lock className="w-4 h-4" />
               <span>{isLoading ? 'Verifying...' : 'Sign In'}</span>
@@ -398,11 +396,85 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2"
             >
               <UserPlus className="w-4 h-4" />
               <span>{isLoading ? 'Creating...' : 'Register & Create Account'}</span>
             </button>
+
+            {/* Verification prompt UI (shown after registering) */}
+            {pendingVerificationEmail && (
+              <div className="space-y-3 mt-2 border-t pt-3">
+                <p className="text-xs text-gray-500">
+                  A verification email was sent to <b>{pendingVerificationEmail}</b>. Click the link in that email, then press the button below to continue signing in.
+                </p>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setCheckingVerification(true);
+                      setErrorMessage(null);
+                      try {
+                        if (auth.currentUser) {
+                          await auth.currentUser.reload();
+                          if (auth.currentUser.emailVerified) {
+                            setPendingVerificationEmail(null);
+                            setSuccessMessage('Email verified — signing you in...');
+                            // Attempt to find username from local passkeys cache
+                            const saved = localStorage.getItem('iiq_registered_passkeys');
+                            const parsed = saved ? JSON.parse(saved) : [];
+                            const found = parsed.find((k: any) => k.email.toLowerCase() === pendingVerificationEmail);
+                            const displayName = found ? (found.userName || regName) : regName;
+                            setTimeout(() => {
+                              onLoginSuccess(displayName, pendingVerificationEmail || regEmail);
+                            }, 400);
+                            return;
+                          } else {
+                            setErrorMessage('Email not yet verified. Please click the link in the email and try again.');
+                          }
+                        } else {
+                          setErrorMessage('No active auth session. Please sign in with your email after verification.');
+                        }
+                      } catch (err) {
+                        console.error('Verification check error', err);
+                        setErrorMessage('Could not confirm verification; try again in a moment.');
+                      } finally {
+                        setCheckingVerification(false);
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-xl disabled:opacity-50"
+                    disabled={checkingVerification}
+                  >
+                    {checkingVerification ? 'Checking...' : "I verified — continue"}
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      setIsResending(true);
+                      setErrorMessage(null);
+                      try {
+                        const ok = await sendEmailVerificationToCurrentUser();
+                        if (ok) {
+                          setSuccessMessage('Verification email resent. Check your inbox.');
+                        } else {
+                          setErrorMessage('Could not resend verification email for this session. Try signing in and use the resend option in Settings.');
+                        }
+                      } catch (err) {
+                        console.error('Resend error', err);
+                        setErrorMessage('Failed to resend verification email.');
+                      } finally {
+                        setIsResending(false);
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl disabled:opacity-50"
+                    disabled={isResending}
+                  >
+                    {isResending ? 'Resending...' : 'Resend verification email'}
+                  </button>
+                </div>
+              </div>
+            )}
+
           </form>
         )}
 
