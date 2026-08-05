@@ -70,6 +70,7 @@ interface AdminScreenProps {
   onUpdateApiKeys?: (keys: ApiKeySettings) => void;
   notificationSettings?: NotificationSettings;
   onUpdateNotificationSettings?: (settings: NotificationSettings) => void;
+  onPerformLoginSync?: (source?: string) => Promise<{ success: boolean; teamCount: number; message: string }>;
 }
 
 export const DEFAULT_TACTICAL_PROMPTS: TacticalPrompt[] = [
@@ -205,6 +206,7 @@ export default function AdminScreen({
   onUpdateApiKeys,
   notificationSettings,
   onUpdateNotificationSettings,
+  onPerformLoginSync,
 }: AdminScreenProps) {
   const [adminSection, setAdminSection] = useState<'access' | 'prompts' | 'notifications'>('access');
   const [jarvisSubTab, setJarvisSubTab] = useState<'keys' | 'prompts'>('keys');
@@ -1750,6 +1752,19 @@ export default function AdminScreen({
               <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
                 Manage your registered sports clubs. Active coaches can be assigned directly to individual team datasets.
               </p>
+
+              {/* Login Sync Rule status banner */}
+              <div className="p-3 bg-indigo-50/80 border border-indigo-200/80 rounded-xl flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-xs text-indigo-950 font-bold">
+                    Login Sync Rule: Active by Default
+                  </span>
+                </div>
+                <span className="text-[10px] bg-indigo-100 text-indigo-800 font-mono font-bold px-2 py-0.5 rounded-md">
+                  Auto-Sync on Sign In
+                </span>
+              </div>
 
               {teamSyncMsg && (
                 <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-950 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-2xs">

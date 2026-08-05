@@ -742,6 +742,44 @@ export default function App() {
     }
   };
 
+  // Automated Rule: Default Sync on Login
+  const hasRunLoginSyncRef = useRef<boolean>(false);
+
+  const performDefaultLoginSync = React.useCallback(async (triggerSource: string = 'User Login'): Promise<{ success: boolean; teamCount: number; message: string }> => {
+    console.log(`[Auto Sync Rule] Performing default cloud & team sync on login (Source: ${triggerSource})...`);
+    try {
+      const teamsSyncResult = await handleForceSyncTeams();
+      const activeTeamSyncResult = await handleForceSync();
+      
+      const logMsg = `[Auto Sync Rule] Default login sync completed successfully (${teamsSyncResult.teamCount} team(s) synced). Trigger: ${triggerSource}`;
+      console.log(logMsg);
+      
+      const entry = {
+        ts: Date.now(),
+        user: userName || userEmail || 'Coach',
+        action: `Automatic Login Sync Rule executed (${teamsSyncResult.teamCount} teams & active roster synchronized with Cloud)`
+      };
+      setAuditLogs((prev) => [entry, ...prev].slice(0, 200));
+      return { success: true, teamCount: teamsSyncResult.teamCount, message: logMsg };
+    } catch (err: any) {
+      console.warn(`[Auto Sync Rule] Default login sync notice:`, err);
+      return { success: false, teamCount: 0, message: err.message || 'Auto sync rule notice' };
+    }
+  }, [handleForceSyncTeams, handleForceSync, userName, userEmail]);
+
+  // Automatic trigger rule when user session becomes authenticated
+  useEffect(() => {
+    if (isAuthenticated && !hasRunLoginSyncRef.current) {
+      hasRunLoginSyncRef.current = true;
+      const timer = setTimeout(() => {
+        performDefaultLoginSync('Authenticated Session Initialized');
+      }, 400);
+      return () => clearTimeout(timer);
+    } else if (!isAuthenticated) {
+      hasRunLoginSyncRef.current = false;
+    }
+  }, [isAuthenticated, performDefaultLoginSync]);
+
   // Invite acceptance states
   const [pendingInviteToAccept, setPendingInviteToAccept] = useState<UserProfile | null>(null);
   const [acceptingInviteName, setAcceptingInviteName] = useState('');
@@ -1851,6 +1889,9 @@ export default function App() {
             });
           }
 
+          // Rule: Perform automatic sync on login by default
+          performDefaultLoginSync('Direct Passkey Login');
+
           const entry = {
             ts: Date.now(),
             user: name || email || 'Admin',
@@ -2240,6 +2281,7 @@ export default function App() {
             onUpdateApiKeys={handleUpdateApiKeys}
             notificationSettings={notificationSettings}
             onUpdateNotificationSettings={handleUpdateNotificationSettings}
+            onPerformLoginSync={performDefaultLoginSync}
           />
         )}
         {activeTab === 'settings' && (
@@ -2252,6 +2294,7 @@ export default function App() {
             onImportData={handleImportBackup}
             auditLogs={auditLogs}
             onClearLogs={() => setAuditLogs([])}
+            onPerformLoginSync={performDefaultLoginSync}
             onLockSystem={() => {
               handleLogout('Locked screen manually and logged out of session.');
             }}

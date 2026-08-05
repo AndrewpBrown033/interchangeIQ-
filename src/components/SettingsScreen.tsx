@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, AuditLogEntry, TeamProfile } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark } from 'lucide-react';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark, CheckCircle2, Cloud, Play, Loader2 } from 'lucide-react';
 import CsvImportGuide from './CsvImportGuide';
 
 interface SettingsScreenProps {
@@ -34,6 +34,7 @@ interface SettingsScreenProps {
   currentUserRole?: string;
   userTeamIds?: string[];
   onUpdateTeams?: (teams: TeamProfile[]) => void;
+  onPerformLoginSync?: (source?: string) => Promise<{ success: boolean; teamCount: number; message: string }>;
 }
 
 export default function SettingsScreen({
@@ -67,7 +68,29 @@ export default function SettingsScreen({
   currentUserRole = 'Coach',
   userTeamIds = [],
   onUpdateTeams,
+  onPerformLoginSync,
 }: SettingsScreenProps) {
+  // Login Sync Rule testing state
+  const [isTestingLoginSync, setIsTestingLoginSync] = useState(false);
+  const [loginSyncNotice, setLoginSyncNotice] = useState<string | null>(null);
+
+  const handleRunLoginSyncTest = async () => {
+    if (!onPerformLoginSync) return;
+    setIsTestingLoginSync(true);
+    setLoginSyncNotice(null);
+    try {
+      const result = await onPerformLoginSync('Manual Settings Test');
+      if (result.success) {
+        setLoginSyncNotice(`✅ Sync Rule Executed: ${result.teamCount} team(s) synchronized with Firestore.`);
+      } else {
+        setLoginSyncNotice(`⚠️ Sync Notice: ${result.message}`);
+      }
+    } catch (e: any) {
+      setLoginSyncNotice(`⚠️ Sync Test Error: ${e.message}`);
+    } finally {
+      setIsTestingLoginSync(false);
+    }
+  };
   // Filter teams to only show those this coach actually belongs to. No role-based
   // bypass and no "fall back to everything if the filter comes up empty" — a coach
   // with no assigned teams should see an empty state, not every club in the system.
@@ -575,6 +598,58 @@ export default function SettingsScreen({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Default Sync on Login Rule Card */}
+          <div className="bg-gradient-to-br from-indigo-50/70 to-blue-50/70 p-5 rounded-2xl border border-indigo-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-600/10 text-indigo-600 rounded-lg">
+                  <Cloud className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-xs text-indigo-950 flex items-center gap-1.5">
+                    <span>Default Sync on Login Rule</span>
+                    <span className="px-2 py-0.5 bg-indigo-600 text-white font-mono text-[9px] rounded-full uppercase tracking-wider">
+                      Active
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-indigo-800 font-medium">
+                    Automatic cloud synchronization triggered upon every successful coach login
+                  </p>
+                </div>
+              </div>
+              {onPerformLoginSync && (
+                <button
+                  type="button"
+                  onClick={handleRunLoginSyncTest}
+                  disabled={isTestingLoginSync}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isTestingLoginSync ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Syncing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Test Sync Rule</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            <p className="text-xs text-indigo-900/90 leading-relaxed font-sans">
+              <strong>Rule Policy:</strong> Whenever a coach logs in or restores an authenticated passkey session, the app automatically executes a background sync rule. This synchronizes all team rosters, active match lineups, rotation logs, and drill templates directly with Cloud Firestore.
+            </p>
+
+            {loginSyncNotice && (
+              <div className="p-2.5 bg-white/90 rounded-xl border border-indigo-200 text-xs font-mono font-semibold text-indigo-900">
+                {loginSyncNotice}
+              </div>
+            )}
           </div>
 
           {/* Data Export & Backup Restore — moved here to balance the two columns
