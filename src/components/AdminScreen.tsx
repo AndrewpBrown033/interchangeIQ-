@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory, ApiKeySettings } from '../types';
-import { DEFAULT_PLAYERS } from '../constants';
+import { DEFAULT_PLAYERS, DEMO_TEAM_ID } from '../constants';
 import {
   Plus,
   Trash,
@@ -313,8 +313,8 @@ export default function AdminScreen({
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState<'Coach' | 'Assistant Coach' | 'Manager' | 'Admin'>('Coach');
-  const [inviteAllowedFeatures, setInviteAllowedFeatures] = useState<string[]>(['training', 'growth', 'jarvis']);
+  const [inviteRole, setInviteRole] = useState<'Provisional' | 'Coach' | 'Assistant Coach' | 'Manager' | 'Admin'>('Provisional');
+  const [inviteAllowedFeatures, setInviteAllowedFeatures] = useState<string[]>([]);
   const [inviteSelectedTeams, setInviteSelectedTeams] = useState<string[]>(activeTeamId ? [activeTeamId] : []);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [activeUserSubTab, setActiveUserSubTab] = useState<'active' | 'pending'>('active');
@@ -480,9 +480,10 @@ export default function AdminScreen({
     if (Array.isArray(users) && users.length > 0) {
       const updatedUsers = users.map((u) => {
         const currentTeamIds = Array.isArray(u.teamIds) ? u.teamIds : [];
+        const nextTeamIds = currentTeamIds.includes(newTeamId) ? currentTeamIds : [...currentTeamIds, newTeamId];
         return {
           ...u,
-          teamIds: currentTeamIds.includes(newTeamId) ? currentTeamIds : [...currentTeamIds, newTeamId],
+          teamIds: withDemoTeamRule(nextTeamIds),
         };
       });
       onUpdateUsers(updatedUsers);
@@ -508,26 +509,32 @@ export default function AdminScreen({
   const handleOpenInviteModal = (teamId?: string) => {
     setInviteEmail('');
     setInviteName('');
-    setInviteRole('Coach');
-    setInviteAllowedFeatures(['training', 'growth', 'jarvis']);
     if (teamId) {
+      setInviteRole('Coach');
+      setInviteAllowedFeatures(['training', 'growth', 'jarvis']);
       setInviteSelectedTeams([teamId]);
-    } else if (activeTeamId) {
-      setInviteSelectedTeams([activeTeamId]);
     } else {
-      setInviteSelectedTeams([]);
+      setInviteRole('Provisional');
+      setInviteAllowedFeatures([]);
+      setInviteSelectedTeams([DEMO_TEAM_ID]);
     }
     setShowInviteModal(true);
   };
 
-  const handleInviteRoleChange = (role: 'Coach' | 'Assistant Coach' | 'Manager' | 'Admin') => {
+  const handleInviteRoleChange = (role: 'Provisional' | 'Coach' | 'Assistant Coach' | 'Manager' | 'Admin') => {
     setInviteRole(role);
-    if (role === 'Admin' || role === 'Coach') {
+    if (role === 'Provisional') {
+      setInviteAllowedFeatures([]);
+      setInviteSelectedTeams([DEMO_TEAM_ID]);
+    } else if (role === 'Admin' || role === 'Coach') {
       setInviteAllowedFeatures(['training', 'growth', 'jarvis']);
+      setInviteSelectedTeams((prev) => prev.filter((id) => id !== DEMO_TEAM_ID));
     } else if (role === 'Assistant Coach') {
       setInviteAllowedFeatures(['training', 'growth']);
+      setInviteSelectedTeams((prev) => prev.filter((id) => id !== DEMO_TEAM_ID));
     } else {
       setInviteAllowedFeatures(['training']);
+      setInviteSelectedTeams((prev) => prev.filter((id) => id !== DEMO_TEAM_ID));
     }
   };
 
@@ -554,7 +561,7 @@ export default function AdminScreen({
       email: trimmedEmail,
       name: trimmedName,
       role: inviteRole,
-      teamIds: inviteSelectedTeams,
+      teamIds: inviteSelectedTeams.length > 0 ? inviteSelectedTeams : [DEMO_TEAM_ID],
       allowedFeatures: inviteAllowedFeatures,
       status: 'Pending',
       invitedBy: 'Administrator',
@@ -617,7 +624,7 @@ export default function AdminScreen({
   };
 
   const handleSelectAllTeams = () => {
-    setInviteSelectedTeams(teams.map((t) => t.id));
+    setInviteSelectedTeams(teams.filter((t) => !t.isDemo).map((t) => t.id));
   };
 
   const handleClearTeams = () => {
@@ -641,13 +648,20 @@ export default function AdminScreen({
     onUpdateUsers(users.filter((u) => u.uid !== uid));
   };
 
+  // A Provisional user's Demo Team access is a placeholder — the moment they have any
+  // real team, the Demo Team is no longer needed and is dropped automatically.
+  const withDemoTeamRule = (teamIds: string[]): string[] => {
+    const hasRealTeam = teamIds.some((id) => id !== DEMO_TEAM_ID);
+    return hasRealTeam ? teamIds.filter((id) => id !== DEMO_TEAM_ID) : teamIds;
+  };
+
   const handleAssignTeamToUser = (uid: string, teamId: string) => {
     const updated = users.map((u) => {
       if (u.uid === uid) {
         const ids = u.teamIds.includes(teamId)
           ? u.teamIds.filter((id) => id !== teamId)
           : [...u.teamIds, teamId];
-        return { ...u, teamIds: ids };
+        return { ...u, teamIds: withDemoTeamRule(ids) };
       }
       return u;
     });
@@ -659,7 +673,7 @@ export default function AdminScreen({
     const updated = users.map((u) => {
       if (!coachUids.includes(u.uid)) return u;
       const ids = u.teamIds.includes(teamId) ? u.teamIds : [...u.teamIds, teamId];
-      return { ...u, teamIds: ids };
+      return { ...u, teamIds: withDemoTeamRule(ids) };
     });
     onUpdateUsers(updated);
     setBulkSelectedIds([]);
@@ -1165,8 +1179,13 @@ export default function AdminScreen({
                           isSelected ? 'bg-blue-50' : 'hover:bg-white'
                         }`}
                       >
-                        <span className={`text-xs font-bold truncate ${isSelected ? 'text-[var(--blue)]' : 'text-gray-700'}`}>
+                        <span className={`text-xs font-bold truncate flex items-center gap-1.5 ${isSelected ? 'text-[var(--blue)]' : 'text-gray-700'}`}>
                           {t.name}
+                          {t.isDemo && (
+                            <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-100 text-amber-700 rounded uppercase shrink-0">
+                              Sandbox
+                            </span>
+                          )}
                         </span>
                         <span className="text-[10px] font-black text-gray-400 shrink-0">{coachCount}</span>
                       </div>
@@ -1189,7 +1208,7 @@ export default function AdminScreen({
                         className="flex-1 px-2.5 py-2 text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none"
                       >
                         <option value="">Choose a team...</option>
-                        {teams.map((t) => (
+                        {teams.filter((t) => !t.isDemo).map((t) => (
                           <option key={`bulk-team-opt-${t.id}`} value={t.id}>{t.name}</option>
                         ))}
                       </select>
@@ -1209,7 +1228,14 @@ export default function AdminScreen({
                   effectiveSelectedCoach ? (
                     <div className="space-y-3">
                       <div>
-                        <p className="text-sm font-extrabold text-[var(--ink)]">{effectiveSelectedCoach.name}</p>
+                        <p className="text-sm font-extrabold text-[var(--ink)] flex items-center gap-1.5">
+                          {effectiveSelectedCoach.name}
+                          {effectiveSelectedCoach.role === 'Provisional' && (
+                            <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-100 text-amber-700 rounded uppercase">
+                              Provisional
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-gray-500 font-semibold">{effectiveSelectedCoach.email} • {effectiveSelectedCoach.role}</p>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -1221,12 +1247,17 @@ export default function AdminScreen({
                           return (
                             <span
                               key={`coach-chip-${effectiveSelectedCoach.uid}-${tid}`}
-                              className="pl-2.5 pr-1.5 py-1 bg-blue-50 text-[var(--blue)] border border-blue-200 rounded-lg text-[11px] font-bold flex items-center gap-1"
+                              className={`pl-2.5 pr-1.5 py-1 border rounded-lg text-[11px] font-bold flex items-center gap-1 ${
+                                t?.isDemo
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-blue-50 text-[var(--blue)] border-blue-200'
+                              }`}
+                              title={t?.isDemo ? 'Temporary sandbox access — removed once a real team is assigned' : undefined}
                             >
                               {t?.name || tid}
                               <button
                                 onClick={() => handleAssignTeamToUser(effectiveSelectedCoach.uid, tid)}
-                                className="hover:bg-blue-100 rounded p-0.5 cursor-pointer"
+                                className={`rounded p-0.5 cursor-pointer ${t?.isDemo ? 'hover:bg-amber-100' : 'hover:bg-blue-100'}`}
                                 title={`Remove ${t?.name || tid}`}
                               >
                                 <X className="w-3 h-3" />
@@ -1242,7 +1273,7 @@ export default function AdminScreen({
                           className="flex-1 px-2.5 py-2 text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg focus:outline-none"
                         >
                           <option value="">Add a team...</option>
-                          {teams.filter((t) => !effectiveSelectedCoach.teamIds.includes(t.id)).map((t) => (
+                          {teams.filter((t) => !t.isDemo && !effectiveSelectedCoach.teamIds.includes(t.id)).map((t) => (
                             <option key={`add-team-opt-${t.id}`} value={t.id}>{t.name}</option>
                           ))}
                         </select>
@@ -1254,7 +1285,19 @@ export default function AdminScreen({
                 ) : (
                   effectiveSelectedTeam ? (
                     <div className="space-y-3">
-                      <p className="text-sm font-extrabold text-[var(--ink)]">{effectiveSelectedTeam.name}</p>
+                      <p className="text-sm font-extrabold text-[var(--ink)] flex items-center gap-1.5">
+                        {effectiveSelectedTeam.name}
+                        {effectiveSelectedTeam.isDemo && (
+                          <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-100 text-amber-700 rounded uppercase">
+                            Sandbox
+                          </span>
+                        )}
+                      </p>
+                      {effectiveSelectedTeam.isDemo && (
+                        <p className="text-[10px] text-amber-700 font-semibold -mt-2">
+                          Everyone here is on temporary Provisional access. Assign them a real team below to move them off the Demo Team automatically.
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-1.5">
                         {assignableCoaches.filter((u) => u.teamIds.includes(effectiveSelectedTeam.id)).length === 0 && (
                           <span className="text-[11px] text-gray-400 font-semibold">No coaches assigned yet.</span>
@@ -1578,6 +1621,11 @@ export default function AdminScreen({
                           <b className="text-sm font-extrabold text-[var(--ink)] block flex items-center gap-1.5">
                             {u.name}
                             {u.role === 'Admin' && <Shield className="w-3.5 h-3.5 text-red-500" />}
+                            {u.role === 'Provisional' && (
+                              <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-100 text-amber-700 rounded uppercase">
+                                Provisional
+                              </span>
+                            )}
                           </b>
                           <span className="text-xs text-[var(--muted)] font-semibold">{u.email}</span>
                         </div>
@@ -1588,6 +1636,7 @@ export default function AdminScreen({
                             onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
                             className="px-2.5 py-1 text-xs font-extrabold bg-gray-50 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                           >
+                            <option value="Provisional">Provisional</option>
                             <option value="Coach">Coach</option>
                             <option value="Assistant Coach">Assistant Coach</option>
                             <option value="Manager">Manager</option>
@@ -1614,14 +1663,22 @@ export default function AdminScreen({
                             {u.teamIds.length === 0 && (
                               <span className="text-[10px] text-gray-400 font-bold">No teams assigned</span>
                             )}
-                            {u.teamIds.slice(0, 3).map((tid, tIdx) => (
-                              <span
-                                key={`assign-preview-${u.uid || 'user'}-${tid || 'team'}-${tIdx}`}
-                                className="px-2 py-0.5 rounded text-[10px] font-bold border bg-green-50 text-[#0E7A48] border-green-200"
-                              >
-                                {teams.find((t) => t.id === tid)?.name || tid}
-                              </span>
-                            ))}
+                            {u.teamIds.slice(0, 3).map((tid, tIdx) => {
+                              const t = teams.find((tm) => tm.id === tid);
+                              return (
+                                <span
+                                  key={`assign-preview-${u.uid || 'user'}-${tid || 'team'}-${tIdx}`}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                    t?.isDemo
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-green-50 text-[#0E7A48] border-green-200'
+                                  }`}
+                                  title={t?.isDemo ? 'Temporary sandbox access — removed once a real team is assigned' : undefined}
+                                >
+                                  {t?.name || tid}
+                                </span>
+                              );
+                            })}
                             {u.teamIds.length > 3 && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">
                                 +{u.teamIds.length - 3} more
@@ -1735,6 +1792,7 @@ export default function AdminScreen({
                               onChange={(e) => handleChangeUserRole(u.uid, e.target.value)}
                               className="px-2 py-0.5 bg-white border border-blue-200 text-[var(--blue)] text-[10px] font-black rounded uppercase focus:outline-none cursor-pointer"
                             >
+                              <option value="Provisional">Provisional</option>
                               <option value="Coach">Coach</option>
                               <option value="Assistant Coach">Assistant Coach</option>
                               <option value="Manager">Manager</option>
@@ -2324,7 +2382,7 @@ export default function AdminScreen({
                   Assigned System Role *
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {(['Coach', 'Assistant Coach', 'Manager', 'Admin'] as const).map((role, idx) => (
+                  {(['Provisional', 'Coach', 'Assistant Coach', 'Manager', 'Admin'] as const).map((role, idx) => (
                     <button
                       key={`role-option-${role}-${idx}`}
                       type="button"
@@ -2342,13 +2400,14 @@ export default function AdminScreen({
                 </div>
                 <p className="text-[9px] text-gray-400 mt-1 font-bold">
                   {inviteRole === 'Admin' && 'Admins possess full universal clearance across all rosters and features.'}
+                  {inviteRole === 'Provisional' && 'Provisional users get temporary access to a sandbox Demo Team to explore InterchangeIQ. This is automatically replaced the moment they\'re assigned a real team.'}
                   {inviteRole === 'Coach' && 'Coaches have elevated access to Training, Growth, and Jarvis features.'}
                   {inviteRole === 'Assistant Coach' && 'Assistant Coaches manage lineups and rotations with restricted feature access.'}
                   {inviteRole === 'Manager' && 'Managers view stats and game plans without administrative profile edits.'}
                 </p>
               </div>
 
-              {inviteRole !== 'Admin' && (
+              {inviteRole !== 'Admin' && inviteRole !== 'Provisional' && (
                 <div className="space-y-2">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-gray-400">
                     Granted Feature Permissions
@@ -2392,7 +2451,19 @@ export default function AdminScreen({
                 </div>
               )}
 
-              {inviteRole !== 'Admin' && (
+              {inviteRole === 'Provisional' && (
+                <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3 flex gap-2.5">
+                  <UserCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-black text-blue-800 uppercase block">Demo Team Access</span>
+                    <p className="text-[9px] text-blue-700 font-semibold leading-relaxed mt-0.5">
+                      This user will be placed on the Demo Team so they can explore the app right away. As soon as you assign them to a real team from Coach & Team Assignments, Demo Team access is removed automatically.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {inviteRole !== 'Admin' && inviteRole !== 'Provisional' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">
@@ -2418,7 +2489,7 @@ export default function AdminScreen({
                   </div>
 
                   <div className="border border-gray-100 rounded-xl max-h-36 overflow-y-auto p-2 bg-gray-50/50 space-y-1">
-                    {teams.map((t, tIdx) => {
+                    {teams.filter((t) => !t.isDemo).map((t, tIdx) => {
                       const isChecked = inviteSelectedTeams.includes(t.id);
                       return (
                         <label

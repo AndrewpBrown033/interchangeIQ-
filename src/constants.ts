@@ -1,6 +1,18 @@
-import { Player, Drill, SkillAssessment } from './types';
+import { Player, Drill, SkillAssessment, TeamProfile } from './types';
 
 export const APP_VERSION = 'v1.5.1';
+
+// New users (self sign-up or admin invite) start on a Provisional license with
+// access to this sandbox team so they have something to explore immediately.
+// It is automatically dropped from a user's teamIds the moment a real team is assigned.
+export const DEMO_TEAM_ID = 'demo-team';
+
+export const DEMO_TEAM: TeamProfile = {
+  id: DEMO_TEAM_ID,
+  name: 'Demo Team',
+  createdAt: 0,
+  isDemo: true,
+};
 
 export const POSITIONS: [string, string, number, number][] = [
   // Full Forward Line (Top End - Attacking Goal)

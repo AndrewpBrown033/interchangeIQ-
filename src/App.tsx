@@ -3,7 +3,7 @@ import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
   Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment, ApiKeySettings
 } from './types';
-import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers } from './constants';
+import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers, DEMO_TEAM, DEMO_TEAM_ID } from './constants';
 
 // Firebase Integrations
 import { auth, db, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, ensureFirebaseAuthSession, User } from './lib/firebase';
@@ -260,11 +260,13 @@ export default function App() {
     try {
       const saved = localStorage.getItem('iiq_teams');
       const parsed = saved ? JSON.parse(saved) : null;
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.some((t: TeamProfile) => t.id === DEMO_TEAM_ID) ? parsed : [...parsed, DEMO_TEAM];
+      }
     } catch (e) {
       console.warn("Failed to parse teams:", e);
     }
-    return [{ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() }];
+    return [{ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() }, DEMO_TEAM];
   });
 
   const [users, setUsers] = useState<UserProfile[]>(() => {
@@ -470,6 +472,9 @@ export default function App() {
         const merged = Array.from(teamMap.values());
         if (merged.length === 0) {
           merged.push({ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() });
+        }
+        if (!merged.some((t) => t.id === DEMO_TEAM_ID)) {
+          merged.push(DEMO_TEAM);
         }
 
         merged.sort((a, b) => {
@@ -909,13 +914,15 @@ export default function App() {
                   }
                 }).catch(() => {});
               } else {
-                // Create fresh profile for new users with Provisional role, no teams assigned, and minimal features
+                // Create fresh profile for new users with Provisional role and temporary Demo Team
+                // access so they have something to explore. The Demo Team is automatically
+                // removed the moment an admin assigns them to a real team (see handleAssignTeamToUser).
                 setDoc(userRef, {
                   uid: user.uid,
                   email: normEmail,
                   name: user.displayName || userName || 'New User',
                   role: 'Provisional',
-                  teamIds: [],
+                  teamIds: [DEMO_TEAM_ID],
                   allowedFeatures: [],
                   status: 'Active',
                 }).catch(() => {});

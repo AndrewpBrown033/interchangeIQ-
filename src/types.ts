@@ -178,6 +178,7 @@ export interface TeamProfile {
   showPlayerGrowth?: boolean;
   showJarvis?: boolean;
   isInactive?: boolean;
+  isDemo?: boolean;
 }
 
 export interface SkillAssessment {
