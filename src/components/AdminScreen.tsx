@@ -263,6 +263,7 @@ export default function AdminScreen({
   };
 
   const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [smtpDebugLogs, setSmtpDebugLogs] = useState<string[] | null>(null);
 
   const handleTestSmtpConnection = async () => {
     const host = smtpHostInput.trim() || notificationSettings?.smtpHost || '';
@@ -271,14 +272,15 @@ export default function AdminScreen({
     const port = Number(smtpPortInput) || notificationSettings?.smtpPort || 587;
     const from = smtpFromInput.trim() || notificationSettings?.smtpFrom || user;
 
-    if (!host || !user) {
-      setNotifSavedNotice('Error: Enter at least SMTP Host and Username to test connection.');
+    if (!host && !pass.startsWith('mlsn.') && !user.startsWith('mlsn.')) {
+      setNotifSavedNotice('Error: Enter at least SMTP Host or a MailerSend API Token (starts with mlsn.) to test connection.');
       setTimeout(() => setNotifSavedNotice(''), 5000);
       return;
     }
 
     setIsTestingSmtp(true);
-    setNotifSavedNotice('Testing SMTP server connection...');
+    setSmtpDebugLogs(null);
+    setNotifSavedNotice('Testing mail server connection and running diagnostics...');
     try {
       const res = await fetch('/api/test-smtp', {
         method: 'POST',
@@ -286,16 +288,19 @@ export default function AdminScreen({
         body: JSON.stringify({ host, port, user, pass, from }),
       });
       const data = await res.json().catch(() => ({}));
+      if (Array.isArray(data.debugLogs)) {
+        setSmtpDebugLogs(data.debugLogs);
+      }
+
       if (res.ok && data.success) {
-        setNotifSavedNotice(`SMTP Connection Test Successful! Verification email sent to ${data.recipient}.`);
+        setNotifSavedNotice(`SMTP / MailerSend Test Successful! Verified via ${data.transport || 'SMTP'}. Test message sent to ${data.recipient}.`);
       } else {
-        setNotifSavedNotice(`SMTP Test Failed: ${data.error || 'Connection failed'} (${data.details || 'Check host, port, or password'})`);
+        setNotifSavedNotice(`SMTP Test Failed: ${data.error || 'Connection failed'}. ${data.details || ''}`);
       }
     } catch (err: any) {
       setNotifSavedNotice(`SMTP Test Error: ${err.message || 'Network error'}`);
     } finally {
       setIsTestingSmtp(false);
-      setTimeout(() => setNotifSavedNotice(''), 8000);
     }
   };
 
@@ -2915,8 +2920,31 @@ export default function AdminScreen({
             </div>
 
             {notifSavedNotice && (
-              <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold">
-                {notifSavedNotice}
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold space-y-1">
+                <div>{notifSavedNotice}</div>
+                {notifSavedNotice.includes('Failed') && (
+                  <p className="text-[11px] font-medium text-blue-700">
+                    💡 <b>MailerSend Tip:</b> Container environments often block raw TCP ports 587/465. If using MailerSend, paste your MailerSend API Token (starts with <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">mlsn.</code>) into the SMTP Password field. InterchangeIQ will automatically route over HTTPS port 443!
+                  </p>
+                )}
+              </div>
+            )}
+
+            {smtpDebugLogs && smtpDebugLogs.length > 0 && (
+              <div className="p-3 bg-gray-900 text-emerald-400 font-mono text-[11px] rounded-xl border border-gray-800 shadow-inner space-y-1 overflow-x-auto max-h-48">
+                <div className="flex items-center justify-between text-gray-400 border-b border-gray-800 pb-1 text-[10px] font-bold uppercase tracking-wider">
+                  <span>SMTP Connection Debug Log</span>
+                  <button
+                    type="button"
+                    onClick={() => setSmtpDebugLogs(null)}
+                    className="hover:text-white cursor-pointer"
+                  >
+                    Close Log
+                  </button>
+                </div>
+                {smtpDebugLogs.map((logLine, idx) => (
+                  <div key={idx} className="whitespace-pre-wrap">{logLine}</div>
+                ))}
               </div>
             )}
 
@@ -2931,12 +2959,23 @@ export default function AdminScreen({
               </button>
               <button
                 onClick={handleTestSmtpConnection}
-                disabled={isTestingSmtp || (!smtpHostInput.trim() && !notificationSettings?.smtpHost)}
+                disabled={isTestingSmtp || (!smtpHostInput.trim() && !notificationSettings?.smtpHost && !smtpPassInput.startsWith('mlsn.'))}
                 className="px-3.5 py-2 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {isTestingSmtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5 text-emerald-600" />}
                 <span>Test Connection</span>
               </button>
+              {onOpenDebugModal && (
+                <button
+                  type="button"
+                  onClick={onOpenDebugModal}
+                  className="px-3.5 py-2 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg cursor-pointer flex items-center gap-1.5"
+                  title="Open Full System & Mail Debugger"
+                >
+                  <Activity className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Open System Debugger</span>
+                </button>
+              )}
               {notificationSettings?.smtpHost && (
                 <button
                   onClick={handleClearSmtpSettings}

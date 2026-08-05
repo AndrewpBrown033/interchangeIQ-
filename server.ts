@@ -554,49 +554,140 @@ app.post("/api/send-password-reset", async (req, res) => {
   }
 });
 
-// Test SMTP connection endpoint
+// Test SMTP connection endpoint with step-by-step debug diagnostics
 app.post("/api/test-smtp", async (req, res) => {
+  const debugLogs: string[] = [];
+  const log = (msg: string) => {
+    const entry = `[${new Date().toISOString().slice(11, 19)}] ${msg}`;
+    debugLogs.push(entry);
+    console.log(`[SMTP Debug] ${msg}`);
+  };
+
   try {
     const { host, port, user, pass, from, testTo } = req.body;
+    log(`Initiating SMTP / Email diagnostics...`);
 
-    if (!host || !user || !pass) {
+    const cleanedUser = (user || "").trim();
+    const cleanedPass = (pass || "").trim();
+    const cleanedHost = (host || "").trim();
+    const smtpPort = Number(port) || 587;
+    const targetAddress = (testTo || cleanedUser || "coach@interchangeiq.app").trim();
+
+    log(`Target host: "${cleanedHost}", port: ${smtpPort}, user: "${cleanedUser}", target: "${targetAddress}"`);
+
+    // 1. Check if user or pass is a MailerSend API Token (starts with mlsn.)
+    const isMailerSendToken = cleanedPass.startsWith("mlsn.") || cleanedUser.startsWith("mlsn.");
+    const tokenToUse = cleanedPass.startsWith("mlsn.") ? cleanedPass : (cleanedUser.startsWith("mlsn.") ? cleanedUser : null);
+
+    if (isMailerSendToken && tokenToUse) {
+      log(`Detected MailerSend API token (starts with mlsn.). Routing test via MailerSend REST API (HTTPS port 443)...`);
+      const senderEmail = from || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "info@interchangeiq.app");
+      
+      const msRes = await fetch("https://api.mailersend.com/v1/email", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokenToUse}`,
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({
+          from: { email: senderEmail, name: "InterchangeIQ Admin Test" },
+          to: [{ email: targetAddress, name: "Admin" }],
+          subject: "InterchangeIQ — MailerSend REST API Test",
+          text: "MailerSend API integration verified! Emails can be delivered directly over HTTPS.",
+          html: `
+            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
+              <h3 style="color: #065f46; margin-top: 0;">MailerSend REST API Connected!</h3>
+              <p style="color: #374151;">Your MailerSend API Token was verified over HTTPS port 443.</p>
+            </div>
+          `,
+        }),
+      });
+
+      if (msRes.ok) {
+        log(`MailerSend REST API test succeeded! HTTP ${msRes.status}`);
+        return res.json({
+          success: true,
+          transport: "mailersend-api",
+          messageId: "ms-api-verified",
+          recipient: targetAddress,
+          debugLogs,
+        });
+      } else {
+        const msErrText = await msRes.text();
+        log(`MailerSend REST API returned error ${msRes.status}: ${msErrText}`);
+        return res.status(502).json({
+          error: `MailerSend API Error (${msRes.status})`,
+          details: msErrText || "Check that your MailerSend API token is active and the sender domain is verified.",
+          debugLogs,
+        });
+      }
+    }
+
+    if (!cleanedHost || !cleanedUser) {
+      log(`Error: Missing host or username in test request.`);
       return res.status(400).json({
-        error: "Host, username, and password are required to test SMTP settings.",
+        error: "Host and username are required to test SMTP settings.",
+        debugLogs,
       });
     }
 
-    const smtpPort = Number(port) || 587;
+    // 2. Standard SMTP Transport Test with Nodemailer
+    log(`Creating Nodemailer transport for ${cleanedHost}:${smtpPort} (implicit TLS: ${smtpPort === 465})...`);
     const transporter = nodemailer.createTransport({
-      host,
+      host: cleanedHost,
       port: smtpPort,
       secure: smtpPort === 465,
-      auth: { user, pass },
-      connectionTimeout: 10000,
+      auth: { user: cleanedUser, pass: cleanedPass },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 8000,
+      tls: {
+        rejectUnauthorized: false, // Prevent self-signed cert blocking
+      },
     });
 
-    // Verify SMTP connection
+    log(`[Step 1/2] Testing socket connection & authentication (transporter.verify)...`);
     await transporter.verify();
+    log(`[Step 1/2] SMTP connection and credentials verified successfully!`);
 
-    const targetAddress = testTo || user;
+    log(`[Step 2/2] Dispatching test email to ${targetAddress}...`);
     const info = await transporter.sendMail({
-      from: from || user,
+      from: from || cleanedUser,
       to: targetAddress,
       subject: "InterchangeIQ — SMTP Connection Test",
       text: "Congratulations! Your SMTP settings are correctly configured and ready to send emails for InterchangeIQ.",
       html: `
-        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px;">
+        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
           <h3 style="color: #065f46; margin-top: 0;">SMTP Test Successful!</h3>
           <p style="color: #374151;">Your mail server credentials in <b>Admin > Notification Settings</b> are verified and working properly.</p>
         </div>
       `,
     });
 
-    return res.json({ success: true, messageId: info.messageId, recipient: targetAddress });
+    log(`Test email dispatched successfully! Message-ID: ${info.messageId}`);
+    return res.json({
+      success: true,
+      transport: "smtp",
+      messageId: info.messageId,
+      recipient: targetAddress,
+      debugLogs,
+    });
   } catch (err: any) {
-    console.error("SMTP test connection error:", err);
+    log(`SMTP Test Exception: ${err.code || err.name || "Error"} - ${err.message}`);
+
+    let helpfulAdvice = err.message || "Unable to connect or authenticate with the specified SMTP host.";
+    if (err.code === "ETIMEDOUT" || err.code === "ECONNREFUSED" || err.message?.includes("timeout")) {
+      helpfulAdvice = `Connection to SMTP host timed out. Container/cloud sandboxes often block outbound TCP ports 587 and 465. TIP: If using MailerSend, paste your MailerSend API Key (starts with mlsn.) into the Password field, and InterchangeIQ will connect over HTTPS port 443 automatically.`;
+    } else if (err.code === "EAUTH" || err.message?.includes("Invalid login") || err.message?.includes("535")) {
+      helpfulAdvice = `Authentication failed. Check your SMTP Username and Password. For MailerSend, verify that your SMTP username is the MS_xxxx identifier from your MailerSend domain settings.`;
+    }
+
     return res.status(502).json({
       error: "SMTP Connection Test Failed",
-      details: err.message || "Unable to connect or authenticate with the specified SMTP host.",
+      details: helpfulAdvice,
+      code: err.code || "ESMTP",
+      debugLogs,
     });
   }
 });

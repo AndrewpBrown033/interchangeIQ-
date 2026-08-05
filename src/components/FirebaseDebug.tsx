@@ -259,6 +259,71 @@ export const FirebaseDebugModal: React.FC<{ isOpen: boolean; onClose: () => void
       });
     }
 
+    // Test 7: SMTP & Email Server Diagnostics
+    addLog('Testing SMTP Mail Server & MailerSend API diagnostics...');
+    try {
+      const savedNotifs = localStorage.getItem('iiq_notification_settings');
+      let notifObj: any = {};
+      try {
+        if (savedNotifs) notifObj = JSON.parse(savedNotifs);
+      } catch (_e) {}
+
+      const testPayload = {
+        host: notifObj.smtpHost || '',
+        port: notifObj.smtpPort || 587,
+        user: notifObj.smtpUser || '',
+        pass: notifObj.smtpPass || '',
+        from: notifObj.smtpFrom || '',
+        testTo: appUserEmail || notifObj.smtpUser || 'coach@interchangeiq.app',
+      };
+
+      if (!testPayload.host && !testPayload.user) {
+        addLog('SMTP settings not configured in Admin > Notification Settings.');
+        diag.tests.push({
+          name: 'SMTP Mail Server Diagnostics',
+          status: 'warning',
+          message: 'No custom SMTP server configured in Admin > Notification Settings. Automatic emails will use fallback direct reset links or server defaults.',
+        });
+      } else {
+        addLog(`Executing SMTP test against ${testPayload.host}:${testPayload.port}...`);
+        const smtpRes = await fetch('/api/test-smtp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(testPayload),
+        });
+
+        const smtpData = await smtpRes.json().catch(() => ({}));
+        if (Array.isArray(smtpData.debugLogs)) {
+          smtpData.debugLogs.forEach((l: string) => addLog(`[Server] ${l}`));
+        }
+
+        if (smtpRes.ok && smtpData.success) {
+          addLog(`SMTP Connection Test SUCCEEDED! Transport: ${smtpData.transport || 'smtp'}`);
+          diag.tests.push({
+            name: 'SMTP Mail Server Diagnostics',
+            status: 'success',
+            message: `Mail server verified! Delivered via ${smtpData.transport || 'smtp'} to ${smtpData.recipient || 'recipient'}.`,
+            details: smtpData.debugLogs ? smtpData.debugLogs.join('\n') : undefined,
+          });
+        } else {
+          addLog(`SMTP Test Failed: ${smtpData.error || 'Connection error'}`);
+          diag.tests.push({
+            name: 'SMTP Mail Server Diagnostics',
+            status: 'error',
+            message: `SMTP Test Failed: ${smtpData.error || 'Connection failed'}. ${smtpData.details || ''}`,
+            details: (smtpData.debugLogs || []).join('\n') || smtpData.details,
+          });
+        }
+      }
+    } catch (sErr: any) {
+      addLog(`SMTP test error: ${sErr.message || sErr}`);
+      diag.tests.push({
+        name: 'SMTP Mail Server Diagnostics',
+        status: 'error',
+        message: `Network error reaching /api/test-smtp: ${sErr.message}`,
+      });
+    }
+
     setResult(diag);
     setIsRunning(false);
   };
