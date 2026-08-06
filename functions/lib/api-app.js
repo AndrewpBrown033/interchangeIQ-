@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -23,7 +56,21 @@ const genai_1 = require("@google/genai");
 const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const admin = __importStar(require("firebase-admin"));
 dotenv_1.default.config();
+if (!admin.apps.length) {
+    // In the deployed Cloud Function this picks up the function's own service
+    // account automatically. In local dev (server.ts) there may be no
+    // credentials available at all — that's fine, we only touch admin.auth()
+    // inside try/catch in the routes below, and local dev can fall back to
+    // the SMTP/Resend/MailerSend transports without it.
+    try {
+        admin.initializeApp();
+    }
+    catch (e) {
+        console.warn("firebase-admin initializeApp skipped:", e?.message || e);
+    }
+}
 const app = (0, express_1.default)();
 exports.app = app;
 app.use(express_1.default.json({ limit: "10mb" }));
@@ -414,7 +461,32 @@ app.post("/api/send-password-reset", async (req, res) => {
             return res.status(400).json({ error: "toEmail is required." });
         }
         const subject = "Password Reset Request — InterchangeIQ";
-        const linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
+        // Generate a REAL, working Firebase password-reset link via the Admin SDK.
+        // This replaces the old placeholder link (just the app's own root URL with
+        // a ?resetEmail= query param, which the app never actually read — so
+        // clicking it just landed back on an ordinary login screen with no way to
+        // set a new password). The Admin SDK also tells the truth about whether
+        // the account exists: unlike the client-side sendPasswordResetEmail call
+        // (which, with Firebase's "Email Enumeration Protection" enabled, always
+        // resolves successfully even for emails with no account, to avoid leaking
+        // which emails are registered), generatePasswordResetLink genuinely throws
+        // auth/user-not-found when there's no matching account, so we can report
+        // an honest error instead of a false "sent!" message.
+        let linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
+        try {
+            linkToUse = await admin.auth().generatePasswordResetLink(toEmail);
+        }
+        catch (linkErr) {
+            if (linkErr?.code === "auth/user-not-found") {
+                return res.status(404).json({
+                    error: "No account found for that email",
+                    details: `There is no InterchangeIQ account registered with ${toEmail}. Double-check the email address, or ask an admin to invite this address first.`,
+                });
+            }
+            console.warn("generatePasswordResetLink failed, falling back to placeholder link:", linkErr?.message || linkErr);
+            // Fall through with the placeholder link rather than hard-failing —
+            // e.g. local dev without Admin credentials configured.
+        }
         const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
         <div style="text-align: center; margin-bottom: 24px;">
