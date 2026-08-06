@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Player } from '../types';
+import { Player, ApiKeySettings } from '../types';
 import { POSITIONS } from '../constants';
 import { Camera, X, CheckCircle2, AlertTriangle, Loader2, UserPlus, ImagePlus } from 'lucide-react';
 
@@ -31,6 +31,8 @@ interface LineupPhotoImportProps {
   players: Player[];
   onUpdatePlayers: (players: Player[]) => void;
   onUpdateLineup: (lineup: Record<string, string>) => void;
+  apiKeys?: ApiKeySettings;
+  isDebugEnabled?: boolean;
   onClose: () => void;
 }
 
@@ -52,78 +54,114 @@ function findMatch(players: Player[], name: string, number: string): Player | nu
   return byContains || null;
 }
 
-export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLineup, onClose }: LineupPhotoImportProps) {
+export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLineup, apiKeys, isDebugEnabled, onClose }: LineupPhotoImportProps) {
   const [step, setStep] = useState<'upload' | 'processing' | 'review'>('upload');
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<MatchRow[]>([]);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const logTrace = (msg: string) => {
+    const ts = new Date().toISOString().slice(11, 23);
+    setDebugLogs((prev) => [...prev, `[${ts}] [CLIENT] ${msg}`]);
+  };
 
   const handleFileSelected = async (file: File) => {
     setError(null);
+    setDebugLogs([]);
     setStep('processing');
+    logTrace(`File selected: "${file.name}" | ${file.type || 'unknown type'} | ${(file.size / 1024).toFixed(1)} KB`);
 
     const reader = new FileReader();
     reader.onload = async () => {
       try {
+        const dataUrl = String(reader.result || '');
+        logTrace(`Image read into memory as base64 (${dataUrl.length} chars total).`);
+        logTrace(`Sending to /api/import-lineup | provider: gemini | using ${apiKeys?.geminiApiKey ? 'admin-configured key override' : 'server GEMINI_API_KEY env var'}.`);
+
+        const requestStartedAt = Date.now();
         const res = await fetch('/api/import-lineup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageBase64: reader.result,
+            imageBase64: dataUrl,
             mimeType: file.type || 'image/jpeg',
             provider: 'gemini',
+            apiKeyOverride: apiKeys?.geminiApiKey,
           }),
         });
-        const data = await res.json().catch(() => ({}));
+        logTrace(`Response received in ${Date.now() - requestStartedAt}ms | HTTP status: ${res.status} ${res.statusText}`);
+
+        const rawText = await res.text();
+        let data: any = {};
+        try {
+          data = JSON.parse(rawText);
+        } catch (parseErr) {
+          logTrace(`ERROR: response body is not valid JSON — this usually means the request never reached the API (e.g. a stale deploy, or /api/* routing isn't set up). First 300 chars of raw response: ${rawText.slice(0, 300)}`);
+        }
+
+        if (Array.isArray(data.debugLogs)) {
+          setDebugLogs((prev) => [...prev, ...data.debugLogs.map((l: string) => `[SERVER] ${l}`)]);
+        }
 
         if (!res.ok || !data.lineup) {
+          logTrace(`Request did not return a usable lineup. error="${data.error || '(none)'}" details="${data.details || '(none)'}"`);
           setError(data.error ? `${data.error}${data.details ? ` — ${data.details}` : ''}` : 'Could not read the team sheet from that photo.');
           setStep('upload');
           return;
         }
 
         const result: LineupImportResult = data.lineup;
+        logTrace(`Parsed result: ${result.onField.length} on-field, ${result.interchange.length} interchange, ${result.unplaced.length} unplaced.`);
         const newRows: MatchRow[] = [];
 
         result.onField.forEach((entry, i) => {
+          const match = findMatch(players, entry.name, entry.number);
+          logTrace(`Match "${entry.name}" #${entry.number} (${entry.position}) -> ${match ? `${match.name} (roster id ${match.id})` : 'NO MATCH'}`);
           newRows.push({
             key: `onfield-${i}`,
             section: 'onField',
             position: entry.position,
             detectedName: entry.name,
             detectedNumber: entry.number,
-            matchedPlayerId: findMatch(players, entry.name, entry.number)?.id || null,
+            matchedPlayerId: match?.id || null,
           });
         });
         result.interchange.forEach((entry, i) => {
+          const match = findMatch(players, entry.name, entry.number);
+          logTrace(`Match "${entry.name}" #${entry.number} (interchange) -> ${match ? `${match.name} (roster id ${match.id})` : 'NO MATCH'}`);
           newRows.push({
             key: `interchange-${i}`,
             section: 'interchange',
             position: '',
             detectedName: entry.name,
             detectedNumber: entry.number,
-            matchedPlayerId: findMatch(players, entry.name, entry.number)?.id || null,
+            matchedPlayerId: match?.id || null,
           });
         });
         result.unplaced.forEach((entry, i) => {
+          const match = findMatch(players, entry.name, entry.number);
+          logTrace(`Match "${entry.name}" #${entry.number} (unplaced) -> ${match ? `${match.name} (roster id ${match.id})` : 'NO MATCH'}`);
           newRows.push({
             key: `unplaced-${i}`,
             section: 'unplaced',
             position: '',
             detectedName: entry.name,
             detectedNumber: entry.number,
-            matchedPlayerId: findMatch(players, entry.name, entry.number)?.id || null,
+            matchedPlayerId: match?.id || null,
           });
         });
 
         setRows(newRows);
         setStep('review');
       } catch (err: any) {
+        logTrace(`FATAL CLIENT ERROR: ${err.message || String(err)}`);
         setError(err.message || 'Something went wrong reading that photo.');
         setStep('upload');
       }
     };
     reader.onerror = () => {
+      logTrace('FileReader error — could not read the selected file.');
       setError('Could not read that image file.');
       setStep('upload');
     };
@@ -210,6 +248,18 @@ export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLi
                   <span>{error}</span>
                 </div>
               )}
+              {isDebugEnabled && debugLogs.length > 0 && (
+                <div className="space-y-1 pt-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Debug Trace:</span>
+                  <div className="p-3 bg-black/80 rounded-xl border border-slate-800 space-y-1 text-[11px] leading-relaxed overflow-x-auto max-h-56 overflow-y-auto">
+                    {debugLogs.map((log, lIdx) => (
+                      <div key={lIdx} className="whitespace-pre-wrap break-all text-emerald-400">
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -233,9 +283,21 @@ export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLi
           )}
 
           {step === 'processing' && (
-            <div className="py-16 flex flex-col items-center gap-3">
+            <div className="py-8 flex flex-col items-center gap-3">
               <Loader2 className="w-8 h-8 text-[var(--blue)] animate-spin" />
               <p className="text-xs font-bold text-gray-500">Reading the team sheet...</p>
+              {isDebugEnabled && debugLogs.length > 0 && (
+                <div className="w-full space-y-1 pt-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Debug Trace:</span>
+                  <div className="p-3 bg-black/80 rounded-xl border border-slate-800 space-y-1 text-[11px] leading-relaxed overflow-x-auto max-h-56 overflow-y-auto">
+                    {debugLogs.map((log, lIdx) => (
+                      <div key={lIdx} className="whitespace-pre-wrap break-all text-emerald-400">
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -254,6 +316,19 @@ export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLi
               )}
               {unplacedRows.length > 0 && (
                 <RowSection title="Unplaced / Emergencies" rows={unplacedRows} players={players} onChangeMatch={handleChangeMatch} onChangePosition={handleChangePosition} onAddNew={handleAddAsNewPlayer} />
+              )}
+
+              {isDebugEnabled && debugLogs.length > 0 && (
+                <div className="space-y-1 pt-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Debug Trace:</span>
+                  <div className="p-3 bg-black/80 rounded-xl border border-slate-800 space-y-1 text-[11px] leading-relaxed overflow-x-auto max-h-56 overflow-y-auto">
+                    {debugLogs.map((log, lIdx) => (
+                      <div key={lIdx} className="whitespace-pre-wrap break-all text-emerald-400">
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}

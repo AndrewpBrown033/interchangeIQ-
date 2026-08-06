@@ -569,20 +569,35 @@ export default function App() {
   const handleUpdateTeams = async (newTeamsList: TeamProfile[]) => {
     if (!Array.isArray(newTeamsList)) return;
 
-    // Upsert each team in newTeamsList to Firestore (merge, never overwrite the whole doc)
-    for (const t of newTeamsList) {
-      const teamDocRef = doc(db, 'teams', t.id);
-      await setDoc(teamDocRef, {
-        id: t.id,
-        name: t.name,
-        createdAt: t.createdAt || Date.now(),
-        isInactive: !!t.isInactive,
-        updatedAt: Date.now()
-      }, { merge: true }).catch(err => console.warn("Error saving team doc to Firestore:", err));
-    }
-
+    // Optimistically update local state + cache FIRST, so the UI reflects the
+    // change immediately rather than waiting on a round-trip to Firestore.
     setTeams(newTeamsList);
     localStorage.setItem('iiq_teams', JSON.stringify(newTeamsList));
+
+    // Upsert each team in parallel (not one-at-a-time) to Firestore (merge, never
+    // overwrite the whole doc). IMPORTANT: every field that can actually change
+    // from the UI must be listed here — a field that's missing from this payload
+    // is silently never persisted, so the next Firestore snapshot refresh reverts
+    // it back to whatever was there before, even though the local toggle looked
+    // like it worked. (showTraining/showPlayerGrowth/showJarvis were missing here
+    // previously, which is exactly why feature toggles kept "un-doing" themselves
+    // shortly after being changed.)
+    await Promise.all(
+      newTeamsList.map((t) => {
+        const teamDocRef = doc(db, 'teams', t.id);
+        return setDoc(teamDocRef, {
+          id: t.id,
+          name: t.name,
+          createdAt: t.createdAt || Date.now(),
+          isInactive: !!t.isInactive,
+          isDemo: !!t.isDemo,
+          showTraining: t.showTraining !== false,
+          showPlayerGrowth: t.showPlayerGrowth !== false,
+          showJarvis: t.showJarvis !== false,
+          updatedAt: Date.now()
+        }, { merge: true }).catch(err => console.warn("Error saving team doc to Firestore:", err));
+      })
+    );
   };
 
   // Explicit, single-team delete. Only ever removes the exact id the user
@@ -1229,19 +1244,35 @@ export default function App() {
     if (!Array.isArray(newUsers)) return;
     const cleanUsers = deduplicateUserProfiles(newUsers);
 
-    // Sync updates and deletions directly to Firestore
     const currentUids = new Set(cleanUsers.map(u => u.uid));
     const currentUsers = Array.isArray(users) ? users : [];
     const deletedUsers = currentUsers.filter(u => !currentUids.has(u.uid));
 
-    for (const u of deletedUsers) {
-      await deleteDoc(doc(db, 'users', u.uid)).catch(e => console.warn("Error deleting user from Firestore:", e));
-    }
+    // Update local state immediately so the UI reflects the change right away,
+    // instead of waiting on a full round-trip to Firestore for every toggle.
+    setUsers(cleanUsers);
 
-    for (const u of cleanUsers) {
-      const oldU = currentUsers.find(old => old.uid === u.uid);
-      if (!oldU || JSON.stringify(oldU) !== JSON.stringify(u)) {
-        await setDoc(doc(db, 'users', u.uid), {
+    // Fire all Firestore writes in parallel rather than one-at-a-time — awaiting
+    // each write sequentially in a loop was the main cause of toggles feeling
+    // slow to save, especially with more than a couple of coaches on the roster.
+    const deletions = deletedUsers.map((u) =>
+      deleteDoc(doc(db, 'users', u.uid)).catch(e => console.warn("Error deleting user from Firestore:", e))
+    );
+
+    const updates = cleanUsers
+      .filter((u) => {
+        const oldU = currentUsers.find(old => old.uid === u.uid);
+        return !oldU || JSON.stringify(oldU) !== JSON.stringify(u);
+      })
+      .map((u) =>
+        // IMPORTANT: every field the UI can actually change must be listed here —
+        // a field missing from this payload is silently never persisted, so the
+        // next Firestore snapshot refresh reverts it back to whatever was there
+        // before. allowedFeatures was missing here previously (and this write had
+        // no { merge: true }, so it fully replaced the document each time) — that's
+        // exactly why toggling one feature off, then another, kept "re-activating"
+        // the first one moments later.
+        setDoc(doc(db, 'users', u.uid), {
           uid: u.uid,
           email: u.email,
           name: u.name,
@@ -1251,11 +1282,11 @@ export default function App() {
           invitedBy: u.invitedBy || '',
           invitedAt: u.invitedAt || 0,
           inviteCode: u.inviteCode || '',
-        }).catch(e => console.warn("Error syncing user to Firestore:", e));
-      }
-    }
+          allowedFeatures: u.allowedFeatures ?? null,
+        }, { merge: true }).catch(e => console.warn("Error syncing user to Firestore:", e))
+      );
 
-    setUsers(cleanUsers);
+    await Promise.all([...deletions, ...updates]);
   };
 
   // Real-time Firestore document subscriber (Downstream sync)
@@ -2171,6 +2202,8 @@ export default function App() {
             onUpdatePlayers={setPlayers}
             lineup={lineup}
             onUpdateLineup={setLineup}
+            apiKeys={apiKeys}
+            isDebugEnabled={isDebugEnabled}
             score={score}
             onUpdateScore={setScore}
             gameInfo={gameInfo}

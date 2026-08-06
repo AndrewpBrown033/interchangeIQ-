@@ -824,25 +824,47 @@ app.post("/api/test-smtp", async (req, res) => {
 
 // AI-powered drill import: converts raw pasted drill notes into a structured Drill object
 app.post("/api/import-lineup", async (req, res) => {
+  const debugLogs: string[] = [];
+  const logTrace = (msg: string) => {
+    const ts = new Date().toISOString().slice(11, 23);
+    const line = `[${ts}] ${msg}`;
+    debugLogs.push(line);
+    console.log(`[IMPORT-LINEUP TRACE] ${line}`);
+  };
+
   try {
     const { imageBase64, mimeType, apiKeyOverride } = req.body;
     const provider: "claude" | "gemini" = req.body.provider === "claude" ? "claude" : "gemini";
 
+    logTrace(`Request received | Provider: ${provider.toUpperCase()} | mimeType: ${mimeType || "(none given)"}`);
+
     if (!imageBase64 || !String(imageBase64).trim()) {
-      return res.status(400).json({ error: "imageBase64 is required." });
+      logTrace("ERROR: no imageBase64 present in request body.");
+      return res.status(400).json({ error: "imageBase64 is required.", debugLogs });
     }
     const cleanBase64 = String(imageBase64).replace(/^data:[^;]+;base64,/, "");
     const effectiveMime = mimeType || "image/jpeg";
+    logTrace(`Image payload size: ~${Math.round((cleanBase64.length * 3) / 4 / 1024)} KB (base64 length ${cleanBase64.length})`);
 
     const effectiveKey = provider === "gemini"
       ? (apiKeyOverride || process.env.GEMINI_API_KEY)
       : (apiKeyOverride || process.env.ANTHROPIC_API_KEY);
 
+    const keySource = apiKeyOverride
+      ? "Admin Override (Admin > Jarvis Settings)"
+      : (provider === "gemini" ? "process.env.GEMINI_API_KEY" : "process.env.ANTHROPIC_API_KEY");
+    const maskedKey = effectiveKey
+      ? (effectiveKey.length > 10 ? `${effectiveKey.slice(0, 6)}...${effectiveKey.slice(-4)}` : "PRESENT")
+      : "MISSING";
+    logTrace(`API Key Source: ${keySource} | Status: ${maskedKey}`);
+
     if (!effectiveKey) {
       const missingKeyName = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+      logTrace(`WARNING: No API key found for ${provider.toUpperCase()}.`);
       return res.status(503).json({
         error: "AI import not configured",
         details: `${missingKeyName} is not set on the server. Add a key in Admin > Jarvis Settings > API Keys, or build the lineup manually.`,
+        debugLogs,
       });
     }
 
@@ -873,7 +895,10 @@ Rules:
 - If a tag's text is unclear, make your best reading rather than omitting it — but never invent a player that isn't visibly on the board.
 - Return ONLY the JSON object.`;
 
+    logTrace(`System prompt built (${systemInstruction.length} chars). Calling ${provider.toUpperCase()} vision API...`);
+
     let raw = "";
+    const callStartedAt = Date.now();
 
     if (provider === "gemini") {
       const geminiClient = apiKeyOverride
@@ -896,6 +921,7 @@ Rules:
         },
       });
       raw = geminiResponse.text || "";
+      logTrace(`Gemini responded in ${Date.now() - callStartedAt}ms | Response length: ${raw.length} chars`);
     } else {
       const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
 
@@ -915,36 +941,51 @@ Rules:
       raw = claudeResponse.content
         .map((block: any) => (block.type === 'text' ? block.text : ''))
         .join('\n');
+      logTrace(`Claude responded in ${Date.now() - callStartedAt}ms | Response length: ${raw.length} chars`);
+    }
+
+    if (!raw.trim()) {
+      logTrace("WARNING: AI returned an empty response body.");
     }
 
     const cleaned = raw.replace(/```json|```/g, "").trim();
+    logTrace(`Raw response (first 300 chars): ${cleaned.slice(0, 300)}${cleaned.length > 300 ? '...' : ''}`);
 
     let parsed: any;
     try {
       parsed = JSON.parse(cleaned);
-    } catch (parseErr) {
+      logTrace("JSON parsed successfully.");
+    } catch (parseErr: any) {
+      logTrace(`ERROR: JSON.parse failed — ${parseErr.message || parseErr}`);
       console.error("Import lineup JSON parse error:", parseErr, cleaned);
       return res.status(502).json({
         error: "Could not parse AI response",
         details: "The AI did not return valid JSON. Try again with a clearer, well-lit photo.",
+        debugLogs,
       });
     }
 
     if (!Array.isArray(parsed.onField)) {
+      logTrace(`ERROR: parsed response missing 'onField' array. Keys received: ${Object.keys(parsed || {}).join(', ') || '(none)'}`);
       return res.status(502).json({
         error: "Incomplete lineup extracted",
         details: "The AI response was missing on-field player data. Try again with a clearer photo.",
+        debugLogs,
       });
     }
     parsed.interchange = Array.isArray(parsed.interchange) ? parsed.interchange : [];
     parsed.unplaced = Array.isArray(parsed.unplaced) ? parsed.unplaced : [];
+    logTrace(`Extracted ${parsed.onField.length} on-field, ${parsed.interchange.length} interchange, ${parsed.unplaced.length} unplaced player(s).`);
 
-    return res.json({ lineup: parsed, provider });
+    return res.json({ lineup: parsed, provider, debugLogs });
   } catch (err: any) {
+    logTrace(`FATAL ERROR: ${err.message || String(err)}`);
+    if (err.stack) logTrace(`Stack: ${String(err.stack).slice(0, 500)}`);
     console.error("Import lineup error:", err);
     return res.status(500).json({
       error: "Import lineup processing error",
       details: err.message || "An error occurred while extracting the lineup from the photo.",
+      debugLogs,
     });
   }
 });
