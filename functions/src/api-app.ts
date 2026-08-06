@@ -17,8 +17,22 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import * as admin from "firebase-admin";
 
 dotenv.config();
+
+if (!admin.apps.length) {
+  // In the deployed Cloud Function this picks up the function's own service
+  // account automatically. In local dev (server.ts) there may be no
+  // credentials available at all — that's fine, we only touch admin.auth()
+  // inside try/catch in the routes below, and local dev can fall back to
+  // the SMTP/Resend/MailerSend transports without it.
+  try {
+    admin.initializeApp();
+  } catch (e) {
+    console.warn("firebase-admin initializeApp skipped:", (e as any)?.message || e);
+  }
+}
 
 const app = express();
 
@@ -448,7 +462,32 @@ app.post("/api/send-password-reset", async (req, res) => {
     }
 
     const subject = "Password Reset Request — InterchangeIQ";
-    const linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
+
+    // Generate a REAL, working Firebase password-reset link via the Admin SDK.
+    // This replaces the old placeholder link (just the app's own root URL with
+    // a ?resetEmail= query param, which the app never actually read — so
+    // clicking it just landed back on an ordinary login screen with no way to
+    // set a new password). The Admin SDK also tells the truth about whether
+    // the account exists: unlike the client-side sendPasswordResetEmail call
+    // (which, with Firebase's "Email Enumeration Protection" enabled, always
+    // resolves successfully even for emails with no account, to avoid leaking
+    // which emails are registered), generatePasswordResetLink genuinely throws
+    // auth/user-not-found when there's no matching account, so we can report
+    // an honest error instead of a false "sent!" message.
+    let linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
+    try {
+      linkToUse = await admin.auth().generatePasswordResetLink(toEmail);
+    } catch (linkErr: any) {
+      if (linkErr?.code === "auth/user-not-found") {
+        return res.status(404).json({
+          error: "No account found for that email",
+          details: `There is no InterchangeIQ account registered with ${toEmail}. Double-check the email address, or ask an admin to invite this address first.`,
+        });
+      }
+      console.warn("generatePasswordResetLink failed, falling back to placeholder link:", linkErr?.message || linkErr);
+      // Fall through with the placeholder link rather than hard-failing —
+      // e.g. local dev without Admin credentials configured.
+    }
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
