@@ -17,22 +17,8 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-import * as admin from "firebase-admin";
 
 dotenv.config();
-
-if (!admin.apps.length) {
-  // In the deployed Cloud Function this picks up the function's own service
-  // account automatically. In local dev (server.ts) there may be no
-  // credentials available at all — that's fine, we only touch admin.auth()
-  // inside try/catch in the routes below, and local dev can fall back to
-  // the SMTP/Resend/MailerSend transports without it.
-  try {
-    admin.initializeApp();
-  } catch (e) {
-    console.warn("firebase-admin initializeApp skipped:", (e as any)?.message || e);
-  }
-}
 
 const app = express();
 
@@ -462,32 +448,7 @@ app.post("/api/send-password-reset", async (req, res) => {
     }
 
     const subject = "Password Reset Request — InterchangeIQ";
-
-    // Generate a REAL, working Firebase password-reset link via the Admin SDK.
-    // This replaces the old placeholder link (just the app's own root URL with
-    // a ?resetEmail= query param, which the app never actually read — so
-    // clicking it just landed back on an ordinary login screen with no way to
-    // set a new password). The Admin SDK also tells the truth about whether
-    // the account exists: unlike the client-side sendPasswordResetEmail call
-    // (which, with Firebase's "Email Enumeration Protection" enabled, always
-    // resolves successfully even for emails with no account, to avoid leaking
-    // which emails are registered), generatePasswordResetLink genuinely throws
-    // auth/user-not-found when there's no matching account, so we can report
-    // an honest error instead of a false "sent!" message.
-    let linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
-    try {
-      linkToUse = await admin.auth().generatePasswordResetLink(toEmail);
-    } catch (linkErr: any) {
-      if (linkErr?.code === "auth/user-not-found") {
-        return res.status(404).json({
-          error: "No account found for that email",
-          details: `There is no InterchangeIQ account registered with ${toEmail}. Double-check the email address, or ask an admin to invite this address first.`,
-        });
-      }
-      console.warn("generatePasswordResetLink failed, falling back to placeholder link:", linkErr?.message || linkErr);
-      // Fall through with the placeholder link rather than hard-failing —
-      // e.g. local dev without Admin credentials configured.
-    }
+    const linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
@@ -873,6 +834,132 @@ app.post("/api/test-smtp", async (req, res) => {
 });
 
 // AI-powered drill import: converts raw pasted drill notes into a structured Drill object
+app.post("/api/import-lineup", async (req, res) => {
+  try {
+    const { imageBase64, mimeType, apiKeyOverride } = req.body;
+    const provider: "claude" | "gemini" = req.body.provider === "claude" ? "claude" : "gemini";
+
+    if (!imageBase64 || !String(imageBase64).trim()) {
+      return res.status(400).json({ error: "imageBase64 is required." });
+    }
+    const cleanBase64 = String(imageBase64).replace(/^data:[^;]+;base64,/, "");
+    const effectiveMime = mimeType || "image/jpeg";
+
+    const effectiveKey = provider === "gemini"
+      ? (apiKeyOverride || process.env.GEMINI_API_KEY)
+      : (apiKeyOverride || process.env.ANTHROPIC_API_KEY);
+
+    if (!effectiveKey) {
+      const missingKeyName = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+      return res.status(503).json({
+        error: "AI import not configured",
+        details: `${missingKeyName} is not set on the server. Add a key in Admin > Jarvis Settings > API Keys, or build the lineup manually.`,
+      });
+    }
+
+    const systemInstruction = `You read a photo of a physical AFL (Australian Rules Football) team-sheet / interchange whiteboard and extract the starting lineup as structured JSON.
+
+The board has player name+number tags arranged into standard AFL position zones. Use ANY visible reference marks (half-lines, "50" arcs, zone labels like "CHB", the centre square, the interchange/bench box, a "ruck rotation" grid) to work out which end is attacking/forward and which is defensive — do not assume forward is always at the top of the photo, the board may be rotated.
+
+Map each on-field player to exactly one of these position codes (do not invent others):
+LFP, FF, RFP  (Full Forward line: Left Forward Pocket, Full Forward, Right Forward Pocket)
+LHF, CHF, RHF (Half Forward line)
+LW, C, RW      (Wings + Centre)
+R, RR, ROV     (Ruck, Ruck-Rover, Rover — the 3 players inside/around the centre square)
+LBF, CHB, RBF  (Half Back line)
+LBP, FB, RBP   (Full Back line: Left Back Pocket, Full Back, Right Back Pocket)
+
+Separately list any players in an "INTERCHANGE" / bench box, and any name+number tags that are visible but NOT clearly placed into an on-field position or the interchange box (e.g. a row of extra/emergency tags along an edge) as "unplaced".
+
+Return ONLY valid JSON, no markdown fences, no commentary, matching exactly this shape:
+{
+  "onField": [{ "position": string, "name": string, "number": string }],
+  "interchange": [{ "name": string, "number": string }],
+  "unplaced": [{ "name": string, "number": string }]
+}
+
+Rules:
+- "name" is exactly what's printed on the tag (usually a first name). "number" is digits only, as a string.
+- Every on-field entry must use one of the 17 position codes above, each used at most once.
+- If a tag's text is unclear, make your best reading rather than omitting it — but never invent a player that isn't visibly on the board.
+- Return ONLY the JSON object.`;
+
+    let raw = "";
+
+    if (provider === "gemini") {
+      const geminiClient = apiKeyOverride
+        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
+        : ai;
+
+      const geminiResponse = await geminiClient.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: effectiveMime, data: cleanBase64 } },
+            { text: "Extract the lineup from this team-sheet photo." },
+          ],
+        }],
+        config: {
+          systemInstruction,
+          temperature: 0.2,
+          responseMimeType: "application/json",
+        },
+      });
+      raw = geminiResponse.text || "";
+    } else {
+      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
+
+      const claudeResponse = await claudeClient.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 2048,
+        system: systemInstruction,
+        temperature: 0.2,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: effectiveMime, data: cleanBase64 } },
+            { type: "text", text: "Extract the lineup from this team-sheet photo." },
+          ],
+        }],
+      });
+      raw = claudeResponse.content
+        .map((block: any) => (block.type === 'text' ? block.text : ''))
+        .join('\n');
+    }
+
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("Import lineup JSON parse error:", parseErr, cleaned);
+      return res.status(502).json({
+        error: "Could not parse AI response",
+        details: "The AI did not return valid JSON. Try again with a clearer, well-lit photo.",
+      });
+    }
+
+    if (!Array.isArray(parsed.onField)) {
+      return res.status(502).json({
+        error: "Incomplete lineup extracted",
+        details: "The AI response was missing on-field player data. Try again with a clearer photo.",
+      });
+    }
+    parsed.interchange = Array.isArray(parsed.interchange) ? parsed.interchange : [];
+    parsed.unplaced = Array.isArray(parsed.unplaced) ? parsed.unplaced : [];
+
+    return res.json({ lineup: parsed, provider });
+  } catch (err: any) {
+    console.error("Import lineup error:", err);
+    return res.status(500).json({
+      error: "Import lineup processing error",
+      details: err.message || "An error occurred while extracting the lineup from the photo.",
+    });
+  }
+});
+
 app.post("/api/import-drill", async (req, res) => {
   try {
     const { rawText, apiKeyOverride } = req.body;
