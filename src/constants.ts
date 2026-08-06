@@ -1,6 +1,6 @@
 import { Player, Drill, SkillAssessment, TeamProfile } from './types';
 
-export const APP_VERSION = 'v1.5.1';
+export const APP_VERSION = 'v1.6';
 
 // New users (self sign-up or admin invite) start on a Provisional license with
 // access to this sandbox team so they have something to explore immediately.
