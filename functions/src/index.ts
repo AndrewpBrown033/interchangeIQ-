@@ -16,15 +16,6 @@ import { app } from "./api-app";
 export const api = onRequest(
   {
     region: "us-central1",
-    secrets: [
-      "ANTHROPIC_API_KEY",
-      "GEMINI_API_KEY",
-      "SMTP_HOST",
-      "SMTP_PORT",
-      "SMTP_USER",
-      "SMTP_PASS",
-      "SMTP_SECURE",
-    ],
     cors: true,
   },
   app

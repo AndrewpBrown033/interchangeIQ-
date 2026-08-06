@@ -17,15 +17,6 @@ const api_app_1 = require("./api-app");
 // then reference them below so the function is granted access at runtime.
 exports.api = (0, https_1.onRequest)({
     region: "us-central1",
-    secrets: [
-        "ANTHROPIC_API_KEY",
-        "GEMINI_API_KEY",
-        "SMTP_HOST",
-        "SMTP_PORT",
-        "SMTP_USER",
-        "SMTP_PASS",
-        "SMTP_SECURE",
-    ],
     cors: true,
 }, api_app_1.app);
 //# sourceMappingURL=index.js.map
