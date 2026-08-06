@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Score, Rotation, Plan, GameInfo } from '../types';
 import { POSITIONS, POSITION_GROUPS, normalizePosition, getZoneForPosition } from '../constants';
-import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp, Sparkles } from 'lucide-react';
+import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp, Sparkles, Camera } from 'lucide-react';
 import PlanModeView from './PlanModeView';
+import LineupPhotoImport from './LineupPhotoImport';
 
 const POSITION_DESCRIPTIONS: Record<string, string> = {
   'RBP': 'Right Back Pocket',
@@ -104,6 +105,7 @@ export default function GameDayScreen({
 
   // UI state overlays
   const [showPlanMode, setShowPlanMode] = useState(false);
+  const [showScanLineup, setShowScanLineup] = useState(false);
   const [scoreExpanded, setScoreExpanded] = useState(false);
   const [insightsCollapsed, setInsightsCollapsed] = useState(true);
   const [alertCollapsed, setAlertCollapsed] = useState(false);
@@ -926,6 +928,13 @@ export default function GameDayScreen({
           >
             <Layers className="w-4 h-4" />
             <span>Visual Plan Mode</span>
+          </button>
+          <button
+            onClick={() => setShowScanLineup(true)}
+            className="px-3.5 py-2 text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Scan Team Sheet</span>
           </button>
           <button
             onClick={onSaveLineup}
@@ -2380,6 +2389,16 @@ export default function GameDayScreen({
           currentQuarter={score.quarter}
           activePlanIds={activePlanIds}
           onTogglePlanRunning={onTogglePlanRunning}
+        />
+      )}
+
+      {/* Scan Team Sheet Modal */}
+      {showScanLineup && (
+        <LineupPhotoImport
+          players={players}
+          onUpdatePlayers={onUpdatePlayers}
+          onUpdateLineup={onUpdateLineup}
+          onClose={() => setShowScanLineup(false)}
         />
       )}
     </div>
