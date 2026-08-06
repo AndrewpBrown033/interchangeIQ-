@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User, sendEmailVerification } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -18,21 +18,32 @@ export type { User };
 
 export async function ensureFirebaseAuthSession(email?: string, password?: string): Promise<User | null> {
   const trimmedEmail = email ? email.trim().toLowerCase() : '';
-  const pwdToUse = password && password.length >= 6 
-    ? password 
-    : `InterchangeIQ_${trimmedEmail ? trimmedEmail.replace(/[^a-zA-Z0-9]/g, '') : 'User'}2026!`;
-  
-  if (trimmedEmail && trimmedEmail.includes('@')) {
+
+  // IMPORTANT: only ever attempt sign-in/account-creation for a specific
+  // email when an explicit, user-chosen password was passed in (i.e. this is
+  // a genuine registration or login attempt). Previously this function fell
+  // back to a DETERMINISTIC, GUESSABLE password
+  // (`InterchangeIQ_<email-with-punctuation-stripped>2026!`) whenever no
+  // password was supplied, and would silently create a brand-new Firebase
+  // Auth account under that guessed password for ANY email string passed in
+  // — including just from loading a cached email on app start, or opening
+  // the debug screen. That meant: (a) a phantom account with a *predictable*
+  // password could be created for someone else's email before they ever
+  // registered, which anyone could then log into, and (b) it produced
+  // confusing side effects like stray "verify your email" sends. If no real
+  // password is supplied, we skip straight to the anonymous/guest fallback
+  // instead of guessing.
+  if (trimmedEmail && trimmedEmail.includes('@') && password && password.length >= 6) {
     if (auth.currentUser && auth.currentUser.email?.toLowerCase() === trimmedEmail) {
       return auth.currentUser;
     }
 
     try {
-      const cred = await signInWithEmailAndPassword(auth, trimmedEmail, pwdToUse);
+      const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
       return cred.user;
     } catch (_signInErr: any) {
       try {
-        const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, pwdToUse);
+        const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
         // Send verification email for newly created users
         try {
           await sendEmailVerification(cred.user);
@@ -121,9 +132,25 @@ export interface SendPasswordResetOptions {
   };
 }
 
-// Sends a "reset your password" email using Firebase Auth and/or custom SMTP/Resend
-// server endpoints. Works for both the login screen's "Forgot password?" link and the
-// Admin > Coaches & Roles "Reset Password" action.
+// Sends a "reset your password" email using a genuine Firebase Admin-generated
+// reset link (created server-side in /api/send-password-reset), delivered via
+// your configured SMTP/MailerSend/Resend transport. Works for both the login
+// screen's "Forgot password?" link and the Admin > Coaches & Roles "Reset
+// Password" action.
+//
+// NOTE: this deliberately does NOT call the client-side Firebase Auth
+// sendPasswordResetEmail() any more. Two problems with that approach:
+//   1. With Firebase's "Email Enumeration Protection" enabled (the default
+//      for newer projects), that call resolves successfully even when no
+//      account exists for the given email, so the UI would report "reset
+//      email sent!" when nothing was actually sent.
+//   2. The link previously emailed to the user was just this app's own root
+//      URL with a ?resetEmail= query param that nothing in the app ever read
+//      — clicking it always just landed back on the ordinary login screen
+//      with no way to actually set a new password.
+// The server now uses the Firebase Admin SDK to generate a real, working
+// password-reset link (and to honestly report auth/user-not-found), which is
+// what actually fixes both issues.
 export async function sendPasswordReset(
   email: string,
   options?: SendPasswordResetOptions
@@ -133,26 +160,10 @@ export async function sendPasswordReset(
     return { ok: false, error: 'Enter a valid email address.' };
   }
 
-  // 1. Ensure a Firebase Auth session exists for this user so Firebase Auth reset can function
-  try {
-    await ensureFirebaseAuthSession(trimmedEmail);
-  } catch (_e) {
-    // Proceed even if sync fails
-  }
-
-  // 2. Try Firebase Auth client sendPasswordResetEmail
-  let firebaseOk = false;
-  let firebaseError = '';
-  try {
-    await sendPasswordResetEmail(auth, trimmedEmail);
-    firebaseOk = true;
-  } catch (err: any) {
-    console.warn('Firebase sendPasswordResetEmail warning:', err);
-    firebaseError = err.message || err.code || 'Firebase Auth reset error';
-  }
-
-  // 3. Queue to Firestore 'mail' collection (Triggers 'Trigger Email from Firestore' extension if installed on Firebase)
-  const resetUrl = options?.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`;
+  // Queue to Firestore 'mail' collection (Triggers 'Trigger Email from Firestore'
+  // extension if installed on Firebase). Best-effort only — ignored if the
+  // extension isn't installed or the write is prevented.
+  const placeholderLink = `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`;
   try {
     await sendEmailViaFirestoreExtension(
       trimmedEmail,
@@ -161,16 +172,17 @@ export async function sendPasswordReset(
         <h2>InterchangeIQ Password Reset Request</h2>
         <p>Hello ${options?.name || 'Coach'},</p>
         <p>A password reset was requested for your account (<strong>${trimmedEmail}</strong>).</p>
-        <p><a href="${resetUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold;">Reset Password Now</a></p>
-        <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">Link: ${resetUrl}</p>
+        <p>Please use the "Forgot password?" link on the InterchangeIQ login screen to receive a working reset link.</p>
       </div>`,
-      `Reset your InterchangeIQ password: ${resetUrl}`
+      `A password reset was requested for your InterchangeIQ account (${trimmedEmail}). Use the "Forgot password?" link on the login screen to receive a working reset link.`
     );
   } catch (_extErr) {
     // Ignore if collection write is prevented or extension isn't active
   }
 
-  // 4. Send via custom server endpoint (/api/send-password-reset) using Admin SMTP / server transport
+  // Send via the server endpoint (/api/send-password-reset), which generates
+  // a real Firebase Admin reset link and delivers it via Admin SMTP / server
+  // transport. This is the single source of truth for success/failure now.
   try {
     const res = await fetch('/api/send-password-reset', {
       method: 'POST',
@@ -178,44 +190,31 @@ export async function sendPasswordReset(
       body: JSON.stringify({
         toEmail: trimmedEmail,
         toName: options?.name,
-        resetLink: options?.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`,
+        resetLink: options?.resetLink,
         smtpOverride: options?.smtpOverride,
       }),
     });
 
     const data = await res.json().catch(() => ({}));
-    const fallbackLink = data.resetLink || `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`;
+    const fallbackLink = data.resetLink || placeholderLink;
 
     if (res.ok && data.success) {
       return { ok: true, transport: data.transport || 'smtp', resetLink: fallbackLink };
     }
 
-    if (firebaseOk) {
-      return {
-        ok: true,
-        transport: 'firebase',
-        resetLink: fallbackLink,
-        error: data.error,
-        details: data.details,
-      };
-    }
-
     return {
       ok: false,
-      error: data.error || firebaseError || 'Failed to send password reset email.',
+      error: data.error || 'Failed to send password reset email.',
       details: data.details || 'Check Admin > Notification Settings to configure SMTP mail server credentials.',
       resetLink: fallbackLink,
     };
   } catch (err: any) {
     console.warn('Server password reset request failed:', err);
-    const fallbackLink = `${window.location.origin}/?resetEmail=${encodeURIComponent(trimmedEmail)}`;
-    if (firebaseOk) {
-      return { ok: true, transport: 'firebase', resetLink: fallbackLink };
-    }
     return {
       ok: false,
-      error: err.message || firebaseError || 'Network error sending password reset.',
-      resetLink: fallbackLink,
+      error: err.message || 'Network error sending password reset.',
+      resetLink: placeholderLink,
     };
   }
+}
 }
