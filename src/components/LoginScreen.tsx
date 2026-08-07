@@ -12,7 +12,7 @@ import {
   UserPlus,
   Terminal
 } from 'lucide-react';
-import { auth, db, signInAnonymously, ensureFirebaseAuthSession, sendEmailVerificationToCurrentUser, sendPasswordReset } from '../lib/firebase';
+import { auth, db, signInAnonymously, ensureFirebaseAuthSession, sendEmailVerificationToCurrentUser, sendPasswordReset, checkPasswordResetCode, completePasswordReset } from '../lib/firebase';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { FirebaseDebugModal } from './FirebaseDebug';
 
@@ -45,6 +45,61 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
   const [isResending, setIsResending] = useState(false);
 
   const [isSendingReset, setIsSendingReset] = useState(false);
+
+  // "Set New Password" flow — triggered when someone arrives via the real
+  // Firebase reset link, which lands here as ?mode=resetPassword&oobCode=...
+  const [resetOobCode, setResetOobCode] = useState<string | null>(null);
+  const [resetCodeStatus, setResetCodeStatus] = useState<'checking' | 'valid' | 'invalid' | null>(null);
+  const [resetTargetEmail, setResetTargetEmail] = useState<string | null>(null);
+  const [resetCodeError, setResetCodeError] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isSubmittingNewPassword, setIsSubmittingNewPassword] = useState(false);
+  const [newPasswordDone, setNewPasswordDone] = useState(false);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+    if (mode === 'resetPassword' && oobCode) {
+      setResetOobCode(oobCode);
+      setResetCodeStatus('checking');
+      checkPasswordResetCode(oobCode).then((result) => {
+        if (result.ok) {
+          setResetCodeStatus('valid');
+          setResetTargetEmail(result.email || null);
+        } else {
+          setResetCodeStatus('invalid');
+          setResetCodeError(result.error || 'This reset link is invalid or has expired.');
+        }
+      });
+    }
+  }, []);
+
+  const handleSubmitNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetOobCode) return;
+    setResetCodeError(null);
+    if (newPassword.length < 6) {
+      setResetCodeError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setResetCodeError('Passwords do not match.');
+      return;
+    }
+    setIsSubmittingNewPassword(true);
+    const result = await completePasswordReset(resetOobCode, newPassword);
+    setIsSubmittingNewPassword(false);
+    if (result.ok) {
+      setNewPasswordDone(true);
+      if (resetTargetEmail) setEmail(resetTargetEmail);
+      // Clear the reset params from the URL so refreshing doesn't re-trigger this flow
+      window.history.replaceState({}, '', window.location.pathname);
+    } else {
+      setResetCodeError(result.error || 'Could not reset password. Please request a new reset link.');
+    }
+  };
 
   const handleForgotPassword = async () => {
     const trimmedEmail = email.trim().toLowerCase();
@@ -262,6 +317,97 @@ export default function LoginScreen({ onLoginSuccess, defaultUserName, isDebugEn
       setIsLoading(false);
     }
   };
+
+  // Real Firebase reset link landed here — show the "Set New Password" screen
+  // instead of the normal sign-in form until it's resolved.
+  if (resetOobCode) {
+    return (
+      <div className="min-h-screen bg-[#f5f6f8] flex items-center justify-center p-4 relative overflow-hidden font-sans select-none">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
+
+        <div className="w-full max-w-md bg-white border border-gray-200 rounded-3xl shadow-xl shadow-gray-200/40 p-6 relative z-10 space-y-5">
+          <div className="text-center space-y-2 pt-2 flex flex-col items-center">
+            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-150 flex items-center justify-center text-blue-600 shadow-sm">
+              <Lock className="w-7 h-7" strokeWidth={2.5} />
+            </div>
+            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Set a new password</h2>
+          </div>
+
+          {resetCodeStatus === 'checking' && (
+            <p className="text-xs text-gray-500 font-semibold text-center">Verifying your reset link...</p>
+          )}
+
+          {resetCodeStatus === 'invalid' && (
+            <div className="rounded-xl p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold text-center space-y-2">
+              <p>{resetCodeError}</p>
+              <button
+                type="button"
+                onClick={() => { setResetOobCode(null); window.history.replaceState({}, '', window.location.pathname); }}
+                className="text-blue-600 hover:underline font-bold"
+              >
+                Back to sign in
+              </button>
+            </div>
+          )}
+
+          {resetCodeStatus === 'valid' && !newPasswordDone && (
+            <>
+              <p className="text-xs text-gray-500 font-semibold text-center">
+                Choose a new password for <span className="text-gray-800">{resetTargetEmail}</span>.
+              </p>
+              {resetCodeError && (
+                <div className="rounded-xl p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold">
+                  {resetCodeError}
+                </div>
+              )}
+              <form onSubmit={handleSubmitNewPassword} className="space-y-3">
+                <input
+                  type="password"
+                  required
+                  placeholder="New password (min. 6 characters)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white font-semibold"
+                />
+                <input
+                  type="password"
+                  required
+                  placeholder="Confirm new password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white font-semibold"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmittingNewPassword}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] disabled:opacity-50 text-white rounded-xl text-xs font-black transition-all"
+                >
+                  {isSubmittingNewPassword ? 'Saving...' : 'Set New Password'}
+                </button>
+              </form>
+            </>
+          )}
+
+          {newPasswordDone && (
+            <div className="space-y-3 text-center">
+              <div className="rounded-xl p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Password updated. You can sign in now.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetOobCode(null)}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all"
+              >
+                Go to Sign In
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f6f8] flex items-center justify-center p-4 relative overflow-hidden font-sans select-none">

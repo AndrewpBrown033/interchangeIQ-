@@ -5,22 +5,8 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-import admin from "firebase-admin";
 
 dotenv.config();
-
-const firebaseAdmin = (admin as any)?.default || admin;
-const adminApps = firebaseAdmin?.apps || [];
-
-if (!adminApps.length) {
-  try {
-    if (typeof firebaseAdmin?.initializeApp === "function") {
-      firebaseAdmin.initializeApp();
-    }
-  } catch (e) {
-    console.warn("firebase-admin initializeApp skipped:", (e as any)?.message || e);
-  }
-}
 
 const app = express();
 const PORT = 3000;
@@ -28,24 +14,20 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Lazy helper for Gemini API client (used by /api/import-drill & /api/jarvis)
-function getGeminiClient(keyOverride?: string): GoogleGenAI {
-  const apiKey = keyOverride || process.env.GEMINI_API_KEY || process.env.API_KEY || "";
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
+// Initialize Gemini API client on the server side (still used by /api/import-drill)
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY || "",
+  httpOptions: {
+    headers: {
+      "User-Agent": "aistudio-build",
     },
-  });
-}
+  },
+});
 
-// Lazy helper for Claude API client (used by /api/jarvis & /api/import-drill)
-function getAnthropicClient(keyOverride?: string): Anthropic {
-  const apiKey = keyOverride || process.env.ANTHROPIC_API_KEY || "";
-  return new Anthropic({ apiKey });
-}
+// Initialize Claude API client on the server side (used by /api/jarvis)
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || "",
+});
 
 // SMTP transport for outbound invite emails (Gmail/Office365, your own mail
 // server, or an SMTP relay from SendGrid/Mailgun/Postmark/etc all work here).
@@ -106,7 +88,7 @@ app.post("/api/jarvis", async (req, res) => {
       ? squad.map((p: any) => {
           const activeMins = Math.round((p.active || 0) / 60);
           const benchMins = Math.round((p.bench || 0) / 60);
-
+          
           // Slot times heatmap breakdown
           let slotHeatmapStr = "No recorded slot time data";
           if (p.slotTimes && Object.keys(p.slotTimes).length > 0) {
@@ -222,8 +204,11 @@ ${drillsSummary}`;
       geminiContents.push({ role: 'user', parts: [{ text: message }] });
       logTrace(`[Gemini] Payload formatted with ${geminiContents.length} content turn(s). Calling Gemini API...`);
 
-      // Instantiate Gemini client on demand with effective key override if provided
-      const geminiClient = getGeminiClient(apiKeyOverride);
+      // Use a one-off client with the admin-entered key if one was supplied,
+      // otherwise fall back to the shared server-configured client.
+      const geminiClient = apiKeyOverride
+        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
+        : ai;
 
       const geminiStart = Date.now();
       try {
@@ -262,8 +247,9 @@ ${drillsSummary}`;
       claudeContents.push({ role: 'user', content: message });
       logTrace(`[Claude] Payload formatted with ${claudeContents.length} message turn(s). Calling Anthropic API...`);
 
-      // Instantiate Claude client on demand with effective key override if provided
-      const claudeClient = getAnthropicClient(apiKeyOverride);
+      // Use a one-off client with the admin-entered key if one was supplied,
+      // otherwise fall back to the shared server-configured client.
+      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
 
       const claudeStart = Date.now();
       try {
@@ -333,12 +319,17 @@ app.post("/api/send-invite", async (req, res) => {
         </p>
       </div>
     `;
+    // Plain-text alternative — some mail clients/security gateways render only this
+    // part, or strip anchor tags from the HTML part entirely. Without this, the
+    // activation link can silently disappear even though the send "succeeds".
     const text =
       `You've been invited to InterchangeIQ${teamName ? ` (${teamName})` : ""}\n\n` +
       `Hi ${toName || "there"},\n\n` +
       `${inviterName || "An administrator"} has invited you to join ${teamName || "InterchangeIQ"} as a ${role || "Coach"}.\n\n` +
       `Accept your invitation here:\n${inviteLink}\n`;
 
+    // 1. Prefer SMTP credentials entered in Admin > Notification Settings for this
+    //    request, so admins don't have to edit the server's .env file directly.
     if (smtpOverride?.host && smtpOverride?.user && smtpOverride?.pass) {
       try {
         const port = Number(smtpOverride.port) || 587;
@@ -365,6 +356,8 @@ app.post("/api/send-invite", async (req, res) => {
       }
     }
 
+    // 2. Fall back to a direct SMTP relay configured on the server itself via
+    //    SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS env vars.
     const smtpTransporter = getSmtpTransporter();
     if (smtpTransporter) {
       const SMTP_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || "";
@@ -386,10 +379,13 @@ app.post("/api/send-invite", async (req, res) => {
       }
     }
 
+    // 3. Fall back to the Resend HTTP API if neither is configured.
     const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
     const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
 
     if (!RESEND_API_KEY) {
+      // Nothing configured — tell the caller explicitly so the UI
+      // can fall back to "copy link" instead of silently pretending to succeed.
       return res.status(503).json({
         error: "Email provider not configured",
         details: "Set SMTP details in Admin > Notification Settings (recommended), SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS on the server, or RESEND_API_KEY as an alternative. Use the Copy Invite Link fallback for now.",
@@ -441,32 +437,7 @@ app.post("/api/send-password-reset", async (req, res) => {
     }
 
     const subject = "Password Reset Request — InterchangeIQ";
-
-    // Generate a REAL, working Firebase password-reset link via the Admin SDK,
-    // instead of the old placeholder link (this app's own root URL with a
-    // ?resetEmail= query param that nothing in the app ever read — clicking
-    // it just landed back on an ordinary login screen with no way to set a
-    // new password). The Admin SDK also tells the truth about whether the
-    // account exists: unlike the client-side sendPasswordResetEmail call
-    // (which, with Firebase's "Email Enumeration Protection" enabled,
-    // resolves successfully even for emails with no account, to avoid
-    // leaking which emails are registered), generatePasswordResetLink
-    // genuinely throws auth/user-not-found when there's no matching account.
-    let linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
-    try {
-      const auth = typeof firebaseAdmin?.auth === "function" ? firebaseAdmin.auth() : null;
-      if (auth) {
-        linkToUse = await auth.generatePasswordResetLink(toEmail);
-      }
-    } catch (linkErr: any) {
-      if (linkErr?.code === "auth/user-not-found") {
-        return res.status(404).json({
-          error: "No account found for that email",
-          details: `There is no InterchangeIQ account registered with ${toEmail}. Double-check the email address, or ask an admin to invite this address first.`,
-        });
-      }
-      console.warn("generatePasswordResetLink failed, falling back to placeholder link:", linkErr?.message || linkErr);
-    }
+    const linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
@@ -505,6 +476,7 @@ app.post("/api/send-password-reset", async (req, res) => {
       `Reset your password or sign in here:\n${linkToUse}\n\n` +
       `If you did not request this, you can safely ignore this email.\n`;
 
+    // 0. MailerSend API Key override entered in Admin > Notification Settings
     const msOverrideKey = smtpOverride?.mailerSendApiKey || (smtpOverride?.pass?.startsWith("mlsn.") ? smtpOverride?.pass : (smtpOverride?.user?.startsWith("mlsn.") ? smtpOverride?.user : undefined));
     if (msOverrideKey) {
       try {
@@ -537,6 +509,7 @@ app.post("/api/send-password-reset", async (req, res) => {
       }
     }
 
+    // 1. Prefer SMTP credentials entered in Admin > Notification Settings
     if (smtpOverride?.host && smtpOverride?.user && smtpOverride?.pass) {
       try {
         const port = Number(smtpOverride.port) || 587;
@@ -564,6 +537,7 @@ app.post("/api/send-password-reset", async (req, res) => {
       }
     }
 
+    // 2. Direct SMTP configured on server
     const smtpTransporter = getSmtpTransporter();
     if (smtpTransporter) {
       const SMTP_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || "";
@@ -586,6 +560,7 @@ app.post("/api/send-password-reset", async (req, res) => {
       }
     }
 
+    // 3. MailerSend REST API
     const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY || process.env.MAILERSEND_API_TOKEN || "";
     if (MAILERSEND_API_KEY) {
       try {
@@ -618,6 +593,7 @@ app.post("/api/send-password-reset", async (req, res) => {
       }
     }
 
+    // 4. Resend HTTP API
     const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
     const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InterchangeIQ <onboarding@resend.dev>";
 
@@ -684,10 +660,12 @@ app.post("/api/test-smtp", async (req, res) => {
     const cleanedHost = (host || "").trim();
     const smtpPort = Number(port) || 587;
 
+    // 1. Check if explicit MailerSend API Key or token (starts with mlsn.) is provided
     const explicitMsKey = (mailerSendApiKey || "").trim();
     const isMailerSendToken = explicitMsKey || cleanedPass.startsWith("mlsn.") || cleanedUser.startsWith("mlsn.");
     const tokenToUse = explicitMsKey || (cleanedPass.startsWith("mlsn.") ? cleanedPass : (cleanedUser.startsWith("mlsn.") ? cleanedUser : null));
 
+    // Ensure target recipient email is a valid email address
     const rawTo = (testTo || req.body.userEmail || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "")).trim();
     const targetAddress = rawTo.includes("@") ? rawTo : "coach@interchangeiq.app";
 
@@ -697,7 +675,7 @@ app.post("/api/test-smtp", async (req, res) => {
       const maskedKey = tokenToUse.length > 10 ? `${tokenToUse.slice(0, 7)}...${tokenToUse.slice(-4)}` : "mlsn.****";
       log(`Detected MailerSend API key/token: ${maskedKey}.`);
       log(`Routing test via MailerSend REST API (HTTPS POST https://api.mailersend.com/v1/email)...`);
-
+      
       const rawFrom = (from || (cleanedUser.includes("@") && !cleanedUser.startsWith("mlsn.") ? cleanedUser : "")).trim();
       const senderEmail = rawFrom.includes("@") ? rawFrom : "info@interchangeiq.app";
       log(`Configured Sender: "${senderEmail}" | Target Recipient: "${targetAddress}"`);
@@ -784,6 +762,7 @@ app.post("/api/test-smtp", async (req, res) => {
       });
     }
 
+    // 2. Standard SMTP Transport Test with Nodemailer
     log(`Creating Nodemailer transport for ${cleanedHost}:${smtpPort} (implicit TLS: ${smtpPort === 465})...`);
     const transporter = nodemailer.createTransport({
       host: cleanedHost,
@@ -794,7 +773,7 @@ app.post("/api/test-smtp", async (req, res) => {
       greetingTimeout: 8000,
       socketTimeout: 8000,
       tls: {
-        rejectUnauthorized: false,
+        rejectUnauthorized: false, // Prevent self-signed cert blocking
       },
     });
 
@@ -844,6 +823,173 @@ app.post("/api/test-smtp", async (req, res) => {
 });
 
 // AI-powered drill import: converts raw pasted drill notes into a structured Drill object
+app.post("/api/import-lineup", async (req, res) => {
+  const debugLogs: string[] = [];
+  const logTrace = (msg: string) => {
+    const ts = new Date().toISOString().slice(11, 23);
+    const line = `[${ts}] ${msg}`;
+    debugLogs.push(line);
+    console.log(`[IMPORT-LINEUP TRACE] ${line}`);
+  };
+
+  try {
+    const { imageBase64, mimeType, apiKeyOverride } = req.body;
+    const provider: "claude" | "gemini" = req.body.provider === "claude" ? "claude" : "gemini";
+
+    logTrace(`Request received | Provider: ${provider.toUpperCase()} | mimeType: ${mimeType || "(none given)"}`);
+
+    if (!imageBase64 || !String(imageBase64).trim()) {
+      logTrace("ERROR: no imageBase64 present in request body.");
+      return res.status(400).json({ error: "imageBase64 is required.", debugLogs });
+    }
+    const cleanBase64 = String(imageBase64).replace(/^data:[^;]+;base64,/, "");
+    const effectiveMime = mimeType || "image/jpeg";
+    logTrace(`Image payload size: ~${Math.round((cleanBase64.length * 3) / 4 / 1024)} KB (base64 length ${cleanBase64.length})`);
+
+    const effectiveKey = provider === "gemini"
+      ? (apiKeyOverride || process.env.GEMINI_API_KEY)
+      : (apiKeyOverride || process.env.ANTHROPIC_API_KEY);
+
+    const keySource = apiKeyOverride
+      ? "Admin Override (Admin > Jarvis Settings)"
+      : (provider === "gemini" ? "process.env.GEMINI_API_KEY" : "process.env.ANTHROPIC_API_KEY");
+    const maskedKey = effectiveKey
+      ? (effectiveKey.length > 10 ? `${effectiveKey.slice(0, 6)}...${effectiveKey.slice(-4)}` : "PRESENT")
+      : "MISSING";
+    logTrace(`API Key Source: ${keySource} | Status: ${maskedKey}`);
+
+    if (!effectiveKey) {
+      const missingKeyName = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+      logTrace(`WARNING: No API key found for ${provider.toUpperCase()}.`);
+      return res.status(503).json({
+        error: "AI import not configured",
+        details: `${missingKeyName} is not set on the server. Add a key in Admin > Jarvis Settings > API Keys, or build the lineup manually.`,
+        debugLogs,
+      });
+    }
+
+    const systemInstruction = `You read a photo of a physical AFL (Australian Rules Football) team-sheet / interchange whiteboard and extract the starting lineup as structured JSON.
+
+The board has player name+number tags arranged into standard AFL position zones. Use ANY visible reference marks (half-lines, "50" arcs, zone labels like "CHB", the centre square, the interchange/bench box, a "ruck rotation" grid) to work out which end is attacking/forward and which is defensive — do not assume forward is always at the top of the photo, the board may be rotated.
+
+Map each on-field player to exactly one of these position codes (do not invent others):
+LFP, FF, RFP  (Full Forward line: Left Forward Pocket, Full Forward, Right Forward Pocket)
+LHF, CHF, RHF (Half Forward line)
+LW, C, RW      (Wings + Centre)
+R, RR, ROV     (Ruck, Ruck-Rover, Rover — the 3 players inside/around the centre square)
+LBF, CHB, RBF  (Half Back line)
+LBP, FB, RBP   (Full Back line: Left Back Pocket, Full Back, Right Back Pocket)
+
+Separately list any players in an "INTERCHANGE" / bench box, and any name+number tags that are visible but NOT clearly placed into an on-field position or the interchange box (e.g. a row of extra/emergency tags along an edge) as "unplaced".
+
+Return ONLY valid JSON, no markdown fences, no commentary, matching exactly this shape:
+{
+  "onField": [{ "position": string, "name": string, "number": string }],
+  "interchange": [{ "name": string, "number": string }],
+  "unplaced": [{ "name": string, "number": string }]
+}
+
+Rules:
+- "name" is exactly what's printed on the tag (usually a first name). "number" is digits only, as a string.
+- Every on-field entry must use one of the 17 position codes above, each used at most once.
+- If a tag's text is unclear, make your best reading rather than omitting it — but never invent a player that isn't visibly on the board.
+- Return ONLY the JSON object.`;
+
+    logTrace(`System prompt built (${systemInstruction.length} chars). Calling ${provider.toUpperCase()} vision API...`);
+
+    let raw = "";
+    const callStartedAt = Date.now();
+
+    if (provider === "gemini") {
+      const geminiClient = apiKeyOverride
+        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
+        : ai;
+
+      const geminiResponse = await geminiClient.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: effectiveMime, data: cleanBase64 } },
+            { text: "Extract the lineup from this team-sheet photo." },
+          ],
+        }],
+        config: {
+          systemInstruction,
+          temperature: 0.2,
+          responseMimeType: "application/json",
+        },
+      });
+      raw = geminiResponse.text || "";
+      logTrace(`Gemini responded in ${Date.now() - callStartedAt}ms | Response length: ${raw.length} chars`);
+    } else {
+      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
+
+      const claudeResponse = await claudeClient.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 2048,
+        system: systemInstruction,
+        temperature: 0.2,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: effectiveMime, data: cleanBase64 } },
+            { type: "text", text: "Extract the lineup from this team-sheet photo." },
+          ],
+        }],
+      });
+      raw = claudeResponse.content
+        .map((block: any) => (block.type === 'text' ? block.text : ''))
+        .join('\n');
+      logTrace(`Claude responded in ${Date.now() - callStartedAt}ms | Response length: ${raw.length} chars`);
+    }
+
+    if (!raw.trim()) {
+      logTrace("WARNING: AI returned an empty response body.");
+    }
+
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+    logTrace(`Raw response (first 300 chars): ${cleaned.slice(0, 300)}${cleaned.length > 300 ? '...' : ''}`);
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+      logTrace("JSON parsed successfully.");
+    } catch (parseErr: any) {
+      logTrace(`ERROR: JSON.parse failed — ${parseErr.message || parseErr}`);
+      console.error("Import lineup JSON parse error:", parseErr, cleaned);
+      return res.status(502).json({
+        error: "Could not parse AI response",
+        details: "The AI did not return valid JSON. Try again with a clearer, well-lit photo.",
+        debugLogs,
+      });
+    }
+
+    if (!Array.isArray(parsed.onField)) {
+      logTrace(`ERROR: parsed response missing 'onField' array. Keys received: ${Object.keys(parsed || {}).join(', ') || '(none)'}`);
+      return res.status(502).json({
+        error: "Incomplete lineup extracted",
+        details: "The AI response was missing on-field player data. Try again with a clearer photo.",
+        debugLogs,
+      });
+    }
+    parsed.interchange = Array.isArray(parsed.interchange) ? parsed.interchange : [];
+    parsed.unplaced = Array.isArray(parsed.unplaced) ? parsed.unplaced : [];
+    logTrace(`Extracted ${parsed.onField.length} on-field, ${parsed.interchange.length} interchange, ${parsed.unplaced.length} unplaced player(s).`);
+
+    return res.json({ lineup: parsed, provider, debugLogs });
+  } catch (err: any) {
+    logTrace(`FATAL ERROR: ${err.message || String(err)}`);
+    if (err.stack) logTrace(`Stack: ${String(err.stack).slice(0, 500)}`);
+    console.error("Import lineup error:", err);
+    return res.status(500).json({
+      error: "Import lineup processing error",
+      details: err.message || "An error occurred while extracting the lineup from the photo.",
+      debugLogs,
+    });
+  }
+});
+
 app.post("/api/import-drill", async (req, res) => {
   try {
     const { rawText, apiKeyOverride } = req.body;
@@ -894,7 +1040,9 @@ Rules:
     let raw = "";
 
     if (provider === "gemini") {
-      const geminiClient = getGeminiClient(apiKeyOverride);
+      const geminiClient = apiKeyOverride
+        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
+        : ai;
 
       const geminiResponse = await geminiClient.models.generateContent({
         model: "gemini-3.6-flash",
@@ -907,7 +1055,7 @@ Rules:
       });
       raw = geminiResponse.text || "";
     } else {
-      const claudeClient = getAnthropicClient(apiKeyOverride);
+      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
 
       const claudeResponse = await claudeClient.messages.create({
         model: "claude-sonnet-5",
@@ -964,30 +1112,24 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
 });
 
 async function startServer() {
-  try {
-    // Vite middleware for development mode
-    if (process.env.NODE_ENV !== "production") {
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: "spa",
-      });
-      app.use(vite.middlewares);
-    } else {
-      const distPath = path.join(process.cwd(), "dist");
-      app.use(express.static(distPath));
-      app.get("*", (_req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
-      });
-    }
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://0.0.0.0:${PORT}`);
+  // Vite middleware for development mode
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
     });
-  } catch (err) {
-    console.error("Failed to start server:", err);
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
   }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  });
 }
 
-startServer().catch((err) => {
-  console.error("Fatal error starting server:", err);
-});
+startServer();

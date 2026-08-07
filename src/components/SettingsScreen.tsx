@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Player, AuditLogEntry, TeamProfile } from '../types';
 import { Palette, Download, Upload, ClipboardList, RefreshCw, User, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark, CheckCircle2, Cloud, Play, Loader2 } from 'lucide-react';
 import CsvImportGuide from './CsvImportGuide';
+import ConfirmModal from './ConfirmModal';
 
 interface SettingsScreenProps {
   currentTheme: string;
@@ -73,6 +74,12 @@ export default function SettingsScreen({
   // Login Sync Rule testing state
   const [isTestingLoginSync, setIsTestingLoginSync] = useState(false);
   const [loginSyncNotice, setLoginSyncNotice] = useState<string | null>(null);
+
+  // Confirmation gate for every toggle on this screen (sound, haptics, theme)
+  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
+  const confirmToggle = (title: string, message: string, action: () => void) => {
+    setPendingConfirm({ title, message, action });
+  };
 
   const handleRunLoginSyncTest = async () => {
     if (!onPerformLoginSync) return;
@@ -584,7 +591,14 @@ export default function SettingsScreen({
               {THEMES.map((t) => (
                 <div
                   key={t.id}
-                  onClick={() => onChangeTheme(t.id)}
+                  onClick={() => {
+                    if (t.id === currentTheme) return;
+                    confirmToggle(
+                      'Change App Theme?',
+                      `Switch your dashboard colour style to "${t.name}"? This applies immediately across all screens.`,
+                      () => onChangeTheme(t.id)
+                    );
+                  }}
                   className={`p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition flex items-center justify-between gap-3 ${
                     currentTheme === t.id ? 'border-[var(--blue)] bg-blue-50/20 shadow-xs' : 'border-gray-100'
                   }`}
@@ -715,7 +729,14 @@ export default function SettingsScreen({
                   <input
                     type="checkbox"
                     checked={soundEnabled}
-                    onChange={(e) => onChangeSoundEnabled(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      confirmToggle(
+                        next ? 'Turn On Audio Chime Alerts?' : 'Turn Off Audio Chime Alerts?',
+                        next ? 'Enable audio chime alerts for rotations and match events?' : 'Disable audio chime alerts for rotations and match events?',
+                        () => onChangeSoundEnabled(next)
+                      );
+                    }}
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                   />
                 </div>
@@ -765,7 +786,14 @@ export default function SettingsScreen({
                   <input
                     type="checkbox"
                     checked={hapticEnabled}
-                    onChange={(e) => onChangeHapticEnabled(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      confirmToggle(
+                        next ? 'Turn On Haptic Vibration?' : 'Turn Off Haptic Vibration?',
+                        next ? 'Enable haptic vibration feedback for rotations and match events?' : 'Disable haptic vibration feedback for rotations and match events?',
+                        () => onChangeHapticEnabled(next)
+                      );
+                    }}
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                   />
                 </div>
@@ -885,6 +913,17 @@ export default function SettingsScreen({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={!!pendingConfirm}
+        title={pendingConfirm?.title || ''}
+        message={pendingConfirm?.message || ''}
+        onCancel={() => setPendingConfirm(null)}
+        onConfirm={() => {
+          pendingConfirm?.action();
+          setPendingConfirm(null);
+        }}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { doc, setDoc, getDoc, onSnapshot, collection, deleteDoc, getDocs } from 
 
 // Screens imports
 import SummaryScreen from './components/SummaryScreen';
+import ConfirmModal from './components/ConfirmModal';
 import JarvisScreen from './components/JarvisScreen';
 import GameDayScreen from './components/GameDayScreen';
 import RotationsScreen from './components/RotationsScreen';
@@ -2426,38 +2427,14 @@ export default function App() {
       )}
 
       {/* MODAL overlay: Confirm Team Switch dialog */}
-      {pendingTeamSwitch && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-[2000] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm border border-[var(--line)] shadow-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <h3 className="text-sm font-black text-[var(--navy)]">Switch Active Team?</h3>
-              <button onClick={() => setPendingTeamSwitch(null)} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-              Switch your active squad to <span className="font-extrabold text-[var(--ink)]">{pendingTeamSwitch.name}</span>?
-              Your current team's data will be saved first.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                onClick={() => setPendingTeamSwitch(null)}
-                className="px-4 py-2 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmSwitchTeam}
-                className="px-4 py-2 text-xs font-black text-white bg-[var(--blue)] hover:opacity-90 rounded-xl cursor-pointer"
-              >
-                OK, Switch Team
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={!!pendingTeamSwitch}
+        title="Switch Active Team?"
+        message={`Switch your active squad to ${pendingTeamSwitch?.name || 'this team'}? Your current team's data will be saved first.`}
+        confirmLabel="OK, Switch Team"
+        onCancel={() => setPendingTeamSwitch(null)}
+        onConfirm={confirmSwitchTeam}
+      />
 
       {/* MODAL overlay: New Game Configuration dialog */}
       {showNewGameModal && (

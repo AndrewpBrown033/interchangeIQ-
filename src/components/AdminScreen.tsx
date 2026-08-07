@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameHistory, ApiKeySettings, NotificationSettings } from '../types';
 import { DEFAULT_PLAYERS, DEMO_TEAM_ID } from '../constants';
 import { sendPasswordReset } from '../lib/firebase';
+import ConfirmModal from './ConfirmModal';
 import {
   Plus,
   Trash,
@@ -861,6 +862,14 @@ export default function AdminScreen({
   };
 
   // Inline "Edit coach details" state for the Coaches & Roles list
+  // Confirmation gate for every toggle on this screen (feature access, team
+  // status, role/team assignment, debug mode) — same shared modal used for
+  // team switching, so every confirmation in the app looks/behaves the same.
+  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
+  const confirmToggle = (title: string, message: string, action: () => void) => {
+    setPendingConfirm({ title, message, action });
+  };
+
   const [editingUserUid, setEditingUserUid] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -1257,7 +1266,16 @@ export default function AdminScreen({
                   </div>
                   <button
                     disabled={!isElevatedRole}
-                    onClick={() => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showTraining')}
+                    onClick={() => {
+                      const isOn = teams.find(t => t.id === activeTeamId)?.showTraining !== false;
+                      confirmToggle(
+                        isOn ? 'Turn Off Training Module?' : 'Turn On Training Module?',
+                        isOn
+                          ? 'Hide the drill library, tactical training plans, and session builder for this team?'
+                          : 'Show the drill library, tactical training plans, and session builder for this team?',
+                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showTraining')
+                      );
+                    }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
                       (teams.find(t => t.id === activeTeamId)?.showTraining !== false)
                         ? 'bg-indigo-600 justify-end'
@@ -1286,7 +1304,16 @@ export default function AdminScreen({
                   </div>
                   <button
                     disabled={!isElevatedRole}
-                    onClick={() => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showPlayerGrowth')}
+                    onClick={() => {
+                      const isOn = teams.find(t => t.id === activeTeamId)?.showPlayerGrowth !== false;
+                      confirmToggle(
+                        isOn ? 'Turn Off Player Growth?' : 'Turn On Player Growth?',
+                        isOn
+                          ? 'Hide skill assessments, 2km time trials, and player growth metrics for this team?'
+                          : 'Show skill assessments, 2km time trials, and player growth metrics for this team?',
+                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showPlayerGrowth')
+                      );
+                    }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
                       (teams.find(t => t.id === activeTeamId)?.showPlayerGrowth !== false)
                         ? 'bg-emerald-600 justify-end'
@@ -1315,7 +1342,16 @@ export default function AdminScreen({
                   </div>
                   <button
                     disabled={!isElevatedRole}
-                    onClick={() => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showJarvis')}
+                    onClick={() => {
+                      const isOn = teams.find(t => t.id === activeTeamId)?.showJarvis !== false;
+                      confirmToggle(
+                        isOn ? 'Turn Off JARVIS AI Assistant?' : 'Turn On JARVIS AI Assistant?',
+                        isOn
+                          ? 'Hide the JARVIS AI Assistant for this team?'
+                          : 'Show the JARVIS AI Assistant for this team?',
+                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showJarvis')
+                      );
+                    }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
                       (teams.find(t => t.id === activeTeamId)?.showJarvis !== false)
                         ? 'bg-purple-600 justify-end'
@@ -1344,7 +1380,16 @@ export default function AdminScreen({
                   </div>
                   <button
                     disabled={!isElevatedRole}
-                    onClick={() => onToggleDebug && onToggleDebug(!isDebugEnabled)}
+                    onClick={() => {
+                      const next = !isDebugEnabled;
+                      confirmToggle(
+                        next ? 'Turn On System Debugger?' : 'Turn Off System Debugger?',
+                        next
+                          ? 'Enable the debug button and trace panels across the app (Login screen, Jarvis, Scan Team Sheet, etc.)?'
+                          : 'Disable the debug button and trace panels across the app?',
+                        () => onToggleDebug && onToggleDebug(next)
+                      );
+                    }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
                       isDebugEnabled
                         ? 'bg-blue-600 justify-end'
@@ -1643,7 +1688,13 @@ export default function AdminScreen({
                             >
                               {t?.name || tid}
                               <button
-                                onClick={() => handleAssignTeamToUser(effectiveSelectedCoach.uid, tid)}
+                                onClick={() => {
+                                  confirmToggle(
+                                    `Remove ${t?.name || tid} Access?`,
+                                    `Remove ${effectiveSelectedCoach.name}'s access to ${t?.name || tid}?`,
+                                    () => handleAssignTeamToUser(effectiveSelectedCoach.uid, tid)
+                                  );
+                                }}
                                 className={`rounded p-0.5 cursor-pointer ${t?.isDemo ? 'hover:bg-amber-100' : 'hover:bg-blue-100'}`}
                                 title={`Remove ${t?.name || tid}`}
                               >
@@ -1696,7 +1747,13 @@ export default function AdminScreen({
                           >
                             {u.name}
                             <button
-                              onClick={() => handleAssignTeamToUser(u.uid, effectiveSelectedTeam.id)}
+                              onClick={() => {
+                                confirmToggle(
+                                  `Remove ${u.name} from ${effectiveSelectedTeam.name}?`,
+                                  `Remove ${u.name}'s access to ${effectiveSelectedTeam.name}?`,
+                                  () => handleAssignTeamToUser(u.uid, effectiveSelectedTeam.id)
+                                );
+                              }}
                               className="hover:bg-blue-100 rounded p-0.5 cursor-pointer"
                               title={`Remove ${u.name}`}
                             >
@@ -1849,7 +1906,15 @@ export default function AdminScreen({
                           <span>Invite Coach</span>
                         </button>
                         <button
-                          onClick={() => handleToggleTeamInactive(t.id)}
+                          onClick={() => {
+                            confirmToggle(
+                              isInactive ? 'Reactivate Team?' : 'End Season for This Team?',
+                              isInactive
+                                ? `Reactivate ${t.name} for a new season?`
+                                : `Mark ${t.name} as inactive now that the season has finished?`,
+                              () => handleToggleTeamInactive(t.id)
+                            );
+                          }}
                           className={`px-2.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition border ${
                             isInactive
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
@@ -2110,7 +2175,15 @@ export default function AdminScreen({
                               <button
                                 key={`user-feat-${u.uid}-${feat.key}`}
                                 disabled={u.role === 'Admin'}
-                                onClick={() => handleToggleUserFeature(u.uid, feat.key)}
+                                onClick={() => {
+                                  confirmToggle(
+                                    isAllowed ? `Turn Off ${feat.label} for ${u.name}?` : `Turn On ${feat.label} for ${u.name}?`,
+                                    isAllowed
+                                      ? `Remove ${u.name}'s access to ${feat.label}?`
+                                      : `Grant ${u.name} access to ${feat.label}?`,
+                                    () => handleToggleUserFeature(u.uid, feat.key)
+                                  );
+                                }}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
                                   isAllowed
                                     ? 'bg-emerald-50 text-emerald-950 border-emerald-300 shadow-2xs'
@@ -2276,7 +2349,15 @@ export default function AdminScreen({
                                 <button
                                   key={`pending-feat-${u.uid}-${feat.key}`}
                                   disabled={u.role === 'Admin'}
-                                  onClick={() => handleToggleUserFeature(u.uid, feat.key)}
+                                  onClick={() => {
+                                    confirmToggle(
+                                      isAllowed ? `Turn Off ${feat.label} for ${u.name}?` : `Turn On ${feat.label} for ${u.name}?`,
+                                      isAllowed
+                                        ? `Remove ${u.name}'s access to ${feat.label}?`
+                                        : `Grant ${u.name} access to ${feat.label}?`,
+                                      () => handleToggleUserFeature(u.uid, feat.key)
+                                    );
+                                  }}
                                   className={`px-2 py-0.5 rounded text-[9px] font-bold border transition flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed ${
                                     isAllowed
                                       ? 'bg-blue-50 text-blue-900 border-blue-200'
@@ -3673,6 +3754,17 @@ export default function AdminScreen({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!pendingConfirm}
+        title={pendingConfirm?.title || ''}
+        message={pendingConfirm?.message || ''}
+        onCancel={() => setPendingConfirm(null)}
+        onConfirm={() => {
+          pendingConfirm?.action();
+          setPendingConfirm(null);
+        }}
+      />
     </div>
   );
 }
