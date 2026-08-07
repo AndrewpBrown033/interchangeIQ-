@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, Score, GameInfo, Rotation, Plan } from '../types';
+import { Player, Score, GameInfo, Rotation, Plan, ApiKeySettings } from '../types';
 import { POSITIONS, POSITION_GROUPS, POSITION_FULL_NAMES, normalizePosition } from '../constants';
 import LineupPhotoImport from './LineupPhotoImport';
 import PlanModeView from './PlanModeView';
@@ -35,6 +35,8 @@ export interface GameDayScreenProps {
   onUpdatePlayers: (players: Player[]) => void;
   lineup: Record<string, string>; // slotName -> playerId
   onUpdateLineup: (lineup: Record<string, string>) => void;
+  apiKeys?: ApiKeySettings;
+  isDebugEnabled?: boolean;
   score: Score;
   onUpdateScore: (score: Score) => void;
   gameInfo: GameInfo;
@@ -64,6 +66,8 @@ export default function GameDayScreen({
   onUpdatePlayers,
   lineup,
   onUpdateLineup,
+  apiKeys,
+  isDebugEnabled,
   score,
   onUpdateScore,
   gameInfo,
@@ -298,6 +302,8 @@ export default function GameDayScreen({
           players={players}
           onUpdatePlayers={onUpdatePlayers}
           onUpdateLineup={onUpdateLineup}
+          apiKeys={apiKeys}
+          isDebugEnabled={isDebugEnabled}
           onClose={() => setShowScanLineup(false)}
         />
       )}
