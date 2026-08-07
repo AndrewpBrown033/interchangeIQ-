@@ -487,33 +487,37 @@ export default function App() {
       });
 
       setTeams((prevTeams) => {
-        let cachedLocalTeams: TeamProfile[] = [];
-        try {
-          const raw = localStorage.getItem('iiq_teams');
-          if (raw) cachedLocalTeams = JSON.parse(raw);
-        } catch (e) {
-          console.warn("Error reading iiq_teams from localStorage:", e);
+        // Firestore is the single source of truth for which teams EXIST. This
+        // used to also merge in anything cached locally/in-memory that Firestore
+        // didn't currently have, meant to preserve teams created while offline —
+        // but that had no way to tell "not yet synced to the server" apart from
+        // "deliberately deleted", so deleting ANY team would get silently
+        // resurrected the next time this listener fired for an unrelated change
+        // (e.g. deleting a second team). A deletion must always win.
+        //
+        // The only time we still fall back to a local cache is if this snapshot
+        // is being served while genuinely offline AND we have no data at all yet
+        // (e.g. first load with no network) — never to "add back" something the
+        // server has just told us doesn't exist.
+        const isOfflineWithNoData =
+          snapshot.metadata.fromCache &&
+          remoteTeams.length === 0 &&
+          (!Array.isArray(prevTeams) || prevTeams.length === 0);
+
+        let merged: TeamProfile[];
+        if (isOfflineWithNoData) {
+          let cachedLocalTeams: TeamProfile[] = [];
+          try {
+            const raw = localStorage.getItem('iiq_teams');
+            if (raw) cachedLocalTeams = JSON.parse(raw);
+          } catch (e) {
+            console.warn("Error reading iiq_teams from localStorage:", e);
+          }
+          merged = Array.isArray(cachedLocalTeams) ? cachedLocalTeams : [];
+        } else {
+          merged = [...remoteTeams];
         }
 
-        // Firestore is the source of truth whenever a team already exists
-        // there — local cache / in-memory state must NEVER override a name
-        // that just arrived from the server, since that cache can be stale
-        // (a different device may have renamed the team since this tab last
-        // wrote to localStorage). Local data is only used to fill in teams
-        // that haven't made it to Firestore yet (e.g. created while offline).
-        const teamMap = new Map<string, TeamProfile>();
-        // 1. Remote cloud teams (authoritative)
-        remoteTeams.forEach(t => teamMap.set(t.id, t));
-        // 2. Cached local teams — only add ones NOT already known to Firestore
-        (Array.isArray(cachedLocalTeams) ? cachedLocalTeams : []).forEach(t => {
-          if (!teamMap.has(t.id)) teamMap.set(t.id, t);
-        });
-        // 3. Existing in-memory state — only add ones NOT already known
-        (Array.isArray(prevTeams) ? prevTeams : []).forEach(t => {
-          if (!teamMap.has(t.id)) teamMap.set(t.id, t);
-        });
-
-        const merged = Array.from(teamMap.values());
         if (merged.length === 0) {
           merged.push({ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() });
         }
@@ -1135,21 +1139,29 @@ export default function App() {
       });
 
       setUsers((prevUsers) => {
-        let cachedLocalUsers: UserProfile[] = [];
-        try {
-          const raw = localStorage.getItem('iiq_users');
-          if (raw) cachedLocalUsers = JSON.parse(raw);
-        } catch (e) {
-          console.warn("Error reading iiq_users from localStorage:", e);
+        // Same principle as the teams listener above: Firestore is the single
+        // source of truth for which users EXIST. Merging in anything ever seen
+        // locally/in-memory made deletions impossible to keep — deleting one
+        // coach, then a second, would resurrect the first the moment this
+        // listener fired again for the unrelated change.
+        const isOfflineWithNoData =
+          snapshot.metadata.fromCache &&
+          remoteUsers.length === 0 &&
+          (!Array.isArray(prevUsers) || prevUsers.length === 0);
+
+        let merged: UserProfile[];
+        if (isOfflineWithNoData) {
+          let cachedLocalUsers: UserProfile[] = [];
+          try {
+            const raw = localStorage.getItem('iiq_users');
+            if (raw) cachedLocalUsers = JSON.parse(raw);
+          } catch (e) {
+            console.warn("Error reading iiq_users from localStorage:", e);
+          }
+          merged = deduplicateUserProfiles(Array.isArray(cachedLocalUsers) ? cachedLocalUsers : []);
+        } else {
+          merged = deduplicateUserProfiles(remoteUsers);
         }
-
-        const userMap = new Map<string, UserProfile>();
-        (Array.isArray(prevUsers) ? prevUsers : []).forEach(u => userMap.set(u.uid, u));
-        (Array.isArray(cachedLocalUsers) ? cachedLocalUsers : []).forEach(u => userMap.set(u.uid, u));
-        remoteUsers.forEach(u => userMap.set(u.uid, u));
-
-        const mergedRaw = Array.from(userMap.values());
-        const merged = deduplicateUserProfiles(mergedRaw);
 
         if (merged.length === 0) {
           merged.push({ uid: 'u1', email: 'coach@example.com', name: userName || 'Coach Andrew', role: 'Admin', teamIds: ['team1'] });
