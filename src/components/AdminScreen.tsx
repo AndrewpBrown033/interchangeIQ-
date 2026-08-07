@@ -1265,8 +1265,11 @@ export default function AdminScreen({
                     <span className="text-xs font-black text-gray-900">Training Module</span>
                   </div>
                   <button
-                    disabled={!isElevatedRole}
                     onClick={() => {
+                      if (!isElevatedRole) {
+                        alert('You need Admin or Coach access to change this setting.');
+                        return;
+                      }
                       const isOn = teams.find(t => t.id === activeTeamId)?.showTraining !== false;
                       confirmToggle(
                         isOn ? 'Turn Off Training Module?' : 'Turn On Training Module?',
@@ -1276,12 +1279,14 @@ export default function AdminScreen({
                         () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showTraining')
                       );
                     }}
-                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
+                      !isElevatedRole ? 'opacity-60' : ''
+                    } ${
                       (teams.find(t => t.id === activeTeamId)?.showTraining !== false)
                         ? 'bg-indigo-600 justify-end'
                         : 'bg-gray-300 justify-start'
                     } flex items-center`}
-                    title="Toggle Training module visibility"
+                    title={isElevatedRole ? 'Toggle Training module visibility' : 'You need Admin or Coach access to change this setting'}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
                   </button>
@@ -1303,8 +1308,11 @@ export default function AdminScreen({
                     <span className="text-xs font-black text-gray-900">Player Growth</span>
                   </div>
                   <button
-                    disabled={!isElevatedRole}
                     onClick={() => {
+                      if (!isElevatedRole) {
+                        alert('You need Admin or Coach access to change this setting.');
+                        return;
+                      }
                       const isOn = teams.find(t => t.id === activeTeamId)?.showPlayerGrowth !== false;
                       confirmToggle(
                         isOn ? 'Turn Off Player Growth?' : 'Turn On Player Growth?',
@@ -1314,12 +1322,14 @@ export default function AdminScreen({
                         () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showPlayerGrowth')
                       );
                     }}
-                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
+                      !isElevatedRole ? 'opacity-60' : ''
+                    } ${
                       (teams.find(t => t.id === activeTeamId)?.showPlayerGrowth !== false)
                         ? 'bg-emerald-600 justify-end'
                         : 'bg-gray-300 justify-start'
                     } flex items-center`}
-                    title="Toggle Player Growth module visibility"
+                    title={isElevatedRole ? 'Toggle Player Growth module visibility' : 'You need Admin or Coach access to change this setting'}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
                   </button>
@@ -1341,8 +1351,11 @@ export default function AdminScreen({
                     <span className="text-xs font-black text-gray-900">JARVIS AI Assistant</span>
                   </div>
                   <button
-                    disabled={!isElevatedRole}
                     onClick={() => {
+                      if (!isElevatedRole) {
+                        alert('You need Admin or Coach access to change this setting.');
+                        return;
+                      }
                       const isOn = teams.find(t => t.id === activeTeamId)?.showJarvis !== false;
                       confirmToggle(
                         isOn ? 'Turn Off JARVIS AI Assistant?' : 'Turn On JARVIS AI Assistant?',
@@ -1352,12 +1365,14 @@ export default function AdminScreen({
                         () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showJarvis')
                       );
                     }}
-                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
+                      !isElevatedRole ? 'opacity-60' : ''
+                    } ${
                       (teams.find(t => t.id === activeTeamId)?.showJarvis !== false)
                         ? 'bg-purple-600 justify-end'
                         : 'bg-gray-300 justify-start'
                     } flex items-center`}
-                    title="Toggle JARVIS AI Assistant visibility"
+                    title={isElevatedRole ? 'Toggle JARVIS AI Assistant visibility' : 'You need Admin or Coach access to change this setting'}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
                   </button>
@@ -1379,8 +1394,11 @@ export default function AdminScreen({
                     <span className="text-xs font-black text-gray-900">System Debugger</span>
                   </div>
                   <button
-                    disabled={!isElevatedRole}
                     onClick={() => {
+                      if (!isElevatedRole) {
+                        alert('You need Admin or Coach access to change this setting.');
+                        return;
+                      }
                       const next = !isDebugEnabled;
                       confirmToggle(
                         next ? 'Turn On System Debugger?' : 'Turn Off System Debugger?',
@@ -1390,12 +1408,14 @@ export default function AdminScreen({
                         () => onToggleDebug && onToggleDebug(next)
                       );
                     }}
-                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer disabled:cursor-not-allowed ${
+                    className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
+                      !isElevatedRole ? 'opacity-60' : ''
+                    } ${
                       isDebugEnabled
                         ? 'bg-blue-600 justify-end'
                         : 'bg-gray-300 justify-start'
                     } flex items-center`}
-                    title="Toggle System Debugger button on Login screen and top navigation bar"
+                    title={isElevatedRole ? 'Toggle System Debugger button on Login screen and top navigation bar' : 'You need Admin or Coach access to change this setting'}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
                   </button>
