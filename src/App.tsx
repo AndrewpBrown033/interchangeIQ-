@@ -541,11 +541,22 @@ export default function App() {
           merged = [...remoteTeams];
         }
 
-        if (merged.length === 0) {
+        // Only seed a default team on a genuine first-ever launch (no team was
+        // ever recorded locally). Previously this fired any time Firestore
+        // returned zero real teams, which also happens right after a user
+        // deletes their last remaining team — recreating a fresh "Valiants
+        // Squad" (often reusing id 'team1') immediately after deletion, making
+        // it look like the delete had silently failed. A legitimately empty
+        // team list (user deleted everything) must be allowed to stay empty.
+        const everHadTeams = localStorage.getItem('iiq_teams_bootstrapped') === '1';
+        if (merged.length === 0 && !everHadTeams) {
           merged.push({ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() });
         }
         if (!merged.some((t) => t.id === DEMO_TEAM_ID)) {
           merged.push(DEMO_TEAM);
+        }
+        if (merged.some((t) => t.id !== DEMO_TEAM_ID)) {
+          localStorage.setItem('iiq_teams_bootstrapped', '1');
         }
 
         merged.sort((a, b) => {
