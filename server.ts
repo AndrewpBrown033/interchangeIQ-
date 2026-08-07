@@ -23,20 +23,24 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Initialize Gemini API client on the server side (still used by /api/import-drill)
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
+// Lazy helper for Gemini API client (used by /api/import-drill & /api/jarvis)
+function getGeminiClient(keyOverride?: string): GoogleGenAI {
+  const apiKey = keyOverride || process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
     },
-  },
-});
+  });
+}
 
-// Initialize Claude API client on the server side (used by /api/jarvis)
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || "",
-});
+// Lazy helper for Claude API client (used by /api/jarvis & /api/import-drill)
+function getAnthropicClient(keyOverride?: string): Anthropic {
+  const apiKey = keyOverride || process.env.ANTHROPIC_API_KEY || "";
+  return new Anthropic({ apiKey });
+}
 
 // SMTP transport for outbound invite emails (Gmail/Office365, your own mail
 // server, or an SMTP relay from SendGrid/Mailgun/Postmark/etc all work here).
@@ -213,11 +217,8 @@ ${drillsSummary}`;
       geminiContents.push({ role: 'user', parts: [{ text: message }] });
       logTrace(`[Gemini] Payload formatted with ${geminiContents.length} content turn(s). Calling Gemini API...`);
 
-      // Use a one-off client with the admin-entered key if one was supplied,
-      // otherwise fall back to the shared server-configured client.
-      const geminiClient = apiKeyOverride
-        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
-        : ai;
+      // Instantiate Gemini client on demand with effective key override if provided
+      const geminiClient = getGeminiClient(apiKeyOverride);
 
       const geminiStart = Date.now();
       try {
@@ -256,9 +257,8 @@ ${drillsSummary}`;
       claudeContents.push({ role: 'user', content: message });
       logTrace(`[Claude] Payload formatted with ${claudeContents.length} message turn(s). Calling Anthropic API...`);
 
-      // Use a one-off client with the admin-entered key if one was supplied,
-      // otherwise fall back to the shared server-configured client.
-      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
+      // Instantiate Claude client on demand with effective key override if provided
+      const claudeClient = getAnthropicClient(apiKeyOverride);
 
       const claudeStart = Date.now();
       try {
@@ -886,9 +886,7 @@ Rules:
     let raw = "";
 
     if (provider === "gemini") {
-      const geminiClient = apiKeyOverride
-        ? new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { "User-Agent": "aistudio-build" } } })
-        : ai;
+      const geminiClient = getGeminiClient(apiKeyOverride);
 
       const geminiResponse = await geminiClient.models.generateContent({
         model: "gemini-3.6-flash",
@@ -901,7 +899,7 @@ Rules:
       });
       raw = geminiResponse.text || "";
     } else {
-      const claudeClient = apiKeyOverride ? new Anthropic({ apiKey: apiKeyOverride }) : anthropic;
+      const claudeClient = getAnthropicClient(apiKeyOverride);
 
       const claudeResponse = await claudeClient.messages.create({
         model: "claude-sonnet-5",
@@ -958,24 +956,30 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
 });
 
 async function startServer() {
-  // Vite middleware for development mode
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
+  try {
+    // Vite middleware for development mode
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-  });
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to start server:", err);
+  }
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error("Fatal error starting server:", err);
+});
