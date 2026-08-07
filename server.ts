@@ -5,13 +5,18 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-import * as admin from "firebase-admin";
+import admin from "firebase-admin";
 
 dotenv.config();
 
-if (!admin.apps.length) {
+const firebaseAdmin = (admin as any)?.default || admin;
+const adminApps = firebaseAdmin?.apps || [];
+
+if (!adminApps.length) {
   try {
-    admin.initializeApp();
+    if (typeof firebaseAdmin?.initializeApp === "function") {
+      firebaseAdmin.initializeApp();
+    }
   } catch (e) {
     console.warn("firebase-admin initializeApp skipped:", (e as any)?.message || e);
   }
@@ -449,7 +454,10 @@ app.post("/api/send-password-reset", async (req, res) => {
     // genuinely throws auth/user-not-found when there's no matching account.
     let linkToUse = resetLink || `${req.protocol}://${req.get("host") || "localhost:3000"}/`;
     try {
-      linkToUse = await admin.auth().generatePasswordResetLink(toEmail);
+      const auth = typeof firebaseAdmin?.auth === "function" ? firebaseAdmin.auth() : null;
+      if (auth) {
+        linkToUse = await auth.generatePasswordResetLink(toEmail);
+      }
     } catch (linkErr: any) {
       if (linkErr?.code === "auth/user-not-found") {
         return res.status(404).json({

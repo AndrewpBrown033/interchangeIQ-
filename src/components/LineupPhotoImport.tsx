@@ -111,11 +111,15 @@ export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLi
           return;
         }
 
-        const result: LineupImportResult = data.lineup;
-        logTrace(`Parsed result: ${result.onField.length} on-field, ${result.interchange.length} interchange, ${result.unplaced.length} unplaced.`);
+        const result: LineupImportResult = data.lineup || { onField: [], interchange: [], unplaced: [] };
+        const onFieldList = Array.isArray(result.onField) ? result.onField : [];
+        const interchangeList = Array.isArray(result.interchange) ? result.interchange : [];
+        const unplacedList = Array.isArray(result.unplaced) ? result.unplaced : [];
+
+        logTrace(`Parsed result: ${onFieldList.length} on-field, ${interchangeList.length} interchange, ${unplacedList.length} unplaced.`);
         const newRows: MatchRow[] = [];
 
-        result.onField.forEach((entry, i) => {
+        onFieldList.forEach((entry, i) => {
           const match = findMatch(players, entry.name, entry.number);
           logTrace(`Match "${entry.name}" #${entry.number} (${entry.position}) -> ${match ? `${match.name} (roster id ${match.id})` : 'NO MATCH'}`);
           newRows.push({
@@ -127,7 +131,7 @@ export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLi
             matchedPlayerId: match?.id || null,
           });
         });
-        result.interchange.forEach((entry, i) => {
+        interchangeList.forEach((entry, i) => {
           const match = findMatch(players, entry.name, entry.number);
           logTrace(`Match "${entry.name}" #${entry.number} (interchange) -> ${match ? `${match.name} (roster id ${match.id})` : 'NO MATCH'}`);
           newRows.push({
@@ -139,7 +143,7 @@ export default function LineupPhotoImport({ players, onUpdatePlayers, onUpdateLi
             matchedPlayerId: match?.id || null,
           });
         });
-        result.unplaced.forEach((entry, i) => {
+        unplacedList.forEach((entry, i) => {
           const match = findMatch(players, entry.name, entry.number);
           logTrace(`Match "${entry.name}" #${entry.number} (unplaced) -> ${match ? `${match.name} (roster id ${match.id})` : 'NO MATCH'}`);
           newRows.push({

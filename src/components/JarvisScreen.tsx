@@ -739,7 +739,8 @@ export default function JarvisScreen({
             {filteredHistoryThreads.map((t) => {
               const isActive = t.id === activeThreadId;
               const isEditing = editingThreadId === t.id;
-              const lastMsg = t.messages[t.messages.length - 1];
+              const msgs = Array.isArray(t.messages) ? t.messages : [];
+              const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
 
               return (
                 <div

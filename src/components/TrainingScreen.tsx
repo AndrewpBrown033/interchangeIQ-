@@ -235,8 +235,9 @@ export default function TrainingScreen({
     };
 
     const spec: DiagramSpec = drill.diagram || defaultSpec;
-    const ball = spec.ballPositions.length > 0
-      ? spec.ballPositions[stepIndex % spec.ballPositions.length]
+    const ballPositions = spec.ballPositions || [];
+    const ball = ballPositions.length > 0
+      ? ballPositions[stepIndex % ballPositions.length]
       : { x: 450, y: 260 };
 
     const content = (
@@ -538,7 +539,8 @@ export default function TrainingScreen({
     });
   };
 
-  const currentStep = activeDrill?.steps[trainingState.step] || activeDrill?.steps[0] || ['Step', ''];
+  const activeDrillSteps = activeDrill?.steps || [];
+  const currentStep = activeDrillSteps[trainingState.step] || activeDrillSteps[0] || ['Step', ''];
 
   return (
     <div id="training" className="space-y-4">
@@ -795,7 +797,7 @@ export default function TrainingScreen({
             <div className="border-t border-gray-150 pt-4 mt-6">
               <div className="mb-3">
                 <span className="text-[10px] font-black text-[var(--blue)] tracking-wider uppercase block mb-1">
-                  Step {trainingState.step + 1} of {activeDrill.steps.length}
+                  Step {trainingState.step + 1} of {activeDrillSteps.length || 1}
                 </span>
                 <b className="text-sm font-black text-[var(--navy)] block mb-1">
                   {currentStep[0]}
@@ -807,24 +809,26 @@ export default function TrainingScreen({
 
               <div className="flex items-center justify-between gap-2 pt-2">
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    const stepCount = activeDrillSteps.length || 1;
                     onUpdateTrainingState({
                       ...trainingState,
-                      step: (trainingState.step - 1 + activeDrill.steps.length) % activeDrill.steps.length,
-                    })
-                  }
+                      step: (trainingState.step - 1 + stepCount) % stepCount,
+                    });
+                  }}
                   className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-gray-100 hover:bg-gray-150 text-[var(--ink)] border border-[var(--line)] rounded-lg transition flex-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Prev</span>
                 </button>
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    const stepCount = activeDrillSteps.length || 1;
                     onUpdateTrainingState({
                       ...trainingState,
-                      step: (trainingState.step + 1) % activeDrill.steps.length,
-                    })
-                  }
+                      step: (trainingState.step + 1) % stepCount,
+                    });
+                  }}
                   className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-[var(--blue)] hover:opacity-90 text-white rounded-lg transition flex-1"
                 >
                   <span>Next Step</span>

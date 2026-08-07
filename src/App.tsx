@@ -451,34 +451,10 @@ export default function App() {
         if (Array.isArray(parsed.activePlanIds)) setActivePlanIds(parsed.activePlanIds);
         if (Array.isArray(parsed.history)) setHistory(parsed.history);
         if (Array.isArray(parsed.savedLineups)) setSavedLineups(parsed.savedLineups);
-
-        // NOTE: drills, growthRecords, and trainingState were being saved into
-        // this same per-team cache (see currentCache above) but never read
-        // back out here — so switching teams left Training and Player Growth
-        // showing whatever the PREVIOUS team had, until the separate Firestore
-        // per-team listener eventually caught up and corrected them a moment
-        // later. That gap is exactly what produced "the team name/players
-        // changed but training/growth didn't" — restoring them immediately
-        // here, from the same cache, closes it.
-        if (Array.isArray(parsed.drills)) setDrills(sanitizeDrillList(parsed.drills));
-        if (Array.isArray(parsed.growthRecords)) setGrowthRecords(parsed.growthRecords);
-        if (parsed.trainingState && typeof parsed.trainingState === 'object') setTrainingState(parsed.trainingState);
       } else {
         // First time switching to this team: give it default 22 players template and canonical name
         setPlayers(normalizePlayers(DEFAULT_PLAYERS));
         setGameInfo({ team: canonicalName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' });
-        // Also reset training/growth to this (new, empty) team's defaults
-        // rather than leaving the previous team's values on screen.
-        setGrowthRecords([]);
-        setTrainingState({
-          view: 'library',
-          filter: 'All',
-          activeId: 'one-v-one-kick-tennis',
-          step: 0,
-          motionPaused: false,
-          plans: [],
-          activePlanId: null,
-        });
       }
     } catch (e) {
       console.warn("Failed to parse cached team data:", e);
@@ -490,6 +466,28 @@ export default function App() {
       isSyncingFromServerRef.current = false;
       setIsSyncingFromServer(false);
     }, 600);
+  };
+
+  // Confirmation gate in front of handleSwitchTeam — any team-switch action
+  // triggered from the UI (Summary squad picker, Settings, Admin) goes through
+  // this first, so the coach has to explicitly confirm before their active
+  // team actually changes. Internal/automatic switches (e.g. auto-selecting a
+  // default team on load, or re-selecting after a delete) call
+  // handleSwitchTeam directly and skip this — those aren't user actions, so a
+  // confirmation popup would just be a false "are you sure?" after the fact.
+  const [pendingTeamSwitch, setPendingTeamSwitch] = useState<{ id: string; name: string } | null>(null);
+
+  const requestSwitchTeam = (teamId: string) => {
+    if (!teamId || teamId === activeTeamId) return;
+    const team = (Array.isArray(teams) ? teams : []).find(t => t.id === teamId);
+    setPendingTeamSwitch({ id: teamId, name: team?.name || 'this team' });
+  };
+
+  const confirmSwitchTeam = () => {
+    if (pendingTeamSwitch) {
+      handleSwitchTeam(pendingTeamSwitch.id);
+    }
+    setPendingTeamSwitch(null);
   };
 
   // Real-time Firestore teams collection subscriber with local preservation & merging
@@ -511,33 +509,37 @@ export default function App() {
       });
 
       setTeams((prevTeams) => {
-        let cachedLocalTeams: TeamProfile[] = [];
-        try {
-          const raw = localStorage.getItem('iiq_teams');
-          if (raw) cachedLocalTeams = JSON.parse(raw);
-        } catch (e) {
-          console.warn("Error reading iiq_teams from localStorage:", e);
+        // Firestore is the single source of truth for which teams EXIST. This
+        // used to also merge in anything cached locally/in-memory that Firestore
+        // didn't currently have, meant to preserve teams created while offline —
+        // but that had no way to tell "not yet synced to the server" apart from
+        // "deliberately deleted", so deleting ANY team would get silently
+        // resurrected the next time this listener fired for an unrelated change
+        // (e.g. deleting a second team). A deletion must always win.
+        //
+        // The only time we still fall back to a local cache is if this snapshot
+        // is being served while genuinely offline AND we have no data at all yet
+        // (e.g. first load with no network) — never to "add back" something the
+        // server has just told us doesn't exist.
+        const isOfflineWithNoData =
+          snapshot.metadata.fromCache &&
+          remoteTeams.length === 0 &&
+          (!Array.isArray(prevTeams) || prevTeams.length === 0);
+
+        let merged: TeamProfile[];
+        if (isOfflineWithNoData) {
+          let cachedLocalTeams: TeamProfile[] = [];
+          try {
+            const raw = localStorage.getItem('iiq_teams');
+            if (raw) cachedLocalTeams = JSON.parse(raw);
+          } catch (e) {
+            console.warn("Error reading iiq_teams from localStorage:", e);
+          }
+          merged = Array.isArray(cachedLocalTeams) ? cachedLocalTeams : [];
+        } else {
+          merged = [...remoteTeams];
         }
 
-        // Firestore is the source of truth whenever a team already exists
-        // there — local cache / in-memory state must NEVER override a name
-        // that just arrived from the server, since that cache can be stale
-        // (a different device may have renamed the team since this tab last
-        // wrote to localStorage). Local data is only used to fill in teams
-        // that haven't made it to Firestore yet (e.g. created while offline).
-        const teamMap = new Map<string, TeamProfile>();
-        // 1. Remote cloud teams (authoritative)
-        remoteTeams.forEach(t => teamMap.set(t.id, t));
-        // 2. Cached local teams — only add ones NOT already known to Firestore
-        (Array.isArray(cachedLocalTeams) ? cachedLocalTeams : []).forEach(t => {
-          if (!teamMap.has(t.id)) teamMap.set(t.id, t);
-        });
-        // 3. Existing in-memory state — only add ones NOT already known
-        (Array.isArray(prevTeams) ? prevTeams : []).forEach(t => {
-          if (!teamMap.has(t.id)) teamMap.set(t.id, t);
-        });
-
-        const merged = Array.from(teamMap.values());
         if (merged.length === 0) {
           merged.push({ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() });
         }
@@ -593,50 +595,35 @@ export default function App() {
   const handleUpdateTeams = async (newTeamsList: TeamProfile[]) => {
     if (!Array.isArray(newTeamsList)) return;
 
-    // Upsert each team in newTeamsList to Firestore (merge, never overwrite the whole doc).
-    // IMPORTANT: any write here can be rejected by firestore.rules (e.g. the
-    // caller isn't an Admin and this team isn't in their teamIds). If we
-    // swallow that and update local state anyway, the UI shows a change that
-    // never actually made it to the server — and the next unrelated Firestore
-    // sync will overwrite the optimistic local change with the real (still
-    // unchanged) server data, making it look like the edit "reverted" or a
-    // deleted/renamed team "came back". So: track failures and tell the user.
-    const failures: { team: TeamProfile; error: any }[] = [];
-    for (const t of newTeamsList) {
-      const teamDocRef = doc(db, 'teams', t.id);
-      try {
-        await setDoc(teamDocRef, {
+    // Optimistically update local state + cache FIRST, so the UI reflects the
+    // change immediately rather than waiting on a round-trip to Firestore.
+    setTeams(newTeamsList);
+    localStorage.setItem('iiq_teams', JSON.stringify(newTeamsList));
+
+    // Upsert each team in parallel (not one-at-a-time) to Firestore (merge, never
+    // overwrite the whole doc). IMPORTANT: every field that can actually change
+    // from the UI must be listed here — a field that's missing from this payload
+    // is silently never persisted, so the next Firestore snapshot refresh reverts
+    // it back to whatever was there before, even though the local toggle looked
+    // like it worked. (showTraining/showPlayerGrowth/showJarvis were missing here
+    // previously, which is exactly why feature toggles kept "un-doing" themselves
+    // shortly after being changed.)
+    await Promise.all(
+      newTeamsList.map((t) => {
+        const teamDocRef = doc(db, 'teams', t.id);
+        return setDoc(teamDocRef, {
           id: t.id,
           name: t.name,
           createdAt: t.createdAt || Date.now(),
           isInactive: !!t.isInactive,
+          isDemo: !!t.isDemo,
+          showTraining: t.showTraining !== false,
+          showPlayerGrowth: t.showPlayerGrowth !== false,
+          showJarvis: t.showJarvis !== false,
           updatedAt: Date.now()
-        }, { merge: true });
-      } catch (err) {
-        console.warn("Error saving team doc to Firestore:", err);
-        failures.push({ team: t, error: err });
-      }
-    }
-
-    if (failures.length > 0) {
-      const names = failures.map(f => f.team.name).join(', ');
-      const isPermissionError = failures.some(f => (f.error as any)?.code === 'permission-denied');
-      window.alert(
-        isPermissionError
-          ? `Could not save changes to: ${names}.\n\nYour account doesn't have permission to edit ${failures.length > 1 ? 'these teams' : 'this team'}. Check Admin > Coaches & Roles — you may need the Admin role or this team added to your assigned teams.`
-          : `Could not save changes to: ${names}.\n\nThe change was not saved to the server, so it has been left out of your local list to avoid it reappearing/reverting later.`
-      );
-    }
-
-    // Only apply the teams that actually saved successfully to local state —
-    // never optimistically show a change the server rejected.
-    const failedIds = new Set(failures.map(f => f.team.id));
-    const successfullyAppliedList = failedIds.size > 0
-      ? newTeamsList.filter(t => !failedIds.has(t.id))
-      : newTeamsList;
-
-    setTeams(successfullyAppliedList);
-    localStorage.setItem('iiq_teams', JSON.stringify(successfullyAppliedList));
+        }, { merge: true }).catch(err => console.warn("Error saving team doc to Firestore:", err));
+      })
+    );
   };
 
   // Explicit, single-team delete. Only ever removes the exact id the user
@@ -645,23 +632,7 @@ export default function App() {
   const handleDeleteTeam = async (teamId: string) => {
     if (!teamId) return;
 
-    // Do NOT touch local state until we know the delete actually succeeded
-    // on the server. Previously this swallowed the error and removed the
-    // team from local state regardless — if the delete was rejected (e.g. by
-    // firestore.rules), the team would silently "come back" the next time
-    // any other Firestore change refreshed local state from the (unchanged)
-    // server data.
-    try {
-      await deleteDoc(doc(db, 'teams', teamId));
-    } catch (err: any) {
-      console.warn("Error deleting team doc from Firestore:", err);
-      window.alert(
-        err?.code === 'permission-denied'
-          ? "Couldn't delete this team — your account doesn't have permission to. Check Admin > Coaches & Roles: you may need the Admin role, or this team needs to be in your assigned teams."
-          : `Couldn't delete this team: ${err?.message || 'a server error occurred'}. Nothing was changed.`
-      );
-      return;
-    }
+    await deleteDoc(doc(db, 'teams', teamId)).catch(err => console.warn("Error deleting team doc from Firestore:", err));
 
     setTeams((prevTeams) => {
       const list = Array.isArray(prevTeams) ? prevTeams : [];
@@ -682,59 +653,33 @@ export default function App() {
     localStorage.removeItem(`iiq_team_data_${teamId}`);
   };
 
-  // Dedicated Admin Team Sync: pushes local teams & pulls all remote teams from Firestore
+  // Dedicated Admin Team Sync: reconciles local state with Firestore's current,
+  // authoritative team list.
+  //
+  // This USED to also "push" every locally-known team back to Firestore first.
+  // That step was redundant — every create/edit/delete already pushes its own
+  // change immediately via handleUpdateTeams/handleDeleteTeam — and it was
+  // actively dangerous: this function reads `teams` from its own closure at
+  // call time, and if that happened to run with a stale snapshot (e.g. a
+  // manual "Sync Now" click, or the automatic login-sync timer, racing against
+  // an in-flight delete whose Firestore write hadn't been reflected back into
+  // state yet), it would re-write a just-deleted team straight back into
+  // Firestore — which is exactly why deleting one team, then a second, could
+  // bring the first one back. Pulling only (never pushing here) removes that
+  // risk entirely: this function can no longer create or resurrect anything,
+  // only reflect whatever Firestore already, genuinely has.
   const handleForceSyncTeams = async (): Promise<{ success: boolean; teamCount: number; message: string }> => {
     try {
       setIsSyncingFromServer(true);
       isSyncingFromServerRef.current = true;
 
-      const currentTeams = Array.isArray(teams) ? teams : [];
-
-      // 1. Push all local teams to Firestore
-      for (const t of currentTeams) {
-        const teamDocRef = doc(db, 'teams', t.id);
-        if (t.id === activeTeamId) {
-          const fullData = JSON.parse(JSON.stringify({
-            id: t.id,
-            name: t.name,
-            createdAt: t.createdAt || Date.now(),
-            isInactive: !!t.isInactive,
-            players: Array.isArray(players) ? players : [],
-            lineup,
-            score,
-            gameInfo,
-            rotations,
-            plans,
-            activePlanIds,
-            history,
-            savedLineups,
-            drills: sanitizeDrillList(drills),
-            growthRecords,
-            trainingState,
-            updatedAt: Date.now()
-          }));
-          await setDoc(teamDocRef, fullData, { merge: true });
-        } else {
-          await setDoc(teamDocRef, {
-            id: t.id,
-            name: t.name,
-            createdAt: t.createdAt || Date.now(),
-            isInactive: !!t.isInactive,
-            updatedAt: Date.now()
-          }, { merge: true });
-        }
-      }
-
-      // 2. Query ALL team docs from Firestore
       const querySnap = await getDocs(collection(db, 'teams'));
-      const teamMap = new Map<string, TeamProfile>();
-      currentTeams.forEach(t => teamMap.set(t.id, t));
-
+      const remoteTeams: TeamProfile[] = [];
       querySnap.forEach((docSnap) => {
         const data = docSnap.data();
         const teamId = data.id || docSnap.id;
         if (teamId) {
-          teamMap.set(teamId, {
+          remoteTeams.push({
             id: teamId,
             name: data.name || 'Unnamed Squad',
             createdAt: data.createdAt || Date.now(),
@@ -743,11 +688,10 @@ export default function App() {
         }
       });
 
-      const mergedList = Array.from(teamMap.values());
-      mergedList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      remoteTeams.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-      setTeams(mergedList);
-      localStorage.setItem('iiq_teams', JSON.stringify(mergedList));
+      setTeams(remoteTeams);
+      localStorage.setItem('iiq_teams', JSON.stringify(remoteTeams));
 
       setLastSyncedAt(Date.now());
       setCloudConnected(true);
@@ -756,8 +700,8 @@ export default function App() {
 
       return {
         success: true,
-        teamCount: mergedList.length,
-        message: `Successfully synced ${mergedList.length} team(s) with the Cloud database! Mobile & desktop devices can now switch between all these teams.`
+        teamCount: remoteTeams.length,
+        message: `Successfully synced ${remoteTeams.length} team(s) with the Cloud database! Mobile & desktop devices can now switch between all these teams.`
       };
     } catch (err: any) {
       console.warn("Error force syncing teams (local fallback active):", err);
@@ -1190,21 +1134,29 @@ export default function App() {
       });
 
       setUsers((prevUsers) => {
-        let cachedLocalUsers: UserProfile[] = [];
-        try {
-          const raw = localStorage.getItem('iiq_users');
-          if (raw) cachedLocalUsers = JSON.parse(raw);
-        } catch (e) {
-          console.warn("Error reading iiq_users from localStorage:", e);
+        // Same principle as the teams listener above: Firestore is the single
+        // source of truth for which users EXIST. Merging in anything ever seen
+        // locally/in-memory made deletions impossible to keep — deleting one
+        // coach, then a second, would resurrect the first the moment this
+        // listener fired again for the unrelated change.
+        const isOfflineWithNoData =
+          snapshot.metadata.fromCache &&
+          remoteUsers.length === 0 &&
+          (!Array.isArray(prevUsers) || prevUsers.length === 0);
+
+        let merged: UserProfile[];
+        if (isOfflineWithNoData) {
+          let cachedLocalUsers: UserProfile[] = [];
+          try {
+            const raw = localStorage.getItem('iiq_users');
+            if (raw) cachedLocalUsers = JSON.parse(raw);
+          } catch (e) {
+            console.warn("Error reading iiq_users from localStorage:", e);
+          }
+          merged = deduplicateUserProfiles(Array.isArray(cachedLocalUsers) ? cachedLocalUsers : []);
+        } else {
+          merged = deduplicateUserProfiles(remoteUsers);
         }
-
-        const userMap = new Map<string, UserProfile>();
-        (Array.isArray(prevUsers) ? prevUsers : []).forEach(u => userMap.set(u.uid, u));
-        (Array.isArray(cachedLocalUsers) ? cachedLocalUsers : []).forEach(u => userMap.set(u.uid, u));
-        remoteUsers.forEach(u => userMap.set(u.uid, u));
-
-        const mergedRaw = Array.from(userMap.values());
-        const merged = deduplicateUserProfiles(mergedRaw);
 
         if (merged.length === 0) {
           merged.push({ uid: 'u1', email: 'coach@example.com', name: userName || 'Coach Andrew', role: 'Admin', teamIds: ['team1'] });
@@ -1299,19 +1251,35 @@ export default function App() {
     if (!Array.isArray(newUsers)) return;
     const cleanUsers = deduplicateUserProfiles(newUsers);
 
-    // Sync updates and deletions directly to Firestore
     const currentUids = new Set(cleanUsers.map(u => u.uid));
     const currentUsers = Array.isArray(users) ? users : [];
     const deletedUsers = currentUsers.filter(u => !currentUids.has(u.uid));
 
-    for (const u of deletedUsers) {
-      await deleteDoc(doc(db, 'users', u.uid)).catch(e => console.warn("Error deleting user from Firestore:", e));
-    }
+    // Update local state immediately so the UI reflects the change right away,
+    // instead of waiting on a full round-trip to Firestore for every toggle.
+    setUsers(cleanUsers);
 
-    for (const u of cleanUsers) {
-      const oldU = currentUsers.find(old => old.uid === u.uid);
-      if (!oldU || JSON.stringify(oldU) !== JSON.stringify(u)) {
-        await setDoc(doc(db, 'users', u.uid), {
+    // Fire all Firestore writes in parallel rather than one-at-a-time — awaiting
+    // each write sequentially in a loop was the main cause of toggles feeling
+    // slow to save, especially with more than a couple of coaches on the roster.
+    const deletions = deletedUsers.map((u) =>
+      deleteDoc(doc(db, 'users', u.uid)).catch(e => console.warn("Error deleting user from Firestore:", e))
+    );
+
+    const updates = cleanUsers
+      .filter((u) => {
+        const oldU = currentUsers.find(old => old.uid === u.uid);
+        return !oldU || JSON.stringify(oldU) !== JSON.stringify(u);
+      })
+      .map((u) =>
+        // IMPORTANT: every field the UI can actually change must be listed here —
+        // a field missing from this payload is silently never persisted, so the
+        // next Firestore snapshot refresh reverts it back to whatever was there
+        // before. allowedFeatures was missing here previously (and this write had
+        // no { merge: true }, so it fully replaced the document each time) — that's
+        // exactly why toggling one feature off, then another, kept "re-activating"
+        // the first one moments later.
+        setDoc(doc(db, 'users', u.uid), {
           uid: u.uid,
           email: u.email,
           name: u.name,
@@ -1321,11 +1289,11 @@ export default function App() {
           invitedBy: u.invitedBy || '',
           invitedAt: u.invitedAt || 0,
           inviteCode: u.inviteCode || '',
-        }).catch(e => console.warn("Error syncing user to Firestore:", e));
-      }
-    }
+          allowedFeatures: u.allowedFeatures ?? null,
+        }, { merge: true }).catch(e => console.warn("Error syncing user to Firestore:", e))
+      );
 
-    setUsers(cleanUsers);
+    await Promise.all([...deletions, ...updates]);
   };
 
   // Real-time Firestore document subscriber (Downstream sync)
@@ -2229,7 +2197,7 @@ export default function App() {
             onStartNewGame={handleStartNewGame}
             teams={teams}
             activeTeamId={activeTeamId}
-            onSelectTeam={handleSwitchTeam}
+            onSelectTeam={requestSwitchTeam}
             isTrainingEnabled={isTrainingEnabled}
             isGrowthEnabled={isGrowthEnabled}
             isJarvisEnabled={isJarvisEnabled}
@@ -2241,6 +2209,8 @@ export default function App() {
             onUpdatePlayers={setPlayers}
             lineup={lineup}
             onUpdateLineup={setLineup}
+            apiKeys={apiKeys}
+            isDebugEnabled={isDebugEnabled}
             score={score}
             onUpdateScore={setScore}
             gameInfo={gameInfo}
@@ -2346,7 +2316,7 @@ export default function App() {
             users={users}
             onUpdateUsers={handleUpdateUsers}
             activeTeamId={activeTeamId}
-            onSelectTeam={handleSwitchTeam}
+            onSelectTeam={requestSwitchTeam}
             currentUserRole={currentUserRole}
             onNavigateTab={handleSelectTab}
             players={players}
@@ -2401,7 +2371,7 @@ export default function App() {
             onUpdateLineup={setLineup}
             teams={teams}
             activeTeamId={activeTeamId}
-            onSelectTeam={handleSwitchTeam}
+            onSelectTeam={requestSwitchTeam}
             currentUserRole={currentUserRole}
             userTeamIds={matchedUserProfile?.teamIds || []}
             onUpdateTeams={handleUpdateTeams}
@@ -2450,6 +2420,40 @@ export default function App() {
                   No saved lineups yet. Create and save one from the Game Day panel.
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL overlay: Confirm Team Switch dialog */}
+      {pendingTeamSwitch && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-[2000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm border border-[var(--line)] shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-black text-[var(--navy)]">Switch Active Team?</h3>
+              <button onClick={() => setPendingTeamSwitch(null)} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+              Switch your active squad to <span className="font-extrabold text-[var(--ink)]">{pendingTeamSwitch.name}</span>?
+              Your current team's data will be saved first.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setPendingTeamSwitch(null)}
+                className="px-4 py-2 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSwitchTeam}
+                className="px-4 py-2 text-xs font-black text-white bg-[var(--blue)] hover:opacity-90 rounded-xl cursor-pointer"
+              >
+                OK, Switch Team
+              </button>
             </div>
           </div>
         </div>

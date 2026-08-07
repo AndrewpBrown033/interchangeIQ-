@@ -114,8 +114,8 @@ body {
 
 /* Custom Field and Slot Styles */
 .field {
-  height: 740px;
-  max-width: 540px;
+  height: 720px;
+  max-width: 600px;
   width: 100%;
   margin: 0 auto;
   position: relative;
@@ -141,8 +141,8 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 100px;
-  height: 100px;
+  width: 104px;
+  height: 104px;
   transform: translate(-50%, -50%);
   border: 2px solid rgba(255,255,255,0.45);
   border-radius: 50%;
@@ -154,8 +154,8 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   transform: translate(-50%, -50%);
   border: 2px solid rgba(255,255,255,0.45);
   border-radius: 50%;
@@ -167,8 +167,8 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 210px;
-  height: 210px;
+  width: 220px;
+  height: 220px;
   transform: translate(-50%, -50%);
   border: 2px solid rgba(255,255,255,0.4);
   pointer-events: none;
@@ -177,10 +177,10 @@ body {
 
 .field .fifty-arc-top {
   position: absolute;
-  top: -110px;
+  top: -100px;
   left: 50%;
-  width: 290px;
-  height: 290px;
+  width: 300px;
+  height: 300px;
   transform: translateX(-50%);
   border: 2px dashed rgba(255, 255, 255, 0.45);
   border-radius: 50%;
@@ -190,10 +190,10 @@ body {
 
 .field .fifty-arc-bottom {
   position: absolute;
-  bottom: -110px;
+  bottom: -100px;
   left: 50%;
-  width: 290px;
-  height: 290px;
+  width: 300px;
+  height: 300px;
   transform: translateX(-50%);
   border: 2px dashed rgba(255, 255, 255, 0.45);
   border-radius: 50%;

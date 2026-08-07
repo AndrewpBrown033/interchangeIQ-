@@ -16,8 +16,8 @@ interface PlayerGrowthScreenProps {
 }
 
 export default function PlayerGrowthScreen({
-  players,
-  growthRecords,
+  players = [],
+  growthRecords = [],
   onUpdateGrowthRecords,
   selectedPlayerId,
   onSelectPlayerId,
