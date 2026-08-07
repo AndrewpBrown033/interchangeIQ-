@@ -129,7 +129,7 @@ export default function App() {
     } catch (e) {
       console.warn("Failed to parse gameInfo:", e);
     }
-    return { team: 'QUEENSLAND', round: 'Round 1', date: new Date().toISOString().slice(0, 10) };
+    return { team: '', round: 'Round 1', date: new Date().toISOString().slice(0, 10) };
   });
 
   const [rotations, setRotations] = useState<Rotation[]>(() => {
@@ -1374,10 +1374,22 @@ export default function App() {
         isSyncingFromServerRef.current = true;
         setIsSyncingFromServer(true);
 
+        // Legacy placeholder names that should never be trusted as a real
+        // team label — 'QUEENSLAND' was a hardcoded sample default baked into
+        // gameInfo's very first initial state, long before per-team data
+        // existed. It got saved into this team's Firestore doc at some point
+        // and, because it's a genuinely non-empty string, kept winning over
+        // the correct team name in the `team: data.gameInfo.team || bestTeamName`
+        // fallback below (a non-empty stale value looks identical to a
+        // deliberately-typed custom label). Treating it the same as the other
+        // known placeholders lets a real custom label still be respected,
+        // while this specific leftover default gets corrected automatically.
+        const LEGACY_PLACEHOLDER_TEAM_NAMES = ['Unnamed Squad', 'New Team', 'QUEENSLAND'];
+
         const remoteTeamName = data.name || data.gameInfo?.team;
-        const bestTeamName = (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name))
+        const bestTeamName = (activeTeamObj?.name && !LEGACY_PLACEHOLDER_TEAM_NAMES.includes(activeTeamObj.name))
           ? activeTeamObj.name
-          : ((remoteTeamName && !['Unnamed Squad', 'New Team'].includes(remoteTeamName)) ? remoteTeamName : 'My Squad');
+          : ((remoteTeamName && !LEGACY_PLACEHOLDER_TEAM_NAMES.includes(remoteTeamName)) ? remoteTeamName : 'My Squad');
 
         const activePlayers = (data.players && Array.isArray(data.players) && data.players.length > 0)
           ? normalizePlayers(data.players)
@@ -1393,7 +1405,7 @@ export default function App() {
         };
         const activeScore = (data.score && typeof data.score === 'object' && !Array.isArray(data.score)) ? data.score : (cachedLocalData?.score || defaultScore);
         const activeGameInfo = (data.gameInfo && typeof data.gameInfo === 'object' && !Array.isArray(data.gameInfo))
-          ? { ...data.gameInfo, team: data.gameInfo.team || bestTeamName }
+          ? { ...data.gameInfo, team: (data.gameInfo.team && !LEGACY_PLACEHOLDER_TEAM_NAMES.includes(data.gameInfo.team)) ? data.gameInfo.team : bestTeamName }
           : (cachedLocalData?.gameInfo || { team: bestTeamName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' });
         const activeRotations = (data.rotations && Array.isArray(data.rotations)) ? data.rotations : (cachedLocalData?.rotations || []);
         const activePlans = (data.plans && Array.isArray(data.plans)) ? data.plans : (cachedLocalData?.plans || [{ id: 'plan1', name: 'Q1 Rotation' }]);
@@ -1465,7 +1477,7 @@ export default function App() {
         setCloudConnected(true);
         setLastSyncedAt(Date.now());
 
-        const bestTeamName = (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name)) ? activeTeamObj.name : 'My Squad';
+        const bestTeamName = (activeTeamObj?.name && !['Unnamed Squad', 'New Team', 'QUEENSLAND'].includes(activeTeamObj.name)) ? activeTeamObj.name : 'My Squad';
 
         const freshPlayers: Player[] = (cachedLocalPlayers.length > 0)
           ? cachedLocalPlayers
