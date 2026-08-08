@@ -275,7 +275,9 @@ export default function App() {
       const saved = localStorage.getItem('iiq_teams');
       const parsed = saved ? JSON.parse(saved) : null;
       if (Array.isArray(parsed)) {
-        return parsed.some((t: TeamProfile) => t.id === DEMO_TEAM_ID) ? parsed : [...parsed, DEMO_TEAM];
+        const hasDemo = parsed.some((t: TeamProfile) => t.id === DEMO_TEAM_ID);
+        const list = hasDemo ? parsed : [...parsed, DEMO_TEAM];
+        return list.map((t: TeamProfile) => (t.id === DEMO_TEAM_ID || t.isDemo ? { ...t, name: 'Demo Team' } : t));
       }
     } catch (e) {
       console.warn("Failed to parse teams:", e);
@@ -586,6 +588,7 @@ export default function App() {
         if (!merged.some((t) => t.id === DEMO_TEAM_ID)) {
           merged.push(DEMO_TEAM);
         }
+        merged = merged.map((t) => (t.id === DEMO_TEAM_ID || t.isDemo ? { ...t, name: 'Demo Team' } : t));
         if (merged.some((t) => t.id !== DEMO_TEAM_ID)) {
           localStorage.setItem('iiq_teams_bootstrapped', '1');
         }
@@ -638,10 +641,14 @@ export default function App() {
   const handleUpdateTeams = async (newTeamsList: TeamProfile[]) => {
     if (!Array.isArray(newTeamsList)) return;
 
+    const sanitizedList = newTeamsList.map((t) =>
+      t.id === DEMO_TEAM_ID || t.isDemo ? { ...t, name: 'Demo Team' } : t
+    );
+
     // Optimistically update local state + cache FIRST, so the UI reflects the
     // change immediately rather than waiting on a round-trip to Firestore.
-    setTeams(newTeamsList);
-    localStorage.setItem('iiq_teams', JSON.stringify(newTeamsList));
+    setTeams(sanitizedList);
+    localStorage.setItem('iiq_teams', JSON.stringify(sanitizedList));
 
     // Upsert each team in parallel (not one-at-a-time) to Firestore (merge, never
     // overwrite the whole doc). IMPORTANT: every field that can actually change
@@ -652,7 +659,7 @@ export default function App() {
     // previously, which is exactly why feature toggles kept "un-doing" themselves
     // shortly after being changed.)
     await Promise.all(
-      newTeamsList.map((t) => {
+      sanitizedList.map((t) => {
         const teamDocRef = doc(db, 'teams', t.id);
         return setDoc(teamDocRef, {
           id: t.id,
@@ -2330,6 +2337,7 @@ export default function App() {
             savedLineups={savedLineups}
             history={history}
             growthRecords={growthRecords}
+            onUpdateGrowthRecords={setGrowthRecords}
             teamName={teams.find(t => t.id === activeTeamId)?.name}
             isInactive={teams.find(t => t.id === activeTeamId)?.isInactive}
             onNavigateTab={handleSelectTab}

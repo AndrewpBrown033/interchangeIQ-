@@ -132,7 +132,7 @@ export default function PlayerGrowthScreen({
   const [formFitnessRating, setFormFitnessRating] = useState(7);
   
   // Kicking states
-  const [formPreferredFoot, setFormPreferredFoot] = useState<'Right' | 'Left'>('Right');
+  const [formPreferredFoot, setFormPreferredFoot] = useState<'Right' | 'Left' | 'Dual'>('Right');
   const [formKickDistance, setFormKickDistance] = useState(32);
   const [formKickAccuracy, setFormKickAccuracy] = useState(7);
   const [formOppositeFoot, setFormOppositeFoot] = useState(5);
@@ -505,6 +505,8 @@ export default function PlayerGrowthScreen({
       leadingTimingRating: formLeadingTiming,
       snapGoalRating: formSnapGoal,
       defensiveTransitionRating: formDefensiveTransition,
+      isCombineTest: entryTaskMode === 'fitness' || formSeasonLabel.toLowerCase().includes('combine'),
+      assessmentType: (entryTaskMode === 'fitness' || formSeasonLabel.toLowerCase().includes('combine')) ? 'Combine Test' : 'Skill Assessment',
       overallInterchangeIqScore: grading.overallScore,
       overallRatingBadge: grading.overallTier.title as any,
       developmentGoals: formGoals.trim(),

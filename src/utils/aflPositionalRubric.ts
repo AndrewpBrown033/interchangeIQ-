@@ -210,25 +210,25 @@ export function evaluatePlayerPositionalRubric(
   const gender: Gender = assessment?.gender || player.gender || 'Male';
   const ageGroup: AgeGroup = assessment?.ageGroup || player.ageGroup || 'U14';
 
-  // Extract ratings (fallbacks if not assessed)
-  const kickAcc = assessment?.kickAccuracyRating ?? 6;
-  const kickDist = assessment?.kickDistanceMeters ?? 28;
-  const oppFoot = assessment?.oppositeFootRating ?? 5;
-  const handball = assessment?.handballRating ?? 6;
-  const marking = assessment?.markingRating ?? 6;
-  const tackling = assessment?.tacklingRating ?? 6;
-  const gameSense = assessment?.gameSenseRating ?? 6;
-  const fitness = assessment?.fitnessRating ?? 6;
+  // Extract ratings — Static player attributes are primary so point-in-time Combine test snapshots do NOT override static attributes
+  const kickAcc = player.kickAccuracyRating ?? assessment?.kickAccuracyRating ?? 6;
+  const kickDist = player.kickDistanceMeters ?? assessment?.kickDistanceMeters ?? 28;
+  const oppFoot = player.oppositeFootRating ?? assessment?.oppositeFootRating ?? 5;
+  const handball = player.handballRating ?? assessment?.handballRating ?? 6;
+  const marking = player.markingRating ?? assessment?.markingRating ?? 6;
+  const tackling = player.tacklingRating ?? assessment?.tacklingRating ?? 6;
+  const gameSense = player.gameSenseRating ?? assessment?.gameSenseRating ?? 6;
+  const fitness = player.fitnessRating ?? assessment?.fitnessRating ?? 6;
 
   // Position-specific sub-ratings
-  const spoiling = assessment?.spoilingRating ?? Math.min(10, Math.round((marking + tackling) / 2));
-  const overheadMark = assessment?.overheadMarkingRating ?? marking;
-  const crumbing = assessment?.crumbingRating ?? Math.min(10, Math.round((handball + gameSense) / 2));
-  const pressure = assessment?.pressureActsRating ?? tackling;
-  const ruckTap = assessment?.ruckTapRating ?? Math.min(10, Math.round((marking + fitness) / 2));
-  const leading = assessment?.leadingTimingRating ?? Math.min(10, Math.round((marking + gameSense) / 2));
-  const snapGoal = assessment?.snapGoalRating ?? kickAcc;
-  const defTransition = assessment?.defensiveTransitionRating ?? Math.min(10, Math.round((tackling + gameSense) / 2));
+  const spoiling = player.spoilingRating ?? assessment?.spoilingRating ?? Math.min(10, Math.round((marking + tackling) / 2));
+  const overheadMark = player.overheadMarkingRating ?? assessment?.overheadMarkingRating ?? marking;
+  const crumbing = player.crumbingRating ?? assessment?.crumbingRating ?? Math.min(10, Math.round((handball + gameSense) / 2));
+  const pressure = player.pressureActsRating ?? assessment?.pressureActsRating ?? tackling;
+  const ruckTap = player.ruckTapRating ?? assessment?.ruckTapRating ?? Math.min(10, Math.round((marking + fitness) / 2));
+  const leading = player.leadingTimingRating ?? assessment?.leadingTimingRating ?? Math.min(10, Math.round((marking + gameSense) / 2));
+  const snapGoal = player.snapGoalRating ?? assessment?.snapGoalRating ?? kickAcc;
+  const defTransition = player.defensiveTransitionRating ?? assessment?.defensiveTransitionRating ?? Math.min(10, Math.round((tackling + gameSense) / 2));
 
   const preferredPosStr = (player.positions || []).join(' ').toUpperCase();
 

@@ -228,6 +228,9 @@ export interface SkillAssessment {
   playerId: string;
   date: string; // e.g. "2026-03-01"
   seasonLabel: string; // e.g. "2025 Start of Season", "2026 Pre-Season", "2026 Mid-Season"
+  // Combine Test vs General Skills Flag
+  isCombineTest?: boolean;
+  assessmentType?: 'Skill Assessment' | 'Combine Test';
   // InterchangeIQ Demographics
   gender?: 'Male' | 'Female';
   ageGroup?: 'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors';
@@ -239,7 +242,7 @@ export interface SkillAssessment {
   standingVerticalCm?: number; // e.g. 52
   fitnessRating: number; // 1-10
   // Kicking
-  preferredFoot: 'Right' | 'Left';
+  preferredFoot: 'Right' | 'Left' | 'Dual';
   kickDistanceMeters: number; // e.g. 35
   kickAccuracyRating: number; // 1-10
   oppositeFootRating: number; // 1-10

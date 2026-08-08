@@ -22,6 +22,7 @@ interface TeamScreenProps {
   savedLineups?: LineupTemplate[];
   history?: GameHistory[];
   growthRecords?: SkillAssessment[];
+  onUpdateGrowthRecords?: (records: SkillAssessment[]) => void;
   teamName?: string;
   isInactive?: boolean;
   onNavigateTab?: (tab: string) => void;
@@ -37,6 +38,7 @@ export default function TeamScreen({
   savedLineups = [],
   history = [],
   growthRecords = [],
+  onUpdateGrowthRecords,
   teamName,
   isInactive,
   onNavigateTab,
@@ -48,6 +50,33 @@ export default function TeamScreen({
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [showGameDayHeatmap, setShowGameDayHeatmap] = useState(false);
+
+  // Static Attributes Adjustment Modal State
+  const [showAdjustAttributesModal, setShowAdjustAttributesModal] = useState(false);
+  const [attrKickAcc, setAttrKickAcc] = useState(7);
+  const [attrKickDist, setAttrKickDist] = useState(45);
+  const [attrOppFoot, setAttrOppFoot] = useState(6);
+  const [attrHandball, setAttrHandball] = useState(8);
+  const [attrMarking, setAttrMarking] = useState(7);
+  const [attrTackling, setAttrTackling] = useState(8);
+  const [attrGameSense, setAttrGameSense] = useState(8);
+  const [attrFitness, setAttrFitness] = useState(7);
+  const [attrSpoiling, setAttrSpoiling] = useState(7);
+  const [attrOverheadMarking, setAttrOverheadMarking] = useState(7);
+  const [attrCrumbing, setAttrCrumbing] = useState(7);
+  const [attrPressureActs, setAttrPressureActs] = useState(8);
+  const [attrRuckTap, setAttrRuckTap] = useState(5);
+  const [attrLeadingTiming, setAttrLeadingTiming] = useState(7);
+  const [attrSnapGoal, setAttrSnapGoal] = useState(6);
+  const [attrDefTransition, setAttrDefTransition] = useState(8);
+
+  // Combine Test Snapshot Modal State
+  const [showCombineModal, setShowCombineModal] = useState(false);
+  const [combineSprint, setCombineSprint] = useState('3.15s');
+  const [combineAgility, setCombineAgility] = useState('8.40s');
+  const [combineVertical, setCombineVertical] = useState('55');
+  const [combineTimeTrial, setCombineTimeTrial] = useState('08:15');
+  const [combineYoyo, setCombineYoyo] = useState('16.5');
 
   // Player Form states
   const [formName, setFormName] = useState('');
@@ -96,32 +125,164 @@ export default function TeamScreen({
     : [];
   const activePlayerLatestRecord = playerRecords[0] || null;
 
-  const heightCm = activePlayer?.heightCm || (activePlayerLatestRecord as any)?.heightCm || 180;
-  const weightKg = activePlayer?.weightKg || (activePlayerLatestRecord as any)?.weightKg || 75;
-  const preferredFoot = activePlayer?.preferredFoot || activePlayerLatestRecord?.preferredFoot || 'Right';
-  const gender = activePlayerLatestRecord?.gender || activePlayer?.gender || 'Female';
-  const ageGroup = activePlayerLatestRecord?.ageGroup || activePlayer?.ageGroup || 'U16';
+  const heightCm = activePlayer?.heightCm ?? 180;
+  const weightKg = activePlayer?.weightKg ?? 75;
+  const preferredFoot = activePlayer?.preferredFoot ?? 'Right';
+  const gender = activePlayer?.gender ?? 'Female';
+  const ageGroup = activePlayer?.ageGroup ?? 'U16';
 
-  const kickAcc = activePlayer?.kickAccuracyRating || activePlayerLatestRecord?.kickAccuracyRating || 7;
-  const kickDist = activePlayer?.kickDistanceMeters || activePlayerLatestRecord?.kickDistanceMeters || 45;
-  const oppFoot = activePlayer?.oppositeFootRating || activePlayerLatestRecord?.oppositeFootRating || 6;
-  const handball = activePlayer?.handballRating || activePlayerLatestRecord?.handballRating || 8;
-  const marking = activePlayer?.markingRating || activePlayerLatestRecord?.markingRating || 7;
-  const tackling = activePlayer?.tacklingRating || activePlayerLatestRecord?.tacklingRating || 8;
-  const gameSense = activePlayer?.gameSenseRating || activePlayerLatestRecord?.gameSenseRating || 8;
-  const fitness = activePlayer?.fitnessRating || activePlayerLatestRecord?.fitnessRating || 7;
+  // Primary static player attributes (independent of snapshot combine tests)
+  const kickAcc = activePlayer?.kickAccuracyRating ?? 7;
+  const kickDist = activePlayer?.kickDistanceMeters ?? 45;
+  const oppFoot = activePlayer?.oppositeFootRating ?? 6;
+  const handball = activePlayer?.handballRating ?? 8;
+  const marking = activePlayer?.markingRating ?? 7;
+  const tackling = activePlayer?.tacklingRating ?? 8;
+  const gameSense = activePlayer?.gameSenseRating ?? 8;
+  const fitness = activePlayer?.fitnessRating ?? 7;
 
-  const spoiling = activePlayer?.spoilingRating || activePlayerLatestRecord?.spoilingRating || 7;
-  const overheadMarking = activePlayer?.overheadMarkingRating || activePlayerLatestRecord?.overheadMarkingRating || 7;
-  const crumbing = activePlayer?.crumbingRating || activePlayerLatestRecord?.crumbingRating || 7;
-  const pressureActs = activePlayer?.pressureActsRating || activePlayerLatestRecord?.pressureActsRating || 8;
-  const ruckTap = activePlayer?.ruckTapRating || activePlayerLatestRecord?.ruckTapRating || 5;
-  const leadingTiming = activePlayer?.leadingTimingRating || activePlayerLatestRecord?.leadingTimingRating || 7;
-  const snapGoal = activePlayer?.snapGoalRating || activePlayerLatestRecord?.snapGoalRating || 6;
-  const defTransition = activePlayer?.defensiveTransitionRating || activePlayerLatestRecord?.defensiveTransitionRating || 8;
+  const spoiling = activePlayer?.spoilingRating ?? 7;
+  const overheadMarking = activePlayer?.overheadMarkingRating ?? 7;
+  const crumbing = activePlayer?.crumbingRating ?? 7;
+  const pressureActs = activePlayer?.pressureActsRating ?? 8;
+  const ruckTap = activePlayer?.ruckTapRating ?? 5;
+  const leadingTiming = activePlayer?.leadingTimingRating ?? 7;
+  const snapGoal = activePlayer?.snapGoalRating ?? 6;
+  const defTransition = activePlayer?.defensiveTransitionRating ?? 8;
+
+  // Filter Combine test snapshot records specifically
+  const combineRecords = playerRecords.filter(r => r.isCombineTest || r.assessmentType === 'Combine Test' || r.sprint20m || r.timeTrial2km);
+  const latestCombineRecord = combineRecords[0] || null;
 
   const evaluations = activePlayer ? evaluatePlayerPositionalRubric(activePlayer, activePlayerLatestRecord) : [];
   const topChoice = evaluations.length > 0 ? evaluations[0] : null;
+
+  // Handlers for adjusting static attributes
+  const handleOpenAdjustAttributes = () => {
+    if (!activePlayer) return;
+    setAttrKickAcc(activePlayer.kickAccuracyRating ?? 7);
+    setAttrKickDist(activePlayer.kickDistanceMeters ?? 45);
+    setAttrOppFoot(activePlayer.oppositeFootRating ?? 6);
+    setAttrHandball(activePlayer.handballRating ?? 8);
+    setAttrMarking(activePlayer.markingRating ?? 7);
+    setAttrTackling(activePlayer.tacklingRating ?? 8);
+    setAttrGameSense(activePlayer.gameSenseRating ?? 8);
+    setAttrFitness(activePlayer.fitnessRating ?? 7);
+    setAttrSpoiling(activePlayer.spoilingRating ?? 7);
+    setAttrOverheadMarking(activePlayer.overheadMarkingRating ?? 7);
+    setAttrCrumbing(activePlayer.crumbingRating ?? 7);
+    setAttrPressureActs(activePlayer.pressureActsRating ?? 8);
+    setAttrRuckTap(activePlayer.ruckTapRating ?? 5);
+    setAttrLeadingTiming(activePlayer.leadingTimingRating ?? 7);
+    setAttrSnapGoal(activePlayer.snapGoalRating ?? 6);
+    setAttrDefTransition(activePlayer.defensiveTransitionRating ?? 8);
+    setShowAdjustAttributesModal(true);
+  };
+
+  const handleSaveAdjustAttributes = () => {
+    if (!activePlayer) return;
+    const updated = players.map(p => {
+      if (p.id === activePlayer.id) {
+        return {
+          ...p,
+          kickAccuracyRating: attrKickAcc,
+          kickDistanceMeters: attrKickDist,
+          oppositeFootRating: attrOppFoot,
+          handballRating: attrHandball,
+          markingRating: attrMarking,
+          tacklingRating: attrTackling,
+          gameSenseRating: attrGameSense,
+          fitnessRating: attrFitness,
+          spoilingRating: attrSpoiling,
+          overheadMarkingRating: attrOverheadMarking,
+          crumbingRating: attrCrumbing,
+          pressureActsRating: attrPressureActs,
+          ruckTapRating: attrRuckTap,
+          leadingTimingRating: attrLeadingTiming,
+          snapGoalRating: attrSnapGoal,
+          defensiveTransitionRating: attrDefTransition,
+        };
+      }
+      return p;
+    });
+    onUpdatePlayers(updated);
+    setShowAdjustAttributesModal(false);
+  };
+
+  // Handlers for combine test snapshot loading/recording
+  const handleLoadSampleCombine = () => {
+    if (!activePlayer || !onUpdateGrowthRecords) return;
+    const sampleCombine: SkillAssessment = {
+      id: `combine-${Date.now()}`,
+      playerId: activePlayer.id,
+      date: new Date().toISOString().slice(0, 10),
+      seasonLabel: 'AFL Combine Test Benchmark',
+      isCombineTest: true,
+      assessmentType: 'Combine Test',
+      gender: activePlayer.gender || 'Female',
+      ageGroup: activePlayer.ageGroup || 'U16',
+      sprint20m: '3.12s',
+      agilityTime: '8.38s',
+      standingVerticalCm: 56,
+      timeTrial2km: '08:12',
+      yoyoLevel: '16.8',
+      fitnessRating: activePlayer.fitnessRating || 7,
+      preferredFoot: activePlayer.preferredFoot || 'Right',
+      kickDistanceMeters: activePlayer.kickDistanceMeters || 35,
+      kickAccuracyRating: activePlayer.kickAccuracyRating || 7,
+      oppositeFootRating: activePlayer.oppositeFootRating || 6,
+      handballRating: activePlayer.handballRating || 8,
+      markingRating: activePlayer.markingRating || 7,
+      tacklingRating: activePlayer.tacklingRating || 8,
+      gameSenseRating: activePlayer.gameSenseRating || 8,
+      developmentGoals: 'Point-in-time AFL Combine benchmark.',
+      coachNotes: 'Loaded Combine snapshot test results. Note: Combine test results do not alter the player\'s static core attributes.'
+    };
+    onUpdateGrowthRecords([sampleCombine, ...growthRecords]);
+  };
+
+  const handleOpenCombineModal = () => {
+    if (latestCombineRecord) {
+      setCombineSprint(latestCombineRecord.sprint20m || '3.15s');
+      setCombineAgility(latestCombineRecord.agilityTime || '8.40s');
+      setCombineVertical(latestCombineRecord.standingVerticalCm ? String(latestCombineRecord.standingVerticalCm) : '55');
+      setCombineTimeTrial(latestCombineRecord.timeTrial2km || '08:15');
+      setCombineYoyo(latestCombineRecord.yoyoLevel || '16.5');
+    }
+    setShowCombineModal(true);
+  };
+
+  const handleSaveCombineSnapshot = () => {
+    if (!activePlayer || !onUpdateGrowthRecords) return;
+    const newCombine: SkillAssessment = {
+      id: `combine-${Date.now()}`,
+      playerId: activePlayer.id,
+      date: new Date().toISOString().slice(0, 10),
+      seasonLabel: 'Combine Snapshot Entry',
+      isCombineTest: true,
+      assessmentType: 'Combine Test',
+      gender: activePlayer.gender || 'Female',
+      ageGroup: activePlayer.ageGroup || 'U16',
+      sprint20m: combineSprint.trim(),
+      agilityTime: combineAgility.trim(),
+      standingVerticalCm: Number(combineVertical) || 50,
+      timeTrial2km: combineTimeTrial.trim(),
+      yoyoLevel: combineYoyo.trim(),
+      fitnessRating: activePlayer.fitnessRating || 7,
+      preferredFoot: activePlayer.preferredFoot || 'Right',
+      kickDistanceMeters: activePlayer.kickDistanceMeters || 35,
+      kickAccuracyRating: activePlayer.kickAccuracyRating || 7,
+      oppositeFootRating: activePlayer.oppositeFootRating || 6,
+      handballRating: activePlayer.handballRating || 8,
+      markingRating: activePlayer.markingRating || 7,
+      tacklingRating: activePlayer.tacklingRating || 8,
+      gameSenseRating: activePlayer.gameSenseRating || 8,
+      developmentGoals: 'AFL Combine physical testing snapshot.',
+      coachNotes: 'Snapshot combine metrics recorded. Does not influence static attributes.'
+    };
+    onUpdateGrowthRecords([newCombine, ...growthRecords]);
+    setShowCombineModal(false);
+  };
 
   const handleExportCSV = () => {
     if (!players || players.length === 0) return;
@@ -747,14 +908,23 @@ export default function TeamScreen({
                       Core Skill Attributes
                     </h3>
                   </div>
-                  {onNavigateTab && (
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => onNavigateTab('growth')}
-                      className="text-xs font-extrabold text-indigo-600 hover:underline cursor-pointer"
+                      onClick={handleOpenAdjustAttributes}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-black transition cursor-pointer border border-emerald-200"
                     >
-                      Assessments →
+                      <Sliders className="w-3.5 h-3.5" />
+                      Adjust Attributes
                     </button>
-                  )}
+                    {onNavigateTab && (
+                      <button
+                        onClick={() => onNavigateTab('growth')}
+                        className="text-xs font-extrabold text-indigo-600 hover:underline cursor-pointer"
+                      >
+                        Assessments →
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -892,6 +1062,88 @@ export default function TeamScreen({
                     <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Def Transition</span>
                     <span className="text-sm font-black text-slate-900">{defTransition}/10</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Combine Test Snapshot Results Card */}
+              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4.5 h-4.5 text-amber-500" />
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                      Combine Test Snapshot Results
+                    </h3>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
+                    ⚡ Point-in-Time Test
+                  </span>
+                </div>
+
+                {latestCombineRecord ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-100 pb-2">
+                      <span>Last Tested: <strong>{latestCombineRecord.date}</strong></span>
+                      <span className="font-bold text-slate-700">{latestCombineRecord.seasonLabel}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/60">
+                        <span className="text-[10px] text-amber-800 uppercase block font-extrabold">🏃 20m Sprint</span>
+                        <span className="text-sm font-black text-slate-900">{latestCombineRecord.sprint20m || '3.15s'}</span>
+                      </div>
+                      <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/60">
+                        <span className="text-[10px] text-amber-800 uppercase block font-extrabold">⚡ Agility Test</span>
+                        <span className="text-sm font-black text-slate-900">{latestCombineRecord.agilityTime || '8.40s'}</span>
+                      </div>
+                      <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/60">
+                        <span className="text-[10px] text-amber-800 uppercase block font-extrabold">🦘 Vertical Jump</span>
+                        <span className="text-sm font-black text-slate-900">
+                          {latestCombineRecord.standingVerticalCm ? `${latestCombineRecord.standingVerticalCm} cm` : '55 cm'}
+                        </span>
+                      </div>
+                      <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/60">
+                        <span className="text-[10px] text-amber-800 uppercase block font-extrabold">🏃‍♂️ 2km Time Trial</span>
+                        <span className="text-sm font-black text-slate-900">{latestCombineRecord.timeTrial2km || '08:15'}</span>
+                      </div>
+                      <div className="col-span-2 bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/60 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-amber-800 uppercase block font-extrabold">🔊 Yo-Yo Intermittent Test</span>
+                          <span className="text-sm font-black text-slate-900">Level {latestCombineRecord.yoyoLevel || '16.5'}</span>
+                        </div>
+                        <Dumbbell className="w-5 h-5 text-amber-600 opacity-80" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 p-4 rounded-xl text-center space-y-2 border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-600">
+                      No combine test snapshot results loaded for this player yet.
+                    </p>
+                  </div>
+                )}
+
+                {/* Actions: Load sample combine benchmarks or log new combine snapshot */}
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleLoadSampleCombine}
+                    className="flex-1 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Load Combine Test Results
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenCombineModal}
+                    className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Log Custom Combine
+                  </button>
+                </div>
+
+                <div className="p-2.5 bg-blue-50/80 rounded-xl border border-blue-200/80 text-[11px] text-blue-900 font-medium leading-tight">
+                  📌 <strong>Snapshot Note:</strong> Combine test results are athletic snapshots recorded at a point in time. They do <strong>NOT</strong> alter or overwrite the player's static core attributes or skill ratings.
                 </div>
               </div>
 
@@ -1686,6 +1938,396 @@ export default function TeamScreen({
                 className="px-4 py-2 text-xs font-bold bg-[var(--green)] hover:opacity-90 text-white rounded-xl"
               >
                 Save Player
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADJUST STATIC ATTRIBUTES MODAL */}
+      {showAdjustAttributesModal && activePlayer && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 border border-slate-200 shadow-2xl my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Adjust Static Attributes — {activePlayer.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Static attributes represent the baseline skill profile used across team rubrics and lineup recommendations.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdjustAttributesModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-xs text-emerald-900 font-medium">
+              💡 <strong>Static Ratings:</strong> You can adjust these static fields anytime. Point-in-time Combine test snapshots will never overwrite or alter these values.
+            </div>
+
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 border-b pb-1">
+                  Core Skills (1–10 Ratings & Kick Distance)
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+                  {/* Kick Accuracy */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Kick Accuracy</label>
+                      <span className="text-emerald-700 font-black">{attrKickAcc}/10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={attrKickAcc}
+                      onChange={(e) => setAttrKickAcc(Number(e.target.value))}
+                      className="w-full accent-emerald-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Kick Distance */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Kick Distance (m)</label>
+                      <span className="text-blue-700 font-black">{attrKickDist} meters</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="15"
+                      max="70"
+                      value={attrKickDist}
+                      onChange={(e) => setAttrKickDist(Number(e.target.value))}
+                      className="w-full p-1.5 bg-white border rounded-lg text-xs font-black text-slate-800"
+                    />
+                  </div>
+
+                  {/* Opposite Foot */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Opposite Foot</label>
+                      <span className="text-indigo-700 font-black">{attrOppFoot}/10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={attrOppFoot}
+                      onChange={(e) => setAttrOppFoot(Number(e.target.value))}
+                      className="w-full accent-indigo-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Handball */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Handball</label>
+                      <span className="text-emerald-700 font-black">{attrHandball}/10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={attrHandball}
+                      onChange={(e) => setAttrHandball(Number(e.target.value))}
+                      className="w-full accent-emerald-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Marking */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Marking</label>
+                      <span className="text-purple-700 font-black">{attrMarking}/10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={attrMarking}
+                      onChange={(e) => setAttrMarking(Number(e.target.value))}
+                      className="w-full accent-purple-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Tackling */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Tackling</label>
+                      <span className="text-amber-700 font-black">{attrTackling}/10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={attrTackling}
+                      onChange={(e) => setAttrTackling(Number(e.target.value))}
+                      className="w-full accent-amber-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Game Sense */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Game Sense</label>
+                      <span className="text-indigo-700 font-black">{attrGameSense}/10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={attrGameSense}
+                      onChange={(e) => setAttrGameSense(Number(e.target.value))}
+                      className="w-full accent-indigo-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Fitness */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex justify-between mb-1">
+                      <label className="text-slate-700">Work Rate & Fitness</label>
+                      <span className="text-green-700 font-black">{attrFitness}/10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={attrFitness}
+                      onChange={(e) => setAttrFitness(Number(e.target.value))}
+                      className="w-full accent-green-600 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 border-b pb-1">
+                  Positional Rubric Attributes
+                </h4>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-bold">
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Spoiling</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrSpoiling}
+                      onChange={(e) => setAttrSpoiling(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Overhead Mark</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrOverheadMarking}
+                      onChange={(e) => setAttrOverheadMarking(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Crumbing</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrCrumbing}
+                      onChange={(e) => setAttrCrumbing(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Pressure Acts</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrPressureActs}
+                      onChange={(e) => setAttrPressureActs(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Ruck Tap</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrRuckTap}
+                      onChange={(e) => setAttrRuckTap(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Leading Timing</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrLeadingTiming}
+                      onChange={(e) => setAttrLeadingTiming(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Snap Goal</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrSnapGoal}
+                      onChange={(e) => setAttrSnapGoal(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase block mb-1">Def Transition</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={attrDefTransition}
+                      onChange={(e) => setAttrDefTransition(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-xl font-black text-slate-800"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowAdjustAttributesModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAdjustAttributes}
+                className="px-5 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition cursor-pointer"
+              >
+                Save Static Attributes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* COMBINE TEST SNAPSHOT MODAL */}
+      {showCombineModal && activePlayer && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Log Combine Test Snapshot
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Record point-in-time physical combine test benchmark.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCombineModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 font-medium">
+              ⚡ <strong>Point-in-time test:</strong> Logging combine test results creates a historical snapshot entry. It will NOT overwrite the player's core static skill ratings.
+            </div>
+
+            <div className="space-y-3 text-xs font-bold text-slate-800">
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase mb-1">🏃 20m Sprint (e.g. 3.15s)</label>
+                <input
+                  type="text"
+                  value={combineSprint}
+                  onChange={(e) => setCombineSprint(e.target.value)}
+                  placeholder="3.15s"
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase mb-1">⚡ Agility Test (e.g. 8.40s)</label>
+                <input
+                  type="text"
+                  value={combineAgility}
+                  onChange={(e) => setCombineAgility(e.target.value)}
+                  placeholder="8.40s"
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase mb-1">🦘 Standing Vertical Jump (cm)</label>
+                <input
+                  type="number"
+                  value={combineVertical}
+                  onChange={(e) => setCombineVertical(e.target.value)}
+                  placeholder="55"
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase mb-1">🏃‍♂️ 2km Time Trial (e.g. 08:15)</label>
+                <input
+                  type="text"
+                  value={combineTimeTrial}
+                  onChange={(e) => setCombineTimeTrial(e.target.value)}
+                  placeholder="08:15"
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase mb-1">🔊 Yo-Yo Recovery Test (Level)</label>
+                <input
+                  type="text"
+                  value={combineYoyo}
+                  onChange={(e) => setCombineYoyo(e.target.value)}
+                  placeholder="16.5"
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowCombineModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCombineSnapshot}
+                className="px-5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-xs transition cursor-pointer"
+              >
+                Save Combine Snapshot
               </button>
             </div>
           </div>

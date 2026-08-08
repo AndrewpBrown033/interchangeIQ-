@@ -680,6 +680,10 @@ export default function AdminScreen({
   const handleRenameTeam = (teamId: string) => {
     const team = teams.find((t) => t.id === teamId);
     if (!team) return;
+    if (teamId === DEMO_TEAM_ID || team.isDemo) {
+      alert('The Demo Team name is hardcoded as "Demo Team" and cannot be changed.');
+      return;
+    }
     const name = prompt('Rename team:', team.name);
     if (!name || !name.trim()) return;
     onUpdateTeams(teams.map((t) => (t.id === teamId ? { ...t, name: name.trim() } : t)));
@@ -1954,12 +1958,21 @@ export default function AdminScreen({
                         >
                           {isInactive ? 'Reactivate' : 'End Season'}
                         </button>
-                        <button
-                          onClick={() => handleRenameTeam(t.id)}
-                          className="px-2.5 py-1.5 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200"
-                        >
-                          Rename
-                        </button>
+                        {t.id === DEMO_TEAM_ID || t.isDemo ? (
+                          <span
+                            className="px-2.5 py-1.5 text-xs font-bold bg-gray-100 text-gray-400 rounded-lg border border-gray-200 cursor-not-allowed"
+                            title="Demo Team name is hardcoded as Demo Team and cannot be changed"
+                          >
+                            Locked Name
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRenameTeam(t.id)}
+                            className="px-2.5 py-1.5 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200"
+                          >
+                            Rename
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteTeam(t.id)}
                           className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer"

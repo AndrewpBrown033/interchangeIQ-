@@ -110,6 +110,10 @@ export default function SettingsScreen({
   const handleRenameTeamInSettings = (teamId: string) => {
     if (!onUpdateTeams || !teams) return;
     const currentTeam = teams.find((t) => t.id === teamId);
+    if (teamId === 'demo-team' || currentTeam?.isDemo) {
+      alert('The Demo Team name is hardcoded as "Demo Team" and cannot be changed.');
+      return;
+    }
     const newName = prompt('Enter new team / club name:', currentTeam?.name || '');
     if (!newName || !newName.trim()) return;
     onUpdateTeams(teams.map((t) => (t.id === teamId ? { ...t, name: newName.trim() } : t)));
@@ -555,12 +559,21 @@ export default function SettingsScreen({
                         </button>
                       )}
                       {onUpdateTeams && (
-                        <button
-                          onClick={() => handleRenameTeamInSettings(t.id)}
-                          className="px-2.5 py-1.5 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200"
-                        >
-                          Rename
-                        </button>
+                        t.id === 'demo-team' || t.isDemo ? (
+                          <span
+                            className="px-2.5 py-1.5 text-xs font-bold bg-gray-100 text-gray-400 rounded-lg border border-gray-200 cursor-not-allowed"
+                            title="Demo Team name is hardcoded as Demo Team and cannot be changed"
+                          >
+                            Locked Name
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRenameTeamInSettings(t.id)}
+                            className="px-2.5 py-1.5 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200"
+                          >
+                            Rename
+                          </button>
+                        )
                       )}
                     </div>
                   </div>
