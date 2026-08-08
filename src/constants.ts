@@ -1,4 +1,4 @@
-import { Player, Drill, SkillAssessment, TeamProfile } from './types';
+import { Player, Drill, SkillAssessment, TeamProfile, GameHistory, LineupTemplate } from './types';
 
 export const APP_VERSION = 'v1.6';
 
@@ -1358,4 +1358,152 @@ export const DEFAULT_GROWTH_RECORDS: SkillAssessment[] = [
     developmentGoals: 'Key defensive pillar - organize back 6 zone positioning.',
     coachNotes: 'Top 2km time trial in squad. Right foot now very reliable under heat.'
   }
+];
+
+// ---------------------------------------------------------------------------
+// Demo Team sample dataset — seeds the sandbox "Demo Team" (isDemo: true)
+// with a realistic 20-player squad, 3 completed games, a live match-day
+// lineup, and 2 saved lineup templates, so new/Provisional users exploring
+// the demo have something populated to look at instead of an empty squad.
+// Scoped entirely to DEMO_TEAM_ID — never applied to any real team.
+// ---------------------------------------------------------------------------
+
+export const DEMO_TEAM_SAMPLE_PLAYERS: Player[] = [
+  { id: 'dp1', name: 'Zoe Campbell', nick: '', number: '7', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1860, bench: 660, note: 'Captain', slotTimes: { 'C': 1200, 'ROV': 660 } },
+  { id: 'dp2', name: 'Maddie Foster', nick: '', number: '12', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1560, bench: 900, note: '', slotTimes: { 'FF': 1560 } },
+  { id: 'dp3', name: 'Priya Anand', nick: '', number: '18', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 2100, bench: 480, note: 'Vice-Captain', slotTimes: { 'CHB': 1500, 'BP-L': 600 } },
+  { id: 'dp4', name: 'Aisha Osei', nick: '', number: '22', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1740, bench: 780, note: '', slotTimes: { 'W-L': 1080, 'W-R': 660 } },
+  { id: 'dp5', name: 'Charlotte Reyes', nick: 'Charlie', number: '31', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1440, bench: 1140, note: '', slotTimes: { 'CHF': 900, 'HF-L': 540 } },
+  { id: 'dp6', name: 'Grace Thompson', nick: '', number: '44', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1980, bench: 540, note: '', slotTimes: { 'FB': 1500, 'BP-R': 480 } },
+  { id: 'dp7', name: 'Willow Baxter', nick: '', number: '55', positions: ['RUCK'], primaryZone: 'RUCK', status: 'available', active: 2160, bench: 420, note: '', slotTimes: { 'R': 2160 } },
+  { id: 'dp8', name: 'Talia Nguyen', nick: '', number: '5', positions: ['MID'], primaryZone: 'MID', status: 'injured', active: 600, bench: 300, note: 'Hamstring strain — reassess in 2 weeks', slotTimes: { 'C': 600 } },
+  { id: 'dp9', name: 'Sienna Walsh', nick: '', number: '9', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1320, bench: 960, note: '', slotTimes: { 'FP-R': 1320 } },
+  { id: 'dp10', name: 'Ruby Fitzgerald', nick: '', number: '14', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1620, bench: 720, note: '', slotTimes: { 'HB-L': 1020, 'BP-L': 600 } },
+  { id: 'dp11', name: 'Isla McKenzie', nick: '', number: '23', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1500, bench: 900, note: '', slotTimes: { 'ROV': 900, 'RR': 600 } },
+  { id: 'dp12', name: 'Ebony Carter', nick: '', number: '33', positions: ['FWD'], primaryZone: 'FWD', status: 'away', active: 0, bench: 0, note: 'Rep squad duty this round' },
+  { id: 'dp13', name: 'Freya Douglas', nick: '', number: '41', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1380, bench: 1020, note: '', slotTimes: { 'HB-R': 1380 } },
+  { id: 'dp14', name: 'Amelia Novak', nick: '', number: '2', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1260, bench: 1140, note: '', slotTimes: { 'W-R': 1260 } },
+  { id: 'dp15', name: 'Layla Simmons', nick: '', number: '16', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1140, bench: 1260, note: '', slotTimes: { 'FP-L': 1140 } },
+  { id: 'dp16', name: 'Poppy Hendricks', nick: '', number: '27', positions: ['DEF'], primaryZone: 'DEF', status: 'injured', active: 420, bench: 300, note: 'Rolled ankle — team physio managing', slotTimes: { 'BP-R': 420 } },
+  { id: 'dp17', name: 'Harriet Cole', nick: '', number: '36', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '' },
+  { id: 'dp18', name: 'Violet Marsh', nick: '', number: '49', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 0, bench: 0, note: '' },
+  { id: 'dp19', name: 'Matilda Grant', nick: '', number: '60', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 0, bench: 0, note: '' },
+  { id: 'dp20', name: 'Scarlett Boyd', nick: '', number: '71', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '' },
+];
+
+// Best-18 match-day lineup used both as the "live" current lineup and as the
+// basis for the first saved lineup template below.
+export const DEMO_TEAM_SAMPLE_LINEUP: Record<string, string> = {
+  LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
+  LHF: 'dp5', CHF: 'dp5', RHF: 'dp5',
+  C: 'dp1', R: 'dp7',
+  LW: 'dp4', RW: 'dp14',
+  RR: 'dp11', ROV: 'dp11',
+  LBF: 'dp13', CHB: 'dp3', RBF: 'dp13',
+  LBP: 'dp10', FB: 'dp6', RBP: 'dp6',
+};
+
+export const DEMO_TEAM_SAMPLE_SAVED_LINEUPS: LineupTemplate[] = [
+  {
+    id: 'dl1',
+    name: 'Round 3 Best 18',
+    slots: {
+      LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
+      LHF: 'dp5', CHF: 'dp2', RHF: 'dp19',
+      C: 'dp1', R: 'dp7',
+      LW: 'dp4', RW: 'dp14',
+      RR: 'dp11', ROV: 'dp8',
+      LBF: 'dp13', CHB: 'dp3', RBF: 'dp18',
+      LBP: 'dp10', FB: 'dp6', RBP: 'dp16',
+    },
+  },
+  {
+    id: 'dl2',
+    name: 'Development Rotation A',
+    slots: {
+      LFP: 'dp19', FF: 'dp9', RFP: 'dp15',
+      LHF: 'dp2', CHF: 'dp5', RHF: 'dp20',
+      C: 'dp17', R: 'dp7',
+      LW: 'dp14', RW: 'dp4',
+      RR: 'dp8', ROV: 'dp1',
+      LBF: 'dp18', CHB: 'dp10', RBF: 'dp13',
+      LBP: 'dp16', FB: 'dp3', RBP: 'dp6',
+    },
+  },
+];
+
+export const DEMO_TEAM_SAMPLE_HISTORY: GameHistory[] = [
+  {
+    id: 'dg1',
+    team: 'Thunder Cats',
+    round: 'Round 1',
+    date: '2026-04-05',
+    score: {
+      quarter: 4,
+      home: { goals: 8, behinds: 6, quarters: [{ g: 1, b: 2 }, { g: 3, b: 1 }, { g: 2, b: 1 }, { g: 2, b: 2 }] },
+      away: { goals: 5, behinds: 4, quarters: [{ g: 0, b: 1 }, { g: 2, b: 1 }, { g: 1, b: 1 }, { g: 2, b: 1 }] },
+    },
+    rotations: [],
+    lineup: { ...DEMO_TEAM_SAMPLE_LINEUP },
+    players: [
+      { id: 'dp1', name: 'Zoe Campbell', nick: '', number: '7', active: 1740, bench: 660, slot: 'C' },
+      { id: 'dp2', name: 'Maddie Foster', nick: '', number: '12', active: 1440, bench: 900, slot: 'FF' },
+      { id: 'dp3', name: 'Priya Anand', nick: '', number: '18', active: 1920, bench: 480, slot: 'CHB' },
+      { id: 'dp5', name: 'Charlotte Reyes', nick: 'Charlie', number: '31', active: 1380, bench: 1080, slot: 'CHF' },
+      { id: 'dp6', name: 'Grace Thompson', nick: '', number: '44', active: 1860, bench: 540, slot: 'FB' },
+      { id: 'dp7', name: 'Willow Baxter', nick: '', number: '55', active: 2040, bench: 420, slot: 'R' },
+      { id: 'dp9', name: 'Sienna Walsh', nick: '', number: '9', active: 1260, bench: 960, slot: 'RFP' },
+      { id: 'dp10', name: 'Ruby Fitzgerald', nick: '', number: '14', active: 1500, bench: 720, slot: 'LBP' },
+      { id: 'dp11', name: 'Isla McKenzie', nick: '', number: '23', active: 1440, bench: 900, slot: 'ROV' },
+      { id: 'dp15', name: 'Layla Simmons', nick: '', number: '16', active: 1080, bench: 1260, slot: 'LFP' },
+    ],
+  },
+  {
+    id: 'dg2',
+    team: 'Eagles Ridge',
+    round: 'Round 2',
+    date: '2026-04-12',
+    score: {
+      quarter: 4,
+      home: { goals: 4, behinds: 7, quarters: [{ g: 1, b: 2 }, { g: 1, b: 1 }, { g: 1, b: 2 }, { g: 1, b: 2 }] },
+      away: { goals: 6, behinds: 5, quarters: [{ g: 1, b: 1 }, { g: 2, b: 1 }, { g: 1, b: 2 }, { g: 2, b: 1 }] },
+    },
+    rotations: [],
+    lineup: { ...DEMO_TEAM_SAMPLE_LINEUP, CHF: 'dp2', FF: 'dp5' },
+    players: [
+      { id: 'dp1', name: 'Zoe Campbell', nick: '', number: '7', active: 1800, bench: 600, slot: 'C' },
+      { id: 'dp3', name: 'Priya Anand', nick: '', number: '18', active: 2040, bench: 360, slot: 'CHB' },
+      { id: 'dp4', name: 'Aisha Osei', nick: '', number: '22', active: 1680, bench: 720, slot: 'LW' },
+      { id: 'dp6', name: 'Grace Thompson', nick: '', number: '44', active: 1920, bench: 480, slot: 'FB' },
+      { id: 'dp7', name: 'Willow Baxter', nick: '', number: '55', active: 2160, bench: 300, slot: 'R' },
+      { id: 'dp8', name: 'Talia Nguyen', nick: '', number: '5', active: 600, bench: 300, slot: 'C' },
+      { id: 'dp13', name: 'Freya Douglas', nick: '', number: '41', active: 1320, bench: 1020, slot: 'HB-R' },
+      { id: 'dp14', name: 'Amelia Novak', nick: '', number: '2', active: 1200, bench: 1140, slot: 'RW' },
+    ],
+  },
+  {
+    id: 'dg3',
+    team: 'Coastal Sharks',
+    round: 'Round 3',
+    date: '2026-04-19',
+    score: {
+      quarter: 4,
+      home: { goals: 9, behinds: 5, quarters: [{ g: 2, b: 1 }, { g: 2, b: 2 }, { g: 3, b: 1 }, { g: 2, b: 1 }] },
+      away: { goals: 3, behinds: 8, quarters: [{ g: 1, b: 2 }, { g: 0, b: 3 }, { g: 1, b: 2 }, { g: 1, b: 1 }] },
+    },
+    rotations: [],
+    lineup: { ...DEMO_TEAM_SAMPLE_LINEUP },
+    players: [
+      { id: 'dp1', name: 'Zoe Campbell', nick: '', number: '7', active: 1860, bench: 660, slot: 'C' },
+      { id: 'dp2', name: 'Maddie Foster', nick: '', number: '12', active: 1560, bench: 900, slot: 'FF' },
+      { id: 'dp5', name: 'Charlotte Reyes', nick: 'Charlie', number: '31', active: 1440, bench: 1140, slot: 'CHF' },
+      { id: 'dp7', name: 'Willow Baxter', nick: '', number: '55', active: 2160, bench: 420, slot: 'R' },
+      { id: 'dp9', name: 'Sienna Walsh', nick: '', number: '9', active: 1320, bench: 960, slot: 'FP-R' },
+      { id: 'dp10', name: 'Ruby Fitzgerald', nick: '', number: '14', active: 1620, bench: 720, slot: 'LBP' },
+      { id: 'dp11', name: 'Isla McKenzie', nick: '', number: '23', active: 1500, bench: 900, slot: 'ROV' },
+      { id: 'dp16', name: 'Poppy Hendricks', nick: '', number: '27', active: 420, bench: 300, slot: 'BP-R' },
+      { id: 'dp18', name: 'Violet Marsh', nick: '', number: '49', active: 1080, bench: 1260, slot: 'RBP' },
+      { id: 'dp19', name: 'Matilda Grant', nick: '', number: '60', active: 960, bench: 1380, slot: 'RHF' },
+    ],
+  },
 ];

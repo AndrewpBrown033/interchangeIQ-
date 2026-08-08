@@ -3,7 +3,7 @@ import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
   Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment, ApiKeySettings, NotificationSettings
 } from './types';
-import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers, DEMO_TEAM, DEMO_TEAM_ID } from './constants';
+import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers, DEMO_TEAM, DEMO_TEAM_ID, DEMO_TEAM_SAMPLE_PLAYERS, DEMO_TEAM_SAMPLE_LINEUP, DEMO_TEAM_SAMPLE_SAVED_LINEUPS, DEMO_TEAM_SAMPLE_HISTORY } from './constants';
 
 // Firebase Integrations
 import { auth, db, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, ensureFirebaseAuthSession, User } from './lib/firebase';
@@ -389,6 +389,95 @@ export default function App() {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // One-time seed: populate the sandbox "Demo Team" with a realistic sample
+  // squad, 3 completed games, a live match-day lineup, and 2 saved lineup
+  // templates, so new/Provisional users exploring the demo have something
+  // populated to look at instead of an empty squad. Scoped strictly to
+  // DEMO_TEAM_ID via its own localStorage/Firestore keys — never touches any
+  // real team's data. Guarded by a one-time flag so it won't stomp over
+  // anything a user has since changed on the demo team themselves.
+  useEffect(() => {
+    const SEED_FLAG = 'iiq_demo_seeded_v1';
+    if (localStorage.getItem(SEED_FLAG) === '1') return;
+
+    let hasRealData = false;
+    try {
+      const existingCacheRaw = localStorage.getItem(`iiq_team_data_${DEMO_TEAM_ID}`);
+      if (existingCacheRaw) {
+        const existing = JSON.parse(existingCacheRaw);
+        hasRealData = Array.isArray(existing.history) && existing.history.length > 0;
+      }
+    } catch (e) {
+      console.warn('Demo team seed: failed to inspect existing cache:', e);
+    }
+    if (hasRealData) {
+      localStorage.setItem(SEED_FLAG, '1');
+      return;
+    }
+
+    const seedData = {
+      players: normalizePlayers(DEMO_TEAM_SAMPLE_PLAYERS),
+      lineup: normalizeLineup(DEMO_TEAM_SAMPLE_LINEUP),
+      score: {
+        quarter: 1,
+        home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+        away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+      },
+      gameInfo: { team: 'Demo Team', round: 'Round 4', date: new Date().toISOString().slice(0, 10), opponent: '' },
+      rotations: [],
+      plans: [{ id: 'plan1', name: 'Q1 Rotation' }],
+      activePlanIds: ['plan1'],
+      history: DEMO_TEAM_SAMPLE_HISTORY,
+      savedLineups: DEMO_TEAM_SAMPLE_SAVED_LINEUPS,
+      drills: DEFAULT_DRILLS,
+      growthRecords: DEFAULT_GROWTH_RECORDS,
+      trainingState: {
+        view: 'library' as const, filter: 'All', activeId: 'one-v-one-kick-tennis', step: 0, motionPaused: false, plans: [], activePlanId: null,
+      },
+    };
+
+    try {
+      localStorage.setItem(`iiq_team_data_${DEMO_TEAM_ID}`, JSON.stringify(seedData));
+    } catch (e) {
+      console.warn('Demo team seed: failed to write local cache:', e);
+    }
+    localStorage.setItem(SEED_FLAG, '1');
+
+    // If the demo team happens to already be the active team, reflect the
+    // seeded data immediately instead of waiting for a team switch.
+    if (activeTeamId === DEMO_TEAM_ID) {
+      setPlayers(seedData.players);
+      setLineup(seedData.lineup);
+      setHistory(seedData.history);
+      setSavedLineups(seedData.savedLineups);
+    }
+
+    // Best-effort cloud sync so the seeded demo data shows up on other
+    // devices too. Uses merge so it never clobbers the demo team's profile
+    // fields (name, showTraining, etc.) already in the same Firestore doc.
+    (async () => {
+      try {
+        if (!auth.currentUser) {
+          try {
+            await signInAnonymously(auth);
+          } catch (authErr) {
+            console.warn('Demo team seed: anonymous auth notice:', authErr);
+          }
+        }
+        await setDoc(doc(db, 'teams', DEMO_TEAM_ID), {
+          id: DEMO_TEAM_ID,
+          name: 'Demo Team',
+          ...seedData,
+          updatedAt: Date.now(),
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Demo team seed: cloud sync notice (local seed still applied):', err);
+      }
+    })();
+    // Intentionally run once on mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Helper to generate a fresh, team-isolated squad (populated with default AFL squad template)
   const createFreshSquadForTeam = (_teamId: string): Player[] => {
     return normalizePlayers(DEFAULT_PLAYERS);
@@ -505,16 +594,17 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: typeof data.createdAt === 'number' && data.createdAt > 0 ? data.createdAt : 0,
             isInactive: !!data.isInactive,
-            isDemo: !!data.isDemo,
-            // These three were missing entirely — meaning every time this listener
-            // fired (which is immediately after ANY write, including a toggle's own),
-            // it rebuilt local state without them, reverting any toggle back to its
-            // default regardless of what was actually written to Firestore. This is
-            // the actual reason toggles never stuck, no matter how many write paths
-            // got fixed to include them.
+            // These were previously omitted here, which meant a write from
+            // handleUpdateTeams (e.g. confirming a Training/Player Growth/
+            // JARVIS toggle) got immediately clobbered the moment this same
+            // live listener re-fired with the round-tripped snapshot — the
+            // rebuilt team object was missing the field, and the toggle UI
+            // treats a missing field as "on", so the confirmed change looked
+            // like it silently reverted/did nothing.
             showTraining: data.showTraining !== false,
             showPlayerGrowth: data.showPlayerGrowth !== false,
             showJarvis: data.showJarvis !== false,
+            isDemo: !!data.isDemo,
           });
         }
       });
@@ -551,11 +641,22 @@ export default function App() {
           merged = [...remoteTeams];
         }
 
-        if (merged.length === 0) {
+        // Only seed a default team on a genuine first-ever launch (no team was
+        // ever recorded locally). Previously this fired any time Firestore
+        // returned zero real teams, which also happens right after a user
+        // deletes their last remaining team — recreating a fresh "Valiants
+        // Squad" (often reusing id 'team1') immediately after deletion, making
+        // it look like the delete had silently failed. A legitimately empty
+        // team list (user deleted everything) must be allowed to stay empty.
+        const everHadTeams = localStorage.getItem('iiq_teams_bootstrapped') === '1';
+        if (merged.length === 0 && !everHadTeams) {
           merged.push({ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() });
         }
         if (!merged.some((t) => t.id === DEMO_TEAM_ID)) {
           merged.push(DEMO_TEAM);
+        }
+        if (merged.some((t) => t.id !== DEMO_TEAM_ID)) {
+          localStorage.setItem('iiq_teams_bootstrapped', '1');
         }
 
         merged.sort((a, b) => {
@@ -695,10 +796,10 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: data.createdAt || Date.now(),
             isInactive: !!data.isInactive,
-            isDemo: !!data.isDemo,
             showTraining: data.showTraining !== false,
             showPlayerGrowth: data.showPlayerGrowth !== false,
             showJarvis: data.showJarvis !== false,
+            isDemo: !!data.isDemo,
           });
         }
       });
@@ -740,25 +841,10 @@ export default function App() {
   const handleForceSync = async (): Promise<boolean> => {
     if (!activeTeamId) return false;
     const currentTeams = Array.isArray(teams) ? teams : [];
-    const activeTeam = currentTeams.find(t => t.id === activeTeamId);
-    const teamName = activeTeam?.name || 'New Team';
+    const teamName = currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team';
     const cleanData = JSON.parse(JSON.stringify({
       id: activeTeamId,
       name: teamName,
-      // IMPORTANT: this used to be a plain (non-merge) setDoc that omitted these
-      // fields entirely — which meant every time this function ran (on login,
-      // and via the Settings "Manual Settings Test" button), it fully replaced
-      // the team document and silently wiped these back to their default/on
-      // state, even if you'd just turned one off. That's exactly why a feature
-      // toggle could look like it "didn't take" — it briefly saved correctly,
-      // then got reverted the next time this ran. { merge: true } below plus
-      // including these fields fixes it the same way handleUpdateTeams was
-      // fixed earlier.
-      isInactive: !!activeTeam?.isInactive,
-      isDemo: !!activeTeam?.isDemo,
-      showTraining: activeTeam?.showTraining !== false,
-      showPlayerGrowth: activeTeam?.showPlayerGrowth !== false,
-      showJarvis: activeTeam?.showJarvis !== false,
       players: Array.isArray(players) ? players : [],
       lineup,
       score,
@@ -790,7 +876,7 @@ export default function App() {
         }
       }
       const docRef = doc(db, 'teams', activeTeamId);
-      await setDoc(docRef, cleanData, { merge: true });
+      await setDoc(docRef, cleanData);
       setLastSyncedAt(Date.now());
       setCloudConnected(true);
       return true;
@@ -1555,22 +1641,9 @@ export default function App() {
     }
 
     const currentTeams = Array.isArray(teams) ? teams : [];
-    const activeTeamForSync = currentTeams.find(t => t.id === activeTeamId);
     const dataToSync = {
       id: activeTeamId,
-      name: activeTeamForSync?.name || 'New Team',
-      // IMPORTANT: this effect fires automatically and often — any time players,
-      // lineup, score, or other match data changes. It used to be a plain
-      // (non-merge) setDoc that omitted these fields entirely, which meant it
-      // would silently wipe a feature toggle back to its default moments after
-      // you set it, since this effect runs so much more frequently than a
-      // manual sync. { merge: true } below plus including these fields fixes
-      // it the same way the other two sync paths were fixed.
-      isInactive: !!activeTeamForSync?.isInactive,
-      isDemo: !!activeTeamForSync?.isDemo,
-      showTraining: activeTeamForSync?.showTraining !== false,
-      showPlayerGrowth: activeTeamForSync?.showPlayerGrowth !== false,
-      showJarvis: activeTeamForSync?.showJarvis !== false,
+      name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
       players: Array.isArray(players) ? players : [],
       lineup,
       score,
@@ -1597,7 +1670,7 @@ export default function App() {
     const timer = setTimeout(() => {
       lastPublishedSerializedRef.current = currentSerialized;
       const cleanPayload = JSON.parse(JSON.stringify({ ...dataToSync, updatedAt: Date.now() }));
-      setDoc(docRef, cleanPayload, { merge: true })
+      setDoc(docRef, cleanPayload)
         .then(() => {
           setLastSyncedAt(Date.now());
           setCloudConnected(true);
