@@ -47,7 +47,7 @@ export default function TeamScreen({
   const [formNumber, setFormNumber] = useState('');
   const [formPrimaryZone, setFormPrimaryZone] = useState('MID');
   const [formPositions, setFormPositions] = useState<string[]>([]);
-  const [formStatus, setFormStatus] = useState<'available' | 'away' | 'injured'>('available');
+  const [formStatus, setFormStatus] = useState<'available' | 'away' | 'injured' | 'other_team'>('available');
   const [formNote, setFormNote] = useState('');
   const [formError, setFormError] = useState('');
 
@@ -578,9 +578,10 @@ export default function TeamScreen({
 
                   <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase ${
                     p.status === 'available' ? 'bg-green-50 text-[#0E7A48]' :
-                    p.status === 'injured' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'
+                    p.status === 'injured' ? 'bg-red-50 text-red-700' :
+                    p.status === 'other_team' ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-amber-50 text-amber-800'
                   }`}>
-                    {p.status}
+                    {p.status === 'other_team' ? 'Playing for Opponent' : p.status}
                   </span>
                 </div>
               );
@@ -1051,6 +1052,7 @@ export default function TeamScreen({
                     className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)]"
                   >
                     <option value="available">Available for selection</option>
+                    <option value="other_team">Playing for Opponent / Other Team</option>
                     <option value="away">Absent / Away</option>
                     <option value="injured">Injured</option>
                   </select>

@@ -7,7 +7,7 @@ export interface Player {
   primaryZone: string;
   gender?: 'Male' | 'Female';
   ageGroup?: 'U12' | 'U14' | 'U16' | 'U18';
-  status: 'available' | 'away' | 'injured';
+  status: 'available' | 'away' | 'injured' | 'other_team';
   active: number; // in seconds
   bench: number;  // in seconds
   note: string;
