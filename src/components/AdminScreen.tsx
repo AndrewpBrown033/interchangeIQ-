@@ -865,9 +865,9 @@ export default function AdminScreen({
   // Confirmation gate for every toggle on this screen (feature access, team
   // status, role/team assignment, debug mode) — same shared modal used for
   // team switching, so every confirmation in the app looks/behaves the same.
-  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
-  const confirmToggle = (title: string, message: string, action: () => void) => {
-    setPendingConfirm({ title, message, action });
+  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; action: () => void; toggleTargetState?: boolean; toggleColorClass?: string } | null>(null);
+  const confirmToggle = (title: string, message: string, action: () => void, toggleTargetState?: boolean, toggleColorClass?: string) => {
+    setPendingConfirm({ title, message, action, toggleTargetState, toggleColorClass });
   };
 
   const [editingUserUid, setEditingUserUid] = useState<string | null>(null);
@@ -1276,7 +1276,9 @@ export default function AdminScreen({
                         isOn
                           ? 'Hide the drill library, tactical training plans, and session builder for this team?'
                           : 'Show the drill library, tactical training plans, and session builder for this team?',
-                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showTraining')
+                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showTraining'),
+                        !isOn,
+                        'bg-indigo-600'
                       );
                     }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
@@ -1319,7 +1321,9 @@ export default function AdminScreen({
                         isOn
                           ? 'Hide skill assessments, 2km time trials, and player growth metrics for this team?'
                           : 'Show skill assessments, 2km time trials, and player growth metrics for this team?',
-                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showPlayerGrowth')
+                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showPlayerGrowth'),
+                        !isOn,
+                        'bg-emerald-600'
                       );
                     }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
@@ -1362,7 +1366,9 @@ export default function AdminScreen({
                         isOn
                           ? 'Hide the JARVIS AI Assistant for this team?'
                           : 'Show the JARVIS AI Assistant for this team?',
-                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showJarvis')
+                        () => activeTeamId && handleToggleTeamFeature(activeTeamId, 'showJarvis'),
+                        !isOn,
+                        'bg-purple-600'
                       );
                     }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
@@ -1405,7 +1411,9 @@ export default function AdminScreen({
                         next
                           ? 'Enable the debug button and trace panels across the app (Login screen, Jarvis, Scan Team Sheet, etc.)?'
                           : 'Disable the debug button and trace panels across the app?',
-                        () => onToggleDebug && onToggleDebug(next)
+                        () => onToggleDebug && onToggleDebug(next),
+                        next,
+                        'bg-blue-600'
                       );
                     }}
                     className={`w-10 h-6 rounded-full p-1 transition cursor-pointer ${
@@ -1932,7 +1940,9 @@ export default function AdminScreen({
                               isInactive
                                 ? `Reactivate ${t.name} for a new season?`
                                 : `Mark ${t.name} as inactive now that the season has finished?`,
-                              () => handleToggleTeamInactive(t.id)
+                              () => handleToggleTeamInactive(t.id),
+                              isInactive,
+                              'bg-emerald-600'
                             );
                           }}
                           className={`px-2.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition border ${
@@ -2201,7 +2211,9 @@ export default function AdminScreen({
                                     isAllowed
                                       ? `Remove ${u.name}'s access to ${feat.label}?`
                                       : `Grant ${u.name} access to ${feat.label}?`,
-                                    () => handleToggleUserFeature(u.uid, feat.key)
+                                    () => handleToggleUserFeature(u.uid, feat.key),
+                                    !isAllowed,
+                                    'bg-indigo-600'
                                   );
                                 }}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
@@ -2375,7 +2387,9 @@ export default function AdminScreen({
                                       isAllowed
                                         ? `Remove ${u.name}'s access to ${feat.label}?`
                                         : `Grant ${u.name} access to ${feat.label}?`,
-                                      () => handleToggleUserFeature(u.uid, feat.key)
+                                      () => handleToggleUserFeature(u.uid, feat.key),
+                                      !isAllowed,
+                                      'bg-indigo-600'
                                     );
                                   }}
                                   className={`px-2 py-0.5 rounded text-[9px] font-bold border transition flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed ${
@@ -3779,6 +3793,8 @@ export default function AdminScreen({
         open={!!pendingConfirm}
         title={pendingConfirm?.title || ''}
         message={pendingConfirm?.message || ''}
+        toggleTargetState={pendingConfirm?.toggleTargetState}
+        toggleColorClass={pendingConfirm?.toggleColorClass}
         onCancel={() => setPendingConfirm(null)}
         onConfirm={() => {
           pendingConfirm?.action();

@@ -8,12 +8,17 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
+  // When provided, shows a live preview of the actual toggle switch inside
+  // the popup itself — the state it will be in once you confirm — so
+  // confirming and seeing the result happen in the same place.
+  toggleTargetState?: boolean;
+  toggleColorClass?: string;
 }
 
 // Shared confirmation popup used for team switching and every toggle across
 // Settings and Admin — one component so every "are you sure?" in the app
 // looks and behaves identically instead of each screen rolling its own.
-export default function ConfirmModal({ open, title, message, confirmLabel = 'OK, Confirm', onCancel, onConfirm }: ConfirmModalProps) {
+export default function ConfirmModal({ open, title, message, confirmLabel = 'OK, Confirm', onCancel, onConfirm, toggleTargetState, toggleColorClass }: ConfirmModalProps) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-[2000] flex items-center justify-center p-4">
@@ -26,6 +31,24 @@ export default function ConfirmModal({ open, title, message, confirmLabel = 'OK,
         </div>
 
         <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">{message}</p>
+
+        {toggleTargetState !== undefined && (
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <span className="text-xs font-bold text-gray-600">After you confirm:</span>
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-black uppercase ${toggleTargetState ? 'text-emerald-600' : 'text-gray-400'}`}>
+                {toggleTargetState ? 'ON' : 'OFF'}
+              </span>
+              <div
+                className={`w-10 h-6 rounded-full p-1 flex items-center ${
+                  toggleTargetState ? `${toggleColorClass || 'bg-blue-600'} justify-end` : 'bg-gray-300 justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-1">
           <button

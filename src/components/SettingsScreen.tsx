@@ -76,9 +76,9 @@ export default function SettingsScreen({
   const [loginSyncNotice, setLoginSyncNotice] = useState<string | null>(null);
 
   // Confirmation gate for every toggle on this screen (sound, haptics, theme)
-  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
-  const confirmToggle = (title: string, message: string, action: () => void) => {
-    setPendingConfirm({ title, message, action });
+  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; action: () => void; toggleTargetState?: boolean; toggleColorClass?: string } | null>(null);
+  const confirmToggle = (title: string, message: string, action: () => void, toggleTargetState?: boolean, toggleColorClass?: string) => {
+    setPendingConfirm({ title, message, action, toggleTargetState, toggleColorClass });
   };
 
   const handleRunLoginSyncTest = async () => {
@@ -734,7 +734,9 @@ export default function SettingsScreen({
                       confirmToggle(
                         next ? 'Turn On Audio Chime Alerts?' : 'Turn Off Audio Chime Alerts?',
                         next ? 'Enable audio chime alerts for rotations and match events?' : 'Disable audio chime alerts for rotations and match events?',
-                        () => onChangeSoundEnabled(next)
+                        () => onChangeSoundEnabled(next),
+                        next,
+                        'bg-indigo-600'
                       );
                     }}
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
@@ -791,7 +793,9 @@ export default function SettingsScreen({
                       confirmToggle(
                         next ? 'Turn On Haptic Vibration?' : 'Turn Off Haptic Vibration?',
                         next ? 'Enable haptic vibration feedback for rotations and match events?' : 'Disable haptic vibration feedback for rotations and match events?',
-                        () => onChangeHapticEnabled(next)
+                        () => onChangeHapticEnabled(next),
+                        next,
+                        'bg-indigo-600'
                       );
                     }}
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
@@ -918,6 +922,8 @@ export default function SettingsScreen({
         open={!!pendingConfirm}
         title={pendingConfirm?.title || ''}
         message={pendingConfirm?.message || ''}
+        toggleTargetState={pendingConfirm?.toggleTargetState}
+        toggleColorClass={pendingConfirm?.toggleColorClass}
         onCancel={() => setPendingConfirm(null)}
         onConfirm={() => {
           pendingConfirm?.action();

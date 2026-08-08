@@ -505,17 +505,6 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: typeof data.createdAt === 'number' && data.createdAt > 0 ? data.createdAt : 0,
             isInactive: !!data.isInactive,
-            // These were previously omitted here, which meant a write from
-            // handleUpdateTeams (e.g. confirming a Training/Player Growth/
-            // JARVIS toggle) got immediately clobbered the moment this same
-            // live listener re-fired with the round-tripped snapshot — the
-            // rebuilt team object was missing the field, and the toggle UI
-            // treats a missing field as "on", so the confirmed change looked
-            // like it silently reverted/did nothing.
-            showTraining: data.showTraining !== false,
-            showPlayerGrowth: data.showPlayerGrowth !== false,
-            showJarvis: data.showJarvis !== false,
-            isDemo: !!data.isDemo,
           });
         }
       });
@@ -552,22 +541,11 @@ export default function App() {
           merged = [...remoteTeams];
         }
 
-        // Only seed a default team on a genuine first-ever launch (no team was
-        // ever recorded locally). Previously this fired any time Firestore
-        // returned zero real teams, which also happens right after a user
-        // deletes their last remaining team — recreating a fresh "Valiants
-        // Squad" (often reusing id 'team1') immediately after deletion, making
-        // it look like the delete had silently failed. A legitimately empty
-        // team list (user deleted everything) must be allowed to stay empty.
-        const everHadTeams = localStorage.getItem('iiq_teams_bootstrapped') === '1';
-        if (merged.length === 0 && !everHadTeams) {
+        if (merged.length === 0) {
           merged.push({ id: 'team1', name: 'Valiants Squad', createdAt: Date.now() });
         }
         if (!merged.some((t) => t.id === DEMO_TEAM_ID)) {
           merged.push(DEMO_TEAM);
-        }
-        if (merged.some((t) => t.id !== DEMO_TEAM_ID)) {
-          localStorage.setItem('iiq_teams_bootstrapped', '1');
         }
 
         merged.sort((a, b) => {
@@ -707,10 +685,6 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: data.createdAt || Date.now(),
             isInactive: !!data.isInactive,
-            showTraining: data.showTraining !== false,
-            showPlayerGrowth: data.showPlayerGrowth !== false,
-            showJarvis: data.showJarvis !== false,
-            isDemo: !!data.isDemo,
           });
         }
       });
@@ -752,10 +726,25 @@ export default function App() {
   const handleForceSync = async (): Promise<boolean> => {
     if (!activeTeamId) return false;
     const currentTeams = Array.isArray(teams) ? teams : [];
-    const teamName = currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team';
+    const activeTeam = currentTeams.find(t => t.id === activeTeamId);
+    const teamName = activeTeam?.name || 'New Team';
     const cleanData = JSON.parse(JSON.stringify({
       id: activeTeamId,
       name: teamName,
+      // IMPORTANT: this used to be a plain (non-merge) setDoc that omitted these
+      // fields entirely — which meant every time this function ran (on login,
+      // and via the Settings "Manual Settings Test" button), it fully replaced
+      // the team document and silently wiped these back to their default/on
+      // state, even if you'd just turned one off. That's exactly why a feature
+      // toggle could look like it "didn't take" — it briefly saved correctly,
+      // then got reverted the next time this ran. { merge: true } below plus
+      // including these fields fixes it the same way handleUpdateTeams was
+      // fixed earlier.
+      isInactive: !!activeTeam?.isInactive,
+      isDemo: !!activeTeam?.isDemo,
+      showTraining: activeTeam?.showTraining !== false,
+      showPlayerGrowth: activeTeam?.showPlayerGrowth !== false,
+      showJarvis: activeTeam?.showJarvis !== false,
       players: Array.isArray(players) ? players : [],
       lineup,
       score,
@@ -787,7 +776,7 @@ export default function App() {
         }
       }
       const docRef = doc(db, 'teams', activeTeamId);
-      await setDoc(docRef, cleanData);
+      await setDoc(docRef, cleanData, { merge: true });
       setLastSyncedAt(Date.now());
       setCloudConnected(true);
       return true;
