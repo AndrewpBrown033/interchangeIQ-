@@ -366,28 +366,52 @@ export interface HeightBand {
   high: number; // cm - upper bound of the Medium band
 }
 
-// Medium band per age cohort/gender, taken directly from the published
-// single-age table (U12=age12, U14=age14, U16=age16, U18=age18 — same
-// age-to-band convention already used for the combine benchmarks above).
-// U10 and Seniors weren't published, so they're a straight-line extrapolation
-// of the age12->age13 (and age17->age18) trend rather than real CDC figures —
-// treat those two cohorts as an estimate.
+// Full published single-age table (real CDC-percentile-derived data, ages
+// 12-18) for both genders. This is the source of truth; the ageGroup-band
+// table below is derived from it.
+export const HEIGHT_MEDIUM_BAND_BY_AGE: Record<Gender, Record<number, HeightBand>> = {
+  Male: {
+    12: { low: 148, high: 160 },
+    13: { low: 155, high: 167 },
+    14: { low: 162, high: 174 },
+    15: { low: 167, high: 179 },
+    16: { low: 170, high: 182 },
+    17: { low: 172, high: 184 },
+    18: { low: 173, high: 185 },
+  },
+  Female: {
+    12: { low: 150, high: 161 },
+    13: { low: 154, high: 165 },
+    14: { low: 156, high: 168 },
+    15: { low: 157, high: 169 },
+    16: { low: 158, high: 170 },
+    17: { low: 159, high: 171 },
+    18: { low: 160, high: 172 },
+  }
+};
+
+// Medium band per age-group cohort/gender, mapped from the single-age table
+// above (U12=age12, U14=age14, U16=age16, U18=age18 — same age-to-band
+// convention already used for the combine benchmarks above). U10 and Seniors
+// weren't published, so they're a straight-line extrapolation of the
+// age12->age13 (and age17->age18) trend rather than real CDC figures — treat
+// those two cohorts as an estimate.
 export const HEIGHT_MEDIUM_BAND: Record<Gender, Record<AgeGroup, HeightBand>> = {
   Male: {
     U10: { low: 134, high: 146 }, // extrapolated
-    U12: { low: 148, high: 160 },
-    U14: { low: 162, high: 174 },
-    U16: { low: 170, high: 182 },
-    U18: { low: 173, high: 185 },
-    Seniors: { low: 173, high: 185 }, // assumed stable post-18
+    U12: HEIGHT_MEDIUM_BAND_BY_AGE.Male[12],
+    U14: HEIGHT_MEDIUM_BAND_BY_AGE.Male[14],
+    U16: HEIGHT_MEDIUM_BAND_BY_AGE.Male[16],
+    U18: HEIGHT_MEDIUM_BAND_BY_AGE.Male[18],
+    Seniors: HEIGHT_MEDIUM_BAND_BY_AGE.Male[18], // assumed stable post-18
   },
   Female: {
     U10: { low: 142, high: 153 }, // extrapolated
-    U12: { low: 150, high: 161 },
-    U14: { low: 156, high: 168 },
-    U16: { low: 158, high: 170 },
-    U18: { low: 160, high: 172 },
-    Seniors: { low: 160, high: 172 }, // assumed stable post-18
+    U12: HEIGHT_MEDIUM_BAND_BY_AGE.Female[12],
+    U14: HEIGHT_MEDIUM_BAND_BY_AGE.Female[14],
+    U16: HEIGHT_MEDIUM_BAND_BY_AGE.Female[16],
+    U18: HEIGHT_MEDIUM_BAND_BY_AGE.Female[18],
+    Seniors: HEIGHT_MEDIUM_BAND_BY_AGE.Female[18], // assumed stable post-18
   }
 };
 
@@ -406,14 +430,7 @@ export interface HeightGradingResult {
   tier: RubricLevel; // same badge/color styling as the InterchangeIQ scale
 }
 
-// Classifies a raw height (cm) against the age/gender Medium band, using a
-// +/-5cm buffer either side of that band to produce the finer 1-5 rating
-// (e.g. 16yo male: <165=1, 165-170=2, 170-182=3, 182-187=4, >187=5).
-export function classifyHeight(heightCm: number, gender: Gender, ageGroup: AgeGroup): HeightGradingResult | null {
-  if (!heightCm || heightCm <= 0 || isNaN(heightCm)) return null;
-  const band = HEIGHT_MEDIUM_BAND[gender]?.[ageGroup];
-  if (!band) return null;
-
+function classifyFromBand(heightCm: number, band: HeightBand): HeightGradingResult {
   let rating: 1 | 2 | 3 | 4 | 5;
   let group: HeightGroup;
   if (heightCm < band.low - 5) { rating = 1; group = 'Small'; }
@@ -425,17 +442,50 @@ export function classifyHeight(heightCm: number, gender: Gender, ageGroup: AgeGr
   return { group, rating, label: HEIGHT_RATING_LABELS[rating], tier: INTERCHANGE_IQ_SCALE[rating] };
 }
 
+// Classifies a raw height (cm) against the age-GROUP/gender Medium band
+// (i.e. the U10/U12/U14/U16/U18/Seniors bands actually collected on Player),
+// using a +/-5cm buffer either side of that band to produce the finer 1-5
+// rating (e.g. 16yo male: <165=1, 165-170=2, 170-182=3, 182-187=4, >187=5).
+export function classifyHeight(heightCm: number, gender: Gender, ageGroup: AgeGroup): HeightGradingResult | null {
+  if (!heightCm || heightCm <= 0 || isNaN(heightCm)) return null;
+  const band = HEIGHT_MEDIUM_BAND[gender]?.[ageGroup];
+  if (!band) return null;
+  return classifyFromBand(heightCm, band);
+}
+
+// Classifies a raw height (cm) against the exact single-year age table
+// (ages 12-18) for a finer-grained rating than the age-GROUP version above
+// — matches the worked examples exactly (e.g. 15yo male: <162=1, 162-167=2,
+// 167-179=3, 179-184=4, >184=5). Ages outside 12-18 are clamped to the
+// nearest published year. Use this instead of classifyHeight() wherever an
+// exact age (rather than just an age-group band) is available.
+export function classifyHeightByAge(heightCm: number, gender: Gender, age: number): HeightGradingResult | null {
+  if (!heightCm || heightCm <= 0 || isNaN(heightCm)) return null;
+  const table = HEIGHT_MEDIUM_BAND_BY_AGE[gender];
+  if (!table) return null;
+  const clampedAge = Math.min(18, Math.max(12, Math.round(age)));
+  const band = table[clampedAge];
+  if (!band) return null;
+  return classifyFromBand(heightCm, band);
+}
+
 // Resolves a player's effective height group: calculated from heightCm
 // whenever one is recorded (always takes precedence), otherwise falls back
-// to a manual heightGroupOverride flag, otherwise null (unknown).
+// to a manual heightGroupOverride flag, otherwise null (unknown). Uses the
+// exact single-year age when provided for the most precise rating, falling
+// back to the ageGroup band otherwise.
 export function resolvePlayerHeightGroup(player: {
   heightCm?: number;
   gender?: Gender;
   ageGroup?: AgeGroup;
+  age?: number;
   heightGroupOverride?: HeightGroup;
 }): { group: HeightGroup; rating: (1 | 2 | 3 | 4 | 5) | null; source: 'calculated' | 'manual' } | null {
   if (player.heightCm && player.heightCm > 0) {
-    const result = classifyHeight(player.heightCm, player.gender || 'Female', player.ageGroup || 'U16');
+    const gender = player.gender || 'Female';
+    const result = (typeof player.age === 'number' && player.age > 0)
+      ? classifyHeightByAge(player.heightCm, gender, player.age)
+      : classifyHeight(player.heightCm, gender, player.ageGroup || 'U16');
     if (result) return { group: result.group, rating: result.rating, source: 'calculated' };
   }
   if (player.heightGroupOverride) {
