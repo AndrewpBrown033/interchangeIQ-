@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Target, Award, Zap, BookOpen, CheckCircle2, ChevronRight, X, Sparkles, Activity, Shield, Brain } from 'lucide-react';
+import { Target, Award, Zap, BookOpen, CheckCircle2, ChevronRight, X, Sparkles, Activity, Shield, Brain, Layers } from 'lucide-react';
+import { COHORT_BENCHMARKS, INTERCHANGE_IQ_SCALE, Gender, AgeGroup } from '../utils/interchangeIQRubric';
 
 interface SkillRubricModalProps {
   onClose: () => void;
@@ -583,10 +584,11 @@ export const SKILL_RUBRICS: SkillCategoryRubric[] = [
 ];
 
 export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubricModalProps) {
-  const [activeTabId, setActiveTabId] = useState<string>('kick');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTabId, setActiveTabId] = useState<string>('interchangeIQ');
+  const [selectedGender, setSelectedGender] = useState<Gender>('Male');
+  const [selectedAge, setSelectedAge] = useState<AgeGroup>('U14');
 
-  const activeCategory = SKILL_RUBRICS.find((r) => r.id === activeTabId) || SKILL_RUBRICS[0];
+  const activeCategory = SKILL_RUBRICS.find((r) => r.id === activeTabId);
 
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-6 overflow-hidden">
@@ -600,13 +602,13 @@ export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubric
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-black text-lg text-white tracking-tight">AFL Skill Testing Rubric</h2>
+                <h2 className="font-black text-lg text-white tracking-tight">InterchangeIQ & AFL Skill Rubrics</h2>
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold text-[10px] uppercase border border-emerald-500/30">
-                  Scoring Guide
+                  Standardized Grading
                 </span>
               </div>
               <p className="text-xs text-slate-300 font-medium">
-                Standardized 1-10 benchmark rubrics for player assessments and talent tracking
+                Cohort combine benchmarks (20m Sprint, Agility, Standing Vertical) & 1-10 technical skill rubrics
               </p>
             </div>
           </div>
@@ -621,6 +623,18 @@ export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubric
 
         {/* Category Tabs Bar */}
         <div className="bg-slate-100 p-2 border-b border-slate-200 overflow-x-auto flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => setActiveTabId('interchangeIQ')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTabId === 'interchangeIQ'
+                ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/30'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          >
+            <span>🏆</span>
+            <span>InterchangeIQ Combine Benchmarks</span>
+          </button>
+
           {SKILL_RUBRICS.map((cat) => {
             const isActive = activeTabId === cat.id;
             return (
@@ -640,93 +654,410 @@ export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubric
           })}
         </div>
 
-        {/* Selected Skill Banner & Drill Info */}
-        <div className="p-4 bg-indigo-50/70 border-b border-indigo-100 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{activeCategory.icon}</span>
-              <h3 className="font-black text-base text-slate-900">{activeCategory.title}</h3>
+        {/* INTERCHANGE IQ COMBINE BENCHMARKS VIEW */}
+        {activeTabId === 'interchangeIQ' ? (
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50">
+            {/* InterchangeIQ 5-Tier Scale Overview */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📊</span>
+                  <h3 className="font-black text-sm text-slate-900 uppercase tracking-tight">
+                    InterchangeIQ 5-Tier Player Rating Scale
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-500 font-semibold">Standardized Cohort Benchmark</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {[5, 4, 3, 2, 1].map((r) => {
+                  const scale = INTERCHANGE_IQ_SCALE[r];
+                  return (
+                    <div key={r} className={`p-3 rounded-xl border flex flex-col items-center text-center ${scale.badgeText}`}>
+                      <span className="text-lg mb-1">{scale.emoji}</span>
+                      <span className="font-black text-xs uppercase block">{scale.title}</span>
+                      <span className="text-[10px] font-bold opacity-80 mt-0.5">Rating {r}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Weighting formula badge */}
+              <div className="bg-indigo-50/80 p-3 rounded-xl border border-indigo-100 text-xs text-indigo-950 font-medium flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    <b>Overall Score Formula:</b> Speed (20m Sprint) = 25% | Agility = 20% | Jumping (Vertical) = 20% | Endurance = 25% | Football Skill = 10%
+                  </span>
+                </div>
+                <span className="text-[11px] font-bold bg-white px-2.5 py-1 rounded-lg border border-indigo-200">
+                  Overall Grade: 4.5+ 🟢 Elite | 3.8-4.49 🔵 Advanced | 3.0-3.79 🟡 Developing
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-slate-600 font-medium">{activeCategory.summary}</p>
-          </div>
 
-          <div className="bg-white p-2.5 rounded-xl border border-indigo-200 text-xs shadow-xs max-w-md">
-            <span className="font-black text-indigo-900 block mb-0.5">🎯 Recommended Testing Protocol:</span>
-            <span className="text-slate-700 font-medium">{activeCategory.testingDrill}</span>
-          </div>
-        </div>
+            {/* Cohort Selector Tabs */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-emerald-600" />
+                  <span>Age & Gender Cohort Benchmarks</span>
+                </h3>
 
-        {/* Rubric Tiers List */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50">
-          {activeCategory.tiers.map((tier) => (
-            <div
-              key={tier.scoreRange}
-              className={`p-4 md:p-5 rounded-2xl border transition-all ${tier.color} bg-white shadow-xs hover:shadow-md flex flex-col gap-3 relative`}
-            >
-              {/* Top Row: Score Badge & Level Title */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-xl font-black text-xs shadow-xs ${tier.badgeBg}`}>
-                    Score {tier.scoreRange} / 10
-                  </span>
-                  <h4 className="font-extrabold text-sm text-slate-900">{tier.levelName} Level</h4>
-                </div>
+                  {/* Gender Selector */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    {(['Male', 'Female'] as Gender[]).map((g) => (
+                      <button
+                        key={g}
+                        onClick={() => setSelectedGender(g)}
+                        className={`px-3 py-1 text-xs font-black rounded-lg transition cursor-pointer ${
+                          selectedGender === g ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
 
-                {onSelectScore && (
-                  <button
-                    onClick={() => {
-                      onSelectScore(activeCategory.id, tier.numericScore);
-                      onClose();
-                    }}
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>Use Score {tier.numericScore}/10</span>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                  {/* Age Group Selector */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    {(['U12', 'U14', 'U16', 'U18'] as AgeGroup[]).map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => setSelectedAge(a)}
+                        className={`px-3 py-1 text-xs font-black rounded-lg transition cursor-pointer ${
+                          selectedAge === a ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Description */}
-              <p className="text-xs text-slate-700 font-semibold leading-relaxed">
-                {tier.description}
-              </p>
-
-              {/* Biomechanics & Keypoints Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-                  <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                    <Activity className="w-3 h-3 text-indigo-600" />
-                    <span>Biomechanical Indicators</span>
+              {/* Specific Cohort Table */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-slate-800">
+                    {selectedGender.toUpperCase()} {selectedAge} COMBINE BENCHMARKS
+                  </h4>
+                  <span className="text-xs text-slate-500 font-semibold">
+                    Electronic Timing & Jump Gate Standards
                   </span>
-                  <ul className="space-y-1">
-                    {tier.biomechanicsKeypoints.map((kp, idx) => (
-                      <li key={idx} className="text-[11px] text-slate-600 font-medium flex items-start gap-1.5">
-                        <span className="text-indigo-500 font-bold">•</span>
-                        <span>{kp}</span>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-                  <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                    <Target className="w-3 h-3 text-emerald-600" />
-                    <span>Testing Benchmark Performance</span>
-                  </span>
-                  <p className="text-[11px] text-slate-700 font-bold bg-white p-2 rounded-lg border border-slate-200">
-                    {tier.testingIndicators}
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* 20m Sprint Table */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                    <b className="text-xs font-black text-slate-900 block border-b border-slate-200 pb-1.5">
+                      ⚡ 20m Sprint (Seconds)
+                    </b>
+                    {selectedGender === 'Male' && selectedAge === 'U12' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.50s</li>
+                        <li>🔵 4 Advanced: 3.50s - 3.64s</li>
+                        <li>🟡 3 Developing: 3.65s - 3.79s</li>
+                        <li>🟠 2 Emerging: 3.80s - 3.94s</li>
+                        <li>🔴 1 Needs Dev: &gt; 3.94s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U14' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.30s</li>
+                        <li>🔵 4 Advanced: 3.30s - 3.39s</li>
+                        <li>🟡 3 Developing: 3.40s - 3.49s</li>
+                        <li>🟠 2 Emerging: 3.50s - 3.59s</li>
+                        <li>🔴 1 Needs Dev: &gt; 3.59s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U16' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.15s</li>
+                        <li>🔵 4 Advanced: 3.15s - 3.19s</li>
+                        <li>🟡 3 Developing: 3.20s - 3.29s</li>
+                        <li>🟠 2 Emerging: 3.30s - 3.39s</li>
+                        <li>🔴 1 Needs Dev: &gt; 3.39s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U18' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.00s</li>
+                        <li>🔵 4 Advanced: 3.00s - 3.04s</li>
+                        <li>🟡 3 Developing: 3.05s - 3.14s</li>
+                        <li>🟠 2 Emerging: 3.15s - 3.24s</li>
+                        <li>🔴 1 Needs Dev: &gt; 3.24s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U12' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.75s</li>
+                        <li>🔵 4 Advanced: 3.75s - 3.89s</li>
+                        <li>🟡 3 Developing: 3.90s - 4.04s</li>
+                        <li>🟠 2 Emerging: 4.05s - 4.19s</li>
+                        <li>🔴 1 Needs Dev: &gt; 4.19s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U14' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.45s</li>
+                        <li>🔵 4 Advanced: 3.45s - 3.59s</li>
+                        <li>🟡 3 Developing: 3.60s - 3.74s</li>
+                        <li>🟠 2 Emerging: 3.75s - 3.89s</li>
+                        <li>🔴 1 Needs Dev: &gt; 3.89s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U16' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.25s</li>
+                        <li>🔵 4 Advanced: 3.25s - 3.39s</li>
+                        <li>🟡 3 Developing: 3.40s - 3.54s</li>
+                        <li>🟠 2 Emerging: 3.55s - 3.69s</li>
+                        <li>🔴 1 Needs Dev: &gt; 3.69s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U18' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 3.15s</li>
+                        <li>🔵 4 Advanced: 3.15s - 3.24s</li>
+                        <li>🟡 3 Developing: 3.25s - 3.39s</li>
+                        <li>🟠 2 Emerging: 3.40s - 3.54s</li>
+                        <li>🔴 1 Needs Dev: &gt; 3.54s</li>
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Agility Table */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                    <b className="text-xs font-black text-slate-900 block border-b border-slate-200 pb-1.5">
+                      🏃 Agility Test (Seconds)
+                    </b>
+                    {selectedGender === 'Male' && selectedAge === 'U12' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 9.30s</li>
+                        <li>🔵 4 Advanced: 9.30s - 9.59s</li>
+                        <li>🟡 3 Developing: 9.60s - 9.89s</li>
+                        <li>🟠 2 Emerging: 9.90s - 10.19s</li>
+                        <li>🔴 1 Needs Dev: &gt; 10.19s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U14' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 8.90s</li>
+                        <li>🔵 4 Advanced: 8.90s - 8.99s</li>
+                        <li>🟡 3 Developing: 9.00s - 9.09s</li>
+                        <li>🟠 2 Emerging: 9.10s - 9.29s</li>
+                        <li>🔴 1 Needs Dev: &gt; 9.29s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U16' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 8.50s</li>
+                        <li>🔵 4 Advanced: 8.50s - 8.59s</li>
+                        <li>🟡 3 Developing: 8.60s - 8.69s</li>
+                        <li>🟠 2 Emerging: 8.70s - 8.89s</li>
+                        <li>🔴 1 Needs Dev: &gt; 8.89s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U18' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 8.20s</li>
+                        <li>🔵 4 Advanced: 8.20s - 8.29s</li>
+                        <li>🟡 3 Developing: 8.30s - 8.39s</li>
+                        <li>🟠 2 Emerging: 8.40s - 8.59s</li>
+                        <li>🔴 1 Needs Dev: &gt; 8.59s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U18' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: &lt; 8.50s</li>
+                        <li>🔵 4 Advanced: 8.50s - 8.59s</li>
+                        <li>🟡 3 Developing: 8.60s - 8.79s</li>
+                        <li>🟠 2 Emerging: 8.80s - 8.99s</li>
+                        <li>🔴 1 Needs Dev: &gt; 8.99s</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge !== 'U18' && (
+                      <div className="p-2 bg-amber-50 rounded-lg text-amber-900 text-[11px]">
+                        <b>Note:</b> Optional test for Female {selectedAge}. Evaluated using standard scaled agility bounds when recorded.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Standing Vertical Jump Table */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                    <b className="text-xs font-black text-slate-900 block border-b border-slate-200 pb-1.5">
+                      🦘 Standing Vertical (cm)
+                    </b>
+                    {selectedGender === 'Male' && selectedAge === 'U12' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 45+ cm</li>
+                        <li>🔵 4 Advanced: 41 - 44 cm</li>
+                        <li>🟡 3 Developing: 37 - 40 cm</li>
+                        <li>🟠 2 Emerging: 33 - 36 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 33 cm</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U14' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 52+ cm</li>
+                        <li>🔵 4 Advanced: 49 - 51 cm</li>
+                        <li>🟡 3 Developing: 46 - 48 cm</li>
+                        <li>🟠 2 Emerging: 43 - 45 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 43 cm</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U16' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 60+ cm</li>
+                        <li>🔵 4 Advanced: 56 - 59 cm</li>
+                        <li>🟡 3 Developing: 52 - 55 cm</li>
+                        <li>🟠 2 Emerging: 48 - 51 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 48 cm</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Male' && selectedAge === 'U18' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 70+ cm</li>
+                        <li>🔵 4 Advanced: 65 - 69 cm</li>
+                        <li>🟡 3 Developing: 60 - 64 cm</li>
+                        <li>🟠 2 Emerging: 55 - 59 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 55 cm</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U12' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 38+ cm</li>
+                        <li>🔵 4 Advanced: 34 - 37 cm</li>
+                        <li>🟡 3 Developing: 30 - 33 cm</li>
+                        <li>🟠 2 Emerging: 26 - 29 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 26 cm</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U14' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 45+ cm</li>
+                        <li>🔵 4 Advanced: 42 - 44 cm</li>
+                        <li>🟡 3 Developing: 38 - 41 cm</li>
+                        <li>🟠 2 Emerging: 35 - 37 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 35 cm</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U16' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 50+ cm</li>
+                        <li>🔵 4 Advanced: 47 - 49 cm</li>
+                        <li>🟡 3 Developing: 43 - 46 cm</li>
+                        <li>🟠 2 Emerging: 39 - 42 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 39 cm</li>
+                      </ul>
+                    )}
+                    {selectedGender === 'Female' && selectedAge === 'U18' && (
+                      <ul className="text-xs space-y-1 font-semibold text-slate-700">
+                        <li>🟢 5 Elite: 55+ cm</li>
+                        <li>🔵 4 Advanced: 52 - 54 cm</li>
+                        <li>🟡 3 Developing: 48 - 51 cm</li>
+                        <li>🟠 2 Emerging: 44 - 47 cm</li>
+                        <li>🔴 1 Needs Dev: &lt; 44 cm</li>
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ) : activeCategory ? (
+          <>
+            {/* Selected Skill Banner & Drill Info */}
+            <div className="p-4 bg-indigo-50/70 border-b border-indigo-100 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{activeCategory.icon}</span>
+                  <h3 className="font-black text-base text-slate-900">{activeCategory.title}</h3>
+                </div>
+                <p className="text-xs text-slate-600 font-medium">{activeCategory.summary}</p>
+              </div>
+
+              <div className="bg-white p-2.5 rounded-xl border border-indigo-200 text-xs shadow-xs max-w-md">
+                <span className="font-black text-indigo-900 block mb-0.5">🎯 Recommended Testing Protocol:</span>
+                <span className="text-slate-700 font-medium">{activeCategory.testingDrill}</span>
+              </div>
+            </div>
+
+            {/* Rubric Tiers List */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50">
+              {activeCategory.tiers.map((tier) => (
+                <div
+                  key={tier.scoreRange}
+                  className={`p-4 md:p-5 rounded-2xl border transition-all ${tier.color} bg-white shadow-xs hover:shadow-md flex flex-col gap-3 relative`}
+                >
+                  {/* Top Row: Score Badge & Level Title */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-xl font-black text-xs shadow-xs ${tier.badgeBg}`}>
+                        Score {tier.scoreRange} / 10
+                      </span>
+                      <h4 className="font-extrabold text-sm text-slate-900">{tier.levelName} Level</h4>
+                    </div>
+
+                    {onSelectScore && (
+                      <button
+                        onClick={() => {
+                          onSelectScore(activeCategory.id, tier.numericScore);
+                          onClose();
+                        }}
+                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>Use Score {tier.numericScore}/10</span>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-xs text-slate-700 font-semibold leading-relaxed">
+                    {tier.description}
+                  </p>
+
+                  {/* Biomechanics & Keypoints Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                      <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+                        <Activity className="w-3 h-3 text-indigo-600" />
+                        <span>Biomechanical Indicators</span>
+                      </span>
+                      <ul className="space-y-1">
+                        {tier.biomechanicsKeypoints.map((kp, idx) => (
+                          <li key={idx} className="text-[11px] text-slate-600 font-medium flex items-start gap-1.5">
+                            <span className="text-indigo-500 font-bold">•</span>
+                            <span>{kp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                      <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+                        <Target className="w-3 h-3 text-emerald-600" />
+                        <span>Testing Benchmark Performance</span>
+                      </span>
+                      <p className="text-[11px] text-slate-700 font-bold bg-white p-2 rounded-lg border border-slate-200">
+                        {tier.testingIndicators}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
 
         {/* Modal Footer */}
         <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
           <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Apply consistent rubric scores across pre-season and mid-season assessments for accurate year-on-year growth.</span>
+            <span>Standardized InterchangeIQ rubrics ensure consistent player grading across age groups and seasons.</span>
           </div>
 
           <button

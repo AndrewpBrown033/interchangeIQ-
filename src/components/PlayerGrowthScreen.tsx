@@ -3,9 +3,10 @@ import { Player, SkillAssessment } from '../types';
 import {
   TrendingUp, Award, Zap, Target, Plus, Calendar, Activity,
   ChevronRight, ArrowUpRight, Sparkles, CheckCircle2, Search, Filter,
-  FileSpreadsheet, Edit3, Trash2, Flame, BookOpen
+  FileSpreadsheet, Edit3, Trash2, Flame, BookOpen, Layers, Trophy
 } from 'lucide-react';
 import SkillRubricModal from './SkillRubricModal';
+import { calculateInterchangeIQGrade, Gender, AgeGroup, INTERCHANGE_IQ_SCALE } from '../utils/interchangeIQRubric';
 
 interface PlayerGrowthScreenProps {
   players: Player[];
@@ -51,10 +52,16 @@ export default function PlayerGrowthScreen({
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
   const [formSeasonLabel, setFormSeasonLabel] = useState('2026 Pre-Season');
   
-  // Fitness states
+  // InterchangeIQ Demographics
+  const [formGender, setFormGender] = useState<Gender>('Female');
+  const [formAgeGroup, setFormAgeGroup] = useState<AgeGroup>('U16');
+
+  // Fitness & Combine states
   const [formTimeTrial, setFormTimeTrial] = useState('08:45');
   const [formYoyo, setFormYoyo] = useState('15.0');
   const [formSprint, setFormSprint] = useState('3.45s');
+  const [formAgility, setFormAgility] = useState('8.90s');
+  const [formVertical, setFormVertical] = useState<number>(48);
   const [formFitnessRating, setFormFitnessRating] = useState(7);
   
   // Kicking states
@@ -75,6 +82,24 @@ export default function PlayerGrowthScreen({
 
   // Task-focused modal entry state ('fitness' | 'kicking' | 'skills' | 'goals' | 'all')
   const [entryTaskMode, setEntryTaskMode] = useState<'fitness' | 'kicking' | 'skills' | 'goals' | 'all'>('fitness');
+
+  // Live InterchangeIQ Grade Calculation for current Modal Form
+  const liveInterchangeIqGrade = calculateInterchangeIQGrade({
+    sprint20m: formSprint,
+    agilityTime: formAgility,
+    standingVerticalCm: formVertical,
+    timeTrial2km: formTimeTrial,
+    yoyoLevel: formYoyo,
+    fitnessRating: formFitnessRating,
+    kickAccuracyRating: formKickAccuracy,
+    oppositeFootRating: formOppositeFoot,
+    handballRating: formHandball,
+    markingRating: formMarking,
+    tacklingRating: formTackling,
+    gameSenseRating: formGameSense,
+    gender: formGender,
+    ageGroup: formAgeGroup
+  });
 
   // Filtered Players
   const filteredPlayers = players.filter((p) => {
@@ -108,11 +133,15 @@ export default function PlayerGrowthScreen({
     initialTaskMode: 'fitness' | 'kicking' | 'skills' | 'goals' | 'all' = 'fitness'
   ) => {
     const targetId = playerId || activePlayerId;
+    const targetPlayer = players.find(p => p.id === targetId);
     setEditingRecord(null);
     setEntryTaskMode(initialTaskMode);
     setFormPlayerId(targetId);
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormSeasonLabel('2026 Pre-Season');
+
+    setFormGender(targetPlayer?.gender || 'Female');
+    setFormAgeGroup(targetPlayer?.ageGroup || 'U16');
     
     // Autofill from latest record if available
     const last = growthRecords.filter(r => r.playerId === targetId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
@@ -124,6 +153,8 @@ export default function PlayerGrowthScreen({
       setFormTimeTrial(last.timeTrial2km || '08:45');
       setFormYoyo(last.yoyoLevel || '15.0');
       setFormSprint(last.sprint20m || '3.45s');
+      setFormAgility(last.agilityTime || '8.90s');
+      setFormVertical(last.standingVerticalCm || 48);
       setFormFitnessRating(last.fitnessRating || 7);
       setFormHandball(last.handballRating || 7);
       setFormMarking(last.markingRating || 7);
@@ -139,6 +170,8 @@ export default function PlayerGrowthScreen({
       setFormTimeTrial('08:45');
       setFormYoyo('15.0');
       setFormSprint('3.45s');
+      setFormAgility('8.90s');
+      setFormVertical(48);
       setFormFitnessRating(7);
       setFormHandball(7);
       setFormMarking(7);
@@ -151,11 +184,14 @@ export default function PlayerGrowthScreen({
   };
 
   const handleOpenEditModal = (record: SkillAssessment) => {
+    const targetPlayer = players.find(p => p.id === record.playerId);
     setEditingRecord(record);
     setEntryTaskMode('all');
     setFormPlayerId(record.playerId);
     setFormDate(record.date);
     setFormSeasonLabel(record.seasonLabel);
+    setFormGender(record.gender || targetPlayer?.gender || 'Female');
+    setFormAgeGroup(record.ageGroup || targetPlayer?.ageGroup || 'U16');
     setFormPreferredFoot(record.preferredFoot);
     setFormKickDistance(record.kickDistanceMeters);
     setFormKickAccuracy(record.kickAccuracyRating);
@@ -163,6 +199,8 @@ export default function PlayerGrowthScreen({
     setFormTimeTrial(record.timeTrial2km || '');
     setFormYoyo(record.yoyoLevel || '');
     setFormSprint(record.sprint20m || '');
+    setFormAgility(record.agilityTime || '8.90s');
+    setFormVertical(record.standingVerticalCm || 48);
     setFormFitnessRating(record.fitnessRating);
     setFormHandball(record.handballRating);
     setFormMarking(record.markingRating);
@@ -176,14 +214,35 @@ export default function PlayerGrowthScreen({
   const handleSaveAssessment = () => {
     if (!formPlayerId) return;
 
+    const grading = calculateInterchangeIQGrade({
+      sprint20m: formSprint,
+      agilityTime: formAgility,
+      standingVerticalCm: formVertical,
+      timeTrial2km: formTimeTrial,
+      yoyoLevel: formYoyo,
+      fitnessRating: formFitnessRating,
+      kickAccuracyRating: formKickAccuracy,
+      oppositeFootRating: formOppositeFoot,
+      handballRating: formHandball,
+      markingRating: formMarking,
+      tacklingRating: formTackling,
+      gameSenseRating: formGameSense,
+      gender: formGender,
+      ageGroup: formAgeGroup
+    });
+
     const assessmentData: SkillAssessment = {
       id: editingRecord ? editingRecord.id : `growth-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       playerId: formPlayerId,
       date: formDate,
       seasonLabel: formSeasonLabel.trim() || 'Pre-Season Benchmark',
+      gender: formGender,
+      ageGroup: formAgeGroup,
       timeTrial2km: formTimeTrial.trim(),
       yoyoLevel: formYoyo.trim(),
       sprint20m: formSprint.trim(),
+      agilityTime: formAgility.trim(),
+      standingVerticalCm: Number(formVertical) || 45,
       fitnessRating: formFitnessRating,
       preferredFoot: formPreferredFoot,
       kickDistanceMeters: Number(formKickDistance) || 30,
@@ -193,6 +252,8 @@ export default function PlayerGrowthScreen({
       markingRating: formMarking,
       tacklingRating: formTackling,
       gameSenseRating: formGameSense,
+      overallInterchangeIqScore: grading.overallScore,
+      overallRatingBadge: grading.overallTier.title as any,
       developmentGoals: formGoals.trim(),
       coachNotes: formNotes.trim(),
     };
@@ -490,79 +551,127 @@ export default function PlayerGrowthScreen({
                   </h4>
 
                   <div className="space-y-4">
-                    {playerRecords.map((rec, index) => (
-                      <div
-                        key={rec.id}
-                        className="bg-gray-50/80 border border-gray-200 rounded-2xl p-4 space-y-4 relative hover:border-gray-300 transition"
-                      >
-                        {/* Session Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-3">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-[10px] flex items-center justify-center">
-                              #{index + 1}
-                            </span>
-                            <span className="font-black text-sm text-[var(--navy)]">
-                              {rec.seasonLabel}
-                            </span>
-                            <span className="text-xs text-gray-400 font-medium">
-                              ({rec.date})
-                            </span>
-                          </div>
+                    {playerRecords.map((rec, index) => {
+                      const recGrade = calculateInterchangeIQGrade({
+                        sprint20m: rec.sprint20m,
+                        agilityTime: rec.agilityTime,
+                        standingVerticalCm: rec.standingVerticalCm,
+                        timeTrial2km: rec.timeTrial2km,
+                        yoyoLevel: rec.yoyoLevel,
+                        fitnessRating: rec.fitnessRating,
+                        kickAccuracyRating: rec.kickAccuracyRating,
+                        oppositeFootRating: rec.oppositeFootRating,
+                        handballRating: rec.handballRating,
+                        markingRating: rec.markingRating,
+                        tacklingRating: rec.tacklingRating,
+                        gameSenseRating: rec.gameSenseRating,
+                        gender: rec.gender || activePlayer?.gender || 'Female',
+                        ageGroup: rec.ageGroup || activePlayer?.ageGroup || 'U16'
+                      });
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenEditModal(rec)}
-                              className="p-1.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition"
-                              title="Edit test record"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteAssessment(rec.id)}
-                              className="p-1.5 bg-white border border-gray-200 hover:bg-red-50 text-red-600 rounded-lg transition"
-                              title="Delete test record"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Metric Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                          {/* Fitness metrics */}
-                          <div className="bg-white p-3 rounded-xl border border-gray-100">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase block mb-1">🏃 2km Time Trial</span>
-                            <span className="font-black text-gray-800 text-sm block">{rec.timeTrial2km || 'N/A'}</span>
-                            <span className="text-[10px] text-gray-400 font-medium">Yo-Yo: {rec.yoyoLevel || 'N/A'}</span>
-                          </div>
-
-                          {/* Kick Distance */}
-                          <div className="bg-white p-3 rounded-xl border border-gray-100">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase block mb-1">🦵 Kicking Distance</span>
-                            <span className="font-black text-emerald-600 text-sm block">{rec.kickDistanceMeters} meters</span>
-                            <span className="text-[10px] text-gray-500 font-semibold">Pref: {rec.preferredFoot} Foot</span>
-                          </div>
-
-                          {/* Opposite Foot Rating */}
-                          <div className="bg-white p-3 rounded-xl border border-gray-100">
-                            <span className="text-[10px] font-bold text-amber-600 uppercase block mb-1">⭐ Opposite Foot</span>
-                            <div className="flex items-center gap-1">
-                              <span className="font-black text-amber-700 text-sm">{rec.oppositeFootRating} / 10</span>
+                      return (
+                        <div
+                          key={rec.id}
+                          className="bg-gray-50/80 border border-gray-200 rounded-2xl p-4 space-y-4 relative hover:border-gray-300 transition"
+                        >
+                          {/* Session Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-[10px] flex items-center justify-center">
+                                #{index + 1}
+                              </span>
+                              <span className="font-black text-sm text-[var(--navy)]">
+                                {rec.seasonLabel}
+                              </span>
+                              <span className="text-xs text-gray-400 font-medium">
+                                ({rec.date})
+                              </span>
                             </div>
-                            <div className="w-full h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
-                              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(rec.oppositeFootRating / 10) * 100}%` }} />
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleOpenEditModal(rec)}
+                                className="p-1.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition"
+                                title="Edit test record"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteAssessment(rec.id)}
+                                className="p-1.5 bg-white border border-gray-200 hover:bg-red-50 text-red-600 rounded-lg transition"
+                                title="Delete test record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
 
-                          {/* Fitness Rating */}
-                          <div className="bg-white p-3 rounded-xl border border-gray-100">
-                            <span className="text-[10px] font-bold text-indigo-600 uppercase block mb-1">⚡ Aerobic Rating</span>
-                            <span className="font-black text-indigo-700 text-sm block">{rec.fitnessRating} / 10</span>
-                            <div className="w-full h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
-                              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(rec.fitnessRating / 10) * 100}%` }} />
+                          {/* InterchangeIQ Athlete Rating Card */}
+                          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-3.5 rounded-xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{recGrade.overallTier.emoji}</span>
+                              <div>
+                                <span className="text-[9px] font-black uppercase text-indigo-300 tracking-wider block">
+                                  InterchangeIQ Overall Grade ({rec.gender || activePlayer?.gender || 'Female'} {rec.ageGroup || activePlayer?.ageGroup || 'U16'})
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-base text-white">
+                                    {recGrade.overallTier.title} ({recGrade.overallScore} / 5.0)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                              <span className="bg-white/10 px-2 py-0.5 rounded-md text-blue-200">
+                                ⚡ Sprint: Grade {recGrade.sprintRating || '-'}
+                              </span>
+                              <span className="bg-white/10 px-2 py-0.5 rounded-md text-blue-200">
+                                🏃 Agility: Grade {recGrade.agilityRating || '-'}
+                              </span>
+                              <span className="bg-white/10 px-2 py-0.5 rounded-md text-blue-200">
+                                🦘 Vert: Grade {recGrade.jumpRating || '-'}
+                              </span>
+                              <span className="bg-white/10 px-2 py-0.5 rounded-md text-blue-200">
+                                🫁 Endurance: Grade {recGrade.enduranceRating || '-'}
+                              </span>
                             </div>
                           </div>
-                        </div>
+
+                          {/* Metric Grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                            {/* Combine Fitness metrics */}
+                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase block mb-1">⚡ Combine Speed & Agility</span>
+                              <span className="font-black text-gray-800 text-xs block">Sprint: {rec.sprint20m || 'N/A'}</span>
+                              <span className="text-[10px] text-gray-500 font-semibold block">Agility: {rec.agilityTime || 'N/A'}</span>
+                            </div>
+
+                            {/* Vertical & Endurance */}
+                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                              <span className="text-[10px] font-bold text-indigo-600 uppercase block mb-1">🦘 Vertical & Aerobic</span>
+                              <span className="font-black text-indigo-700 text-xs block">Vert: {rec.standingVerticalCm ? `${rec.standingVerticalCm} cm` : 'N/A'}</span>
+                              <span className="text-[10px] text-gray-500 font-semibold block">2km: {rec.timeTrial2km || 'N/A'}</span>
+                            </div>
+
+                            {/* Kick Distance */}
+                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase block mb-1">🦵 Kicking Distance</span>
+                              <span className="font-black text-emerald-600 text-sm block">{rec.kickDistanceMeters} meters</span>
+                              <span className="text-[10px] text-gray-500 font-semibold">Pref: {rec.preferredFoot} Foot</span>
+                            </div>
+
+                            {/* Opposite Foot Rating */}
+                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                              <span className="text-[10px] font-bold text-amber-600 uppercase block mb-1">⭐ Opposite Foot</span>
+                              <div className="flex items-center gap-1">
+                                <span className="font-black text-amber-700 text-sm">{rec.oppositeFootRating} / 10</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
+                                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(rec.oppositeFootRating / 10) * 100}%` }} />
+                              </div>
+                            </div>
+                          </div>
 
                         {/* Fundamentals breakdown */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-white p-3 rounded-xl border border-gray-100">
@@ -602,8 +711,9 @@ export default function PlayerGrowthScreen({
                           </div>
                         )}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
                 </div>
               )}
             </div>
@@ -702,16 +812,61 @@ export default function PlayerGrowthScreen({
 
             <div className="space-y-4 text-xs font-semibold text-gray-700">
               
-              {/* Player and Season Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* LIVE INTERCHANGE IQ ATHLETE GRADE BANNER IN MODAL */}
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 rounded-2xl text-white border border-indigo-500/30 shadow-md space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{liveInterchangeIqGrade.overallTier.emoji}</span>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-indigo-300 block tracking-wider">
+                        InterchangeIQ Calculated Rating
+                      </span>
+                      <span className="font-black text-base text-white">
+                        Score: {liveInterchangeIqGrade.overallScore} / 5.0 — {liveInterchangeIqGrade.overallTier.title}
+                      </span>
+                    </div>
+                  </div>
+
+                  <span className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider ${liveInterchangeIqGrade.overallTier.badgeBg}`}>
+                    {liveInterchangeIqGrade.overallTier.title} ({liveInterchangeIqGrade.overallScore})
+                  </span>
+                </div>
+
+                {/* Sub-Grade Badges Breakdown */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[10px] font-bold">
+                  <div className="bg-white/10 px-2 py-1 rounded-lg flex flex-col items-center">
+                    <span className="text-blue-300">⚡ 20m Sprint</span>
+                    <span className="text-white font-black">{liveInterchangeIqGrade.sprintRating ? `Rating ${liveInterchangeIqGrade.sprintRating}` : 'N/A'}</span>
+                  </div>
+                  <div className="bg-white/10 px-2 py-1 rounded-lg flex flex-col items-center">
+                    <span className="text-blue-300">🏃 Agility</span>
+                    <span className="text-white font-black">{liveInterchangeIqGrade.agilityRating ? `Rating ${liveInterchangeIqGrade.agilityRating}` : 'N/A'}</span>
+                  </div>
+                  <div className="bg-white/10 px-2 py-1 rounded-lg flex flex-col items-center">
+                    <span className="text-blue-300">🦘 Vertical</span>
+                    <span className="text-white font-black">{liveInterchangeIqGrade.jumpRating ? `Rating ${liveInterchangeIqGrade.jumpRating}` : 'N/A'}</span>
+                  </div>
+                  <div className="bg-white/10 px-2 py-1 rounded-lg flex flex-col items-center">
+                    <span className="text-blue-300">🫁 Endurance</span>
+                    <span className="text-white font-black">{liveInterchangeIqGrade.enduranceRating ? `Rating ${liveInterchangeIqGrade.enduranceRating}` : 'N/A'}</span>
+                  </div>
+                  <div className="bg-white/10 px-2 py-1 rounded-lg flex flex-col items-center col-span-2 sm:col-span-1">
+                    <span className="text-blue-300">⚽ Skill Avg</span>
+                    <span className="text-white font-black">{liveInterchangeIqGrade.skillRating} / 5.0</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Player and Season Selection + InterchangeIQ Cohort Demographics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50 p-3.5 rounded-2xl border border-gray-200">
                 <div>
-                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-400">
+                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-500">
                     Player *
                   </label>
                   <select
                     value={formPlayerId}
                     onChange={(e) => setFormPlayerId(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none"
+                    className="w-full p-2 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none"
                   >
                     {players.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -722,13 +877,43 @@ export default function PlayerGrowthScreen({
                 </div>
 
                 <div>
-                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-400">
+                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-500">
+                    Cohort Gender *
+                  </label>
+                  <select
+                    value={formGender}
+                    onChange={(e) => setFormGender(e.target.value as Gender)}
+                    className="w-full p-2 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none"
+                  >
+                    <option value="Male">Male Benchmark</option>
+                    <option value="Female">Female Benchmark</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-500">
+                    Age Group *
+                  </label>
+                  <select
+                    value={formAgeGroup}
+                    onChange={(e) => setFormAgeGroup(e.target.value as AgeGroup)}
+                    className="w-full p-2 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none"
+                  >
+                    <option value="U12">U12 Cohort</option>
+                    <option value="U14">U14 Cohort</option>
+                    <option value="U16">U16 Cohort</option>
+                    <option value="U18">U18 Cohort</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-500">
                     Testing Label / Season *
                   </label>
                   <select
                     value={formSeasonLabel}
                     onChange={(e) => setFormSeasonLabel(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none"
+                    className="w-full p-2 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none"
                   >
                     <option value="2025 Start of Season">2025 Start of Season</option>
                     <option value="2025 Mid-Season">2025 Mid-Season</option>
@@ -738,21 +923,9 @@ export default function PlayerGrowthScreen({
                     <option value="2027 Pre-Season">2027 Pre-Season</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="block mb-1 text-[10px] font-black uppercase text-gray-400">
-                    Test Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none"
-                  />
-                </div>
               </div>
 
-              {/* FITNESS SECTION */}
+              {/* FITNESS & COMBINE SECTION */}
               {(entryTaskMode === 'fitness' || entryTaskMode === 'all') && (
                 <div className={`p-4 rounded-2xl border transition-all ${
                   entryTaskMode === 'fitness'
@@ -761,19 +934,61 @@ export default function PlayerGrowthScreen({
                 } space-y-3`}>
                   <div className="flex items-center justify-between">
                     <b className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>🏃 Aerobic & Fitness Metrics</span>
+                      <span>🏃 InterchangeIQ Combine & Fitness Testing</span>
                       {entryTaskMode === 'fitness' && (
                         <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[9px] font-extrabold uppercase">
                           Active Focus Task
                         </span>
                       )}
                     </b>
+                    <span className="text-[10px] text-indigo-700 font-bold">
+                      Cohort: {formGender} {formAgeGroup}
+                    </span>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
                     <div>
-                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
-                        2km Time Trial (mm:ss)
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-900">
+                        ⚡ 20m Sprint (s)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 3.42s"
+                        value={formSprint}
+                        onChange={(e) => setFormSprint(e.target.value)}
+                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-900">
+                        🏃 Agility (s)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 8.90s"
+                        value={formAgility}
+                        onChange={(e) => setFormAgility(e.target.value)}
+                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-900">
+                        🦘 Vertical (cm)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 52"
+                        value={formVertical}
+                        onChange={(e) => setFormVertical(parseInt(e.target.value) || 0)}
+                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-900">
+                        2km Trial (mm:ss)
                       </label>
                       <input
                         type="text"
@@ -785,7 +1000,7 @@ export default function PlayerGrowthScreen({
                     </div>
 
                     <div>
-                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-900">
                         Yo-Yo Level
                       </label>
                       <input
@@ -798,21 +1013,8 @@ export default function PlayerGrowthScreen({
                     </div>
 
                     <div>
-                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
-                        20m Sprint (s)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 3.42s"
-                        value={formSprint}
-                        onChange={(e) => setFormSprint(e.target.value)}
-                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-800">
-                        Aerobic Rating ({formFitnessRating}/10)
+                      <label className="block mb-1 text-[10px] font-extrabold text-indigo-900">
+                        Aerobic ({formFitnessRating}/10)
                       </label>
                       <input
                         type="range"

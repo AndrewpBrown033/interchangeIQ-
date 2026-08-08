@@ -5,6 +5,8 @@ export interface Player {
   number: string;
   positions: string[];
   primaryZone: string;
+  gender?: 'Male' | 'Female';
+  ageGroup?: 'U12' | 'U14' | 'U16' | 'U18';
   status: 'available' | 'away' | 'injured';
   active: number; // in seconds
   bench: number;  // in seconds
@@ -204,21 +206,29 @@ export interface SkillAssessment {
   playerId: string;
   date: string; // e.g. "2026-03-01"
   seasonLabel: string; // e.g. "2025 Start of Season", "2026 Pre-Season", "2026 Mid-Season"
-  // Fitness
+  // InterchangeIQ Demographics
+  gender?: 'Male' | 'Female';
+  ageGroup?: 'U12' | 'U14' | 'U16' | 'U18';
+  // Fitness & Combine Tests
   timeTrial2km?: string; // e.g. "08:45"
   yoyoLevel?: string; // e.g. "15.2"
   sprint20m?: string; // e.g. "3.40s"
+  agilityTime?: string; // e.g. "8.65s"
+  standingVerticalCm?: number; // e.g. 52
   fitnessRating: number; // 1-10
   // Kicking
   preferredFoot: 'Right' | 'Left';
   kickDistanceMeters: number; // e.g. 35
   kickAccuracyRating: number; // 1-10
-  oppositeFootRating: number; // 1-10 (Crucial for AFL Girls year-on-year growth)
+  oppositeFootRating: number; // 1-10
   // Fundamental Skills
   handballRating: number; // 1-10
   markingRating: number; // 1-10
   tacklingRating: number; // 1-10
   gameSenseRating: number; // 1-10
+  // InterchangeIQ Calculated Ratings
+  overallInterchangeIqScore?: number; // 1.0 - 5.0
+  overallRatingBadge?: 'Elite' | 'Advanced' | 'Developing' | 'Emerging' | 'Needs Development';
   // Goals & Notes
   developmentGoals: string;
   coachNotes: string;
