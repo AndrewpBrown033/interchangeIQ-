@@ -53,20 +53,20 @@ export default function TeamScreen({
 
   // Static Attributes Adjustment Modal State
   const [showAdjustAttributesModal, setShowAdjustAttributesModal] = useState(false);
-  const [attrKickAcc, setAttrKickAcc] = useState(7);
+  const [attrKickAcc, setAttrKickAcc] = useState(4);
   const [attrKickDist, setAttrKickDist] = useState(45);
   const [attrOppFoot, setAttrOppFoot] = useState(6);
   const [attrHandball, setAttrHandball] = useState(8);
-  const [attrMarking, setAttrMarking] = useState(7);
+  const [attrMarking, setAttrMarking] = useState(4);
   const [attrTackling, setAttrTackling] = useState(8);
   const [attrGameSense, setAttrGameSense] = useState(8);
-  const [attrFitness, setAttrFitness] = useState(7);
-  const [attrSpoiling, setAttrSpoiling] = useState(7);
-  const [attrOverheadMarking, setAttrOverheadMarking] = useState(7);
-  const [attrCrumbing, setAttrCrumbing] = useState(7);
+  const [attrFitness, setAttrFitness] = useState(4);
+  const [attrSpoiling, setAttrSpoiling] = useState(4);
+  const [attrOverheadMarking, setAttrOverheadMarking] = useState(4);
+  const [attrCrumbing, setAttrCrumbing] = useState(4);
   const [attrPressureActs, setAttrPressureActs] = useState(8);
   const [attrRuckTap, setAttrRuckTap] = useState(5);
-  const [attrLeadingTiming, setAttrLeadingTiming] = useState(7);
+  const [attrLeadingTiming, setAttrLeadingTiming] = useState(4);
   const [attrSnapGoal, setAttrSnapGoal] = useState(6);
   const [attrDefTransition, setAttrDefTransition] = useState(8);
 
@@ -86,11 +86,11 @@ export default function TeamScreen({
   const [formPositions, setFormPositions] = useState<string[]>([]);
   const [formStatus, setFormStatus] = useState<'available' | 'away' | 'injured' | 'other_team'>('available');
   const [formNote, setFormNote] = useState('');
-  const [formHeightCm, setFormHeightCm] = useState<string>('180');
-  const [formWeightKg, setFormWeightKg] = useState<string>('75');
+  const [formHeightCm, setFormHeightCm] = useState<string>('0');
+  const [formWeightKg, setFormWeightKg] = useState<string>('0');
   const [formPreferredFoot, setFormPreferredFoot] = useState<'Right' | 'Left' | 'Dual'>('Right');
   const [formGender, setFormGender] = useState<'Female' | 'Male'>('Female');
-  const [formAgeGroup, setFormAgeGroup] = useState<'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors'>('U16');
+  const [formAgeGroup, setFormAgeGroup] = useState<'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors'>('U14');
   const [formError, setFormError] = useState('');
 
   // Sorting and filtering list
@@ -125,28 +125,28 @@ export default function TeamScreen({
     : [];
   const activePlayerLatestRecord = playerRecords[0] || null;
 
-  const heightCm = activePlayer?.heightCm ?? 180;
-  const weightKg = activePlayer?.weightKg ?? 75;
+  const heightCm = activePlayer?.heightCm ?? 0;
+  const weightKg = activePlayer?.weightKg ?? 0;
   const preferredFoot = activePlayer?.preferredFoot ?? 'Right';
   const gender = activePlayer?.gender ?? 'Female';
-  const ageGroup = activePlayer?.ageGroup ?? 'U16';
+  const ageGroup = activePlayer?.ageGroup ?? 'U14';
 
   // Primary static player attributes (independent of snapshot combine tests)
-  const kickAcc = activePlayer?.kickAccuracyRating ?? 7;
+  const kickAcc = activePlayer?.kickAccuracyRating ?? 4;
   const kickDist = activePlayer?.kickDistanceMeters ?? 45;
   const oppFoot = activePlayer?.oppositeFootRating ?? 6;
   const handball = activePlayer?.handballRating ?? 8;
-  const marking = activePlayer?.markingRating ?? 7;
+  const marking = activePlayer?.markingRating ?? 4;
   const tackling = activePlayer?.tacklingRating ?? 8;
   const gameSense = activePlayer?.gameSenseRating ?? 8;
-  const fitness = activePlayer?.fitnessRating ?? 7;
+  const fitness = activePlayer?.fitnessRating ?? 4;
 
-  const spoiling = activePlayer?.spoilingRating ?? 7;
-  const overheadMarking = activePlayer?.overheadMarkingRating ?? 7;
-  const crumbing = activePlayer?.crumbingRating ?? 7;
+  const spoiling = activePlayer?.spoilingRating ?? 4;
+  const overheadMarking = activePlayer?.overheadMarkingRating ?? 4;
+  const crumbing = activePlayer?.crumbingRating ?? 4;
   const pressureActs = activePlayer?.pressureActsRating ?? 8;
   const ruckTap = activePlayer?.ruckTapRating ?? 5;
-  const leadingTiming = activePlayer?.leadingTimingRating ?? 7;
+  const leadingTiming = activePlayer?.leadingTimingRating ?? 4;
   const snapGoal = activePlayer?.snapGoalRating ?? 6;
   const defTransition = activePlayer?.defensiveTransitionRating ?? 8;
 
@@ -160,20 +160,20 @@ export default function TeamScreen({
   // Handlers for adjusting static attributes
   const handleOpenAdjustAttributes = () => {
     if (!activePlayer) return;
-    setAttrKickAcc(activePlayer.kickAccuracyRating ?? 7);
+    setAttrKickAcc(activePlayer.kickAccuracyRating ?? 4);
     setAttrKickDist(activePlayer.kickDistanceMeters ?? 45);
     setAttrOppFoot(activePlayer.oppositeFootRating ?? 6);
     setAttrHandball(activePlayer.handballRating ?? 8);
-    setAttrMarking(activePlayer.markingRating ?? 7);
+    setAttrMarking(activePlayer.markingRating ?? 4);
     setAttrTackling(activePlayer.tacklingRating ?? 8);
     setAttrGameSense(activePlayer.gameSenseRating ?? 8);
-    setAttrFitness(activePlayer.fitnessRating ?? 7);
-    setAttrSpoiling(activePlayer.spoilingRating ?? 7);
-    setAttrOverheadMarking(activePlayer.overheadMarkingRating ?? 7);
-    setAttrCrumbing(activePlayer.crumbingRating ?? 7);
+    setAttrFitness(activePlayer.fitnessRating ?? 4);
+    setAttrSpoiling(activePlayer.spoilingRating ?? 4);
+    setAttrOverheadMarking(activePlayer.overheadMarkingRating ?? 4);
+    setAttrCrumbing(activePlayer.crumbingRating ?? 4);
     setAttrPressureActs(activePlayer.pressureActsRating ?? 8);
     setAttrRuckTap(activePlayer.ruckTapRating ?? 5);
-    setAttrLeadingTiming(activePlayer.leadingTimingRating ?? 7);
+    setAttrLeadingTiming(activePlayer.leadingTimingRating ?? 4);
     setAttrSnapGoal(activePlayer.snapGoalRating ?? 6);
     setAttrDefTransition(activePlayer.defensiveTransitionRating ?? 8);
     setShowAdjustAttributesModal(true);
@@ -220,19 +220,19 @@ export default function TeamScreen({
       isCombineTest: true,
       assessmentType: 'Combine Test',
       gender: activePlayer.gender || 'Female',
-      ageGroup: activePlayer.ageGroup || 'U16',
+      ageGroup: activePlayer.ageGroup || 'U14',
       sprint20m: '3.12s',
       agilityTime: '8.38s',
       standingVerticalCm: 56,
       timeTrial2km: '08:12',
       yoyoLevel: '16.8',
-      fitnessRating: activePlayer.fitnessRating || 7,
+      fitnessRating: activePlayer.fitnessRating || 4,
       preferredFoot: activePlayer.preferredFoot || 'Right',
       kickDistanceMeters: activePlayer.kickDistanceMeters || 35,
-      kickAccuracyRating: activePlayer.kickAccuracyRating || 7,
+      kickAccuracyRating: activePlayer.kickAccuracyRating || 4,
       oppositeFootRating: activePlayer.oppositeFootRating || 6,
       handballRating: activePlayer.handballRating || 8,
-      markingRating: activePlayer.markingRating || 7,
+      markingRating: activePlayer.markingRating || 4,
       tacklingRating: activePlayer.tacklingRating || 8,
       gameSenseRating: activePlayer.gameSenseRating || 8,
       developmentGoals: 'Point-in-time AFL Combine benchmark.',
@@ -262,19 +262,19 @@ export default function TeamScreen({
       isCombineTest: true,
       assessmentType: 'Combine Test',
       gender: activePlayer.gender || 'Female',
-      ageGroup: activePlayer.ageGroup || 'U16',
+      ageGroup: activePlayer.ageGroup || 'U14',
       sprint20m: combineSprint.trim(),
       agilityTime: combineAgility.trim(),
       standingVerticalCm: Number(combineVertical) || 50,
       timeTrial2km: combineTimeTrial.trim(),
       yoyoLevel: combineYoyo.trim(),
-      fitnessRating: activePlayer.fitnessRating || 7,
+      fitnessRating: activePlayer.fitnessRating || 4,
       preferredFoot: activePlayer.preferredFoot || 'Right',
       kickDistanceMeters: activePlayer.kickDistanceMeters || 35,
-      kickAccuracyRating: activePlayer.kickAccuracyRating || 7,
+      kickAccuracyRating: activePlayer.kickAccuracyRating || 4,
       oppositeFootRating: activePlayer.oppositeFootRating || 6,
       handballRating: activePlayer.handballRating || 8,
-      markingRating: activePlayer.markingRating || 7,
+      markingRating: activePlayer.markingRating || 4,
       tacklingRating: activePlayer.tacklingRating || 8,
       gameSenseRating: activePlayer.gameSenseRating || 8,
       developmentGoals: 'AFL Combine physical testing snapshot.',
@@ -316,11 +316,11 @@ export default function TeamScreen({
     setFormPositions([]);
     setFormStatus('available');
     setFormNote('');
-    setFormHeightCm('180');
-    setFormWeightKg('75');
+    setFormHeightCm('0');
+    setFormWeightKg('0');
     setFormPreferredFoot('Right');
     setFormGender('Female');
-    setFormAgeGroup('U16');
+    setFormAgeGroup('U14');
     setFormError('');
     setShowAddEditModal(true);
   };
@@ -334,11 +334,11 @@ export default function TeamScreen({
     setFormPositions((p.positions || []).map(normalizePosition));
     setFormStatus(p.status);
     setFormNote(p.note || '');
-    setFormHeightCm(p.heightCm ? String(p.heightCm) : '180');
-    setFormWeightKg(p.weightKg ? String(p.weightKg) : '75');
+    setFormHeightCm(p.heightCm ? String(p.heightCm) : '0');
+    setFormWeightKg(p.weightKg ? String(p.weightKg) : '0');
     setFormPreferredFoot(p.preferredFoot || 'Right');
     setFormGender((p.gender as any) || 'Female');
-    setFormAgeGroup(p.ageGroup || 'U16');
+    setFormAgeGroup(p.ageGroup || 'U14');
     setFormError('');
     setShowAddEditModal(true);
   };
@@ -366,8 +366,8 @@ export default function TeamScreen({
       positions: normPositions,
       status: formStatus,
       note: formNote.trim(),
-      heightCm: parseFloat(formHeightCm) || 180,
-      weightKg: parseFloat(formWeightKg) || 75,
+      heightCm: parseFloat(formHeightCm) || 0,
+      weightKg: parseFloat(formWeightKg) || 0,
       preferredFoot: formPreferredFoot,
       gender: formGender,
       ageGroup: formAgeGroup,
@@ -398,8 +398,8 @@ export default function TeamScreen({
         positions: normPositions,
         status: formStatus,
         note: formNote.trim(),
-        heightCm: parseFloat(formHeightCm) || 180,
-        weightKg: parseFloat(formWeightKg) || 75,
+        heightCm: parseFloat(formHeightCm) || 0,
+        weightKg: parseFloat(formWeightKg) || 0,
         preferredFoot: formPreferredFoot,
         gender: formGender,
         ageGroup: formAgeGroup,
@@ -1857,7 +1857,7 @@ export default function TeamScreen({
                       type="number"
                       value={formHeightCm}
                       onChange={(e) => setFormHeightCm(e.target.value)}
-                      placeholder="180"
+                      placeholder="0"
                       className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
                     />
                   </div>
@@ -1867,7 +1867,7 @@ export default function TeamScreen({
                       type="number"
                       value={formWeightKg}
                       onChange={(e) => setFormWeightKg(e.target.value)}
-                      placeholder="75"
+                      placeholder="0"
                       className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
                     />
                   </div>
