@@ -3,7 +3,7 @@ import { Player, SkillAssessment } from '../types';
 import {
   TrendingUp, Award, Zap, Target, Plus, Calendar, Activity,
   ChevronRight, ArrowUpRight, Sparkles, CheckCircle2, Search, Filter,
-  FileSpreadsheet, Edit3, Trash2, Flame, BookOpen, Layers, Trophy, ChevronDown, ChevronUp, BarChart3
+  FileSpreadsheet, Edit3, Trash2, Flame, BookOpen, Layers, Trophy, ChevronDown, ChevronUp, BarChart3, User, Users
 } from 'lucide-react';
 import SkillRubricModal from './SkillRubricModal';
 import { calculateInterchangeIQGrade, Gender, AgeGroup, INTERCHANGE_IQ_SCALE } from '../utils/interchangeIQRubric';
@@ -24,6 +24,29 @@ function parseTimeToSeconds(val?: string): number | null {
     if (!isNaN(m) && !isNaN(s)) return m * 60 + s;
   }
   return parseSeconds(val);
+}
+
+function getPlayerCombineRank(
+  playerId: string,
+  metric: 'sprint20m' | 'agilityTime' | 'standingVerticalCm' | 'timeTrial2km' | 'kickDistanceMeters',
+  assessments: { record: SkillAssessment; player?: Player }[]
+) {
+  const items = assessments.map(a => {
+    let val: number | null = null;
+    if (metric === 'sprint20m') val = parseSeconds(a.record.sprint20m);
+    else if (metric === 'agilityTime') val = parseSeconds(a.record.agilityTime);
+    else if (metric === 'standingVerticalCm') val = a.record.standingVerticalCm || null;
+    else if (metric === 'timeTrial2km') val = parseTimeToSeconds(a.record.timeTrial2km);
+    else if (metric === 'kickDistanceMeters') val = a.record.kickDistanceMeters || null;
+    return { playerId: a.record.playerId, val };
+  }).filter(i => i.val !== null) as { playerId: string; val: number }[];
+
+  const isAscending = metric === 'sprint20m' || metric === 'agilityTime' || metric === 'timeTrial2km';
+  items.sort((a, b) => isAscending ? a.val - b.val : b.val - a.val);
+
+  const index = items.findIndex(i => i.playerId === playerId);
+  if (index === -1) return { rank: null, total: items.length, best: items[0]?.val ?? null };
+  return { rank: index + 1, total: items.length, best: items[0]?.val ?? null };
 }
 
 interface PlayerGrowthScreenProps {
@@ -50,6 +73,27 @@ export default function PlayerGrowthScreen({
   // Dashboard filter & toggle states
   const [dashboardSeasonFilter, setDashboardSeasonFilter] = useState<string>('All');
   const [showDashboardSummary, setShowDashboardSummary] = useState<boolean>(true);
+
+  // Dashboard view scope ('squad' vs 'selected')
+  const [dashboardViewScope, setDashboardViewScope] = useState<'squad' | 'selected'>('squad');
+
+  // Interactive Tile Filter for Squad Roster list
+  const [tileFilter, setTileFilter] = useState<'all' | 'tested' | 'untested' | 'assessments' | 'kick' | 'elite' | 'advanced' | 'developing' | 'emerging' | 'needsDev'>('all');
+
+  const getFilterLabel = (f: string) => {
+    switch (f) {
+      case 'tested': return 'Tested Roster';
+      case 'assessments': return 'Completed Assessments';
+      case 'untested': return 'Untested Roster';
+      case 'kick': return 'Kick Penetration Logged';
+      case 'elite': return '🟢 Elite Tier (4.5+)';
+      case 'advanced': return '🔵 Advanced Tier (3.5 - 4.4)';
+      case 'developing': return '🟡 Developing Tier (2.5 - 3.4)';
+      case 'emerging': return '🟠 Emerging Tier (1.5 - 2.4)';
+      case 'needsDev': return '🔴 Needs Development (< 1.5)';
+      default: return 'All Players';
+    }
+  };
 
   // Score selection callback from Rubric Modal
   const handleRubricScoreSelect = (
@@ -123,13 +167,6 @@ export default function PlayerGrowthScreen({
     ageGroup: formAgeGroup
   });
 
-  // Filtered Players
-  const filteredPlayers = players.filter((p) => {
-    const matchesZone = selectedZone === 'All' || p.primaryZone === selectedZone;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.number.includes(searchQuery);
-    return matchesZone && matchesSearch;
-  });
-
   // Active player records sorted chronologically
   const playerRecords = growthRecords
     .filter((r) => r.playerId === activePlayerId)
@@ -185,6 +222,65 @@ export default function PlayerGrowthScreen({
     });
     return { record: rec, player: p, grade };
   });
+
+  // Filtered Players using selectedZone, searchQuery, AND tileFilter
+  const filteredPlayers = players.filter((p) => {
+    const matchesZone = selectedZone === 'All' || p.primaryZone === selectedZone;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.number.includes(searchQuery);
+
+    let matchesTile = true;
+    if (tileFilter === 'tested' || tileFilter === 'assessments') {
+      matchesTile = growthRecords.some(r => r.playerId === p.id);
+    } else if (tileFilter === 'untested') {
+      matchesTile = !growthRecords.some(r => r.playerId === p.id);
+    } else if (tileFilter === 'kick') {
+      matchesTile = growthRecords.some(r => r.playerId === p.id && r.kickDistanceMeters > 0);
+    } else if (['elite', 'advanced', 'developing', 'emerging', 'needsDev'].includes(tileFilter)) {
+      const pEval = evaluatedAssessments.find(e => e.player?.id === p.id);
+      if (!pEval) {
+        matchesTile = false;
+      } else {
+        const score = pEval.grade.overallScore;
+        if (tileFilter === 'elite') matchesTile = score >= 4.5;
+        else if (tileFilter === 'advanced') matchesTile = score >= 3.5 && score < 4.5;
+        else if (tileFilter === 'developing') matchesTile = score >= 2.5 && score < 3.5;
+        else if (tileFilter === 'emerging') matchesTile = score >= 1.5 && score < 2.5;
+        else if (tileFilter === 'needsDev') matchesTile = score < 1.5;
+      }
+    }
+
+    return matchesZone && matchesSearch && matchesTile;
+  });
+
+  // Selected Player Combine Data for Dashboard
+  const activePlayerLatestRecord = activePlayer ? growthRecords
+    .filter(r => r.playerId === activePlayer.id)
+    .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] : null;
+
+  const activePlayerGrade = (activePlayer && activePlayerLatestRecord)
+    ? calculateInterchangeIQGrade({
+        sprint20m: activePlayerLatestRecord.sprint20m,
+        agilityTime: activePlayerLatestRecord.agilityTime,
+        standingVerticalCm: activePlayerLatestRecord.standingVerticalCm,
+        timeTrial2km: activePlayerLatestRecord.timeTrial2km,
+        yoyoLevel: activePlayerLatestRecord.yoyoLevel,
+        fitnessRating: activePlayerLatestRecord.fitnessRating,
+        kickAccuracyRating: activePlayerLatestRecord.kickAccuracyRating,
+        oppositeFootRating: activePlayerLatestRecord.oppositeFootRating,
+        handballRating: activePlayerLatestRecord.handballRating,
+        markingRating: activePlayerLatestRecord.markingRating,
+        tacklingRating: activePlayerLatestRecord.tacklingRating,
+        gameSenseRating: activePlayerLatestRecord.gameSenseRating,
+        gender: activePlayerLatestRecord.gender || activePlayer.gender || 'Female',
+        ageGroup: activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U16'
+      })
+    : null;
+
+  const activeSprintRank = activePlayer ? getPlayerCombineRank(activePlayer.id, 'sprint20m', evaluatedAssessments) : null;
+  const activeAgilityRank = activePlayer ? getPlayerCombineRank(activePlayer.id, 'agilityTime', evaluatedAssessments) : null;
+  const activeVerticalRank = activePlayer ? getPlayerCombineRank(activePlayer.id, 'standingVerticalCm', evaluatedAssessments) : null;
+  const activeTimeTrialRank = activePlayer ? getPlayerCombineRank(activePlayer.id, 'timeTrial2km', evaluatedAssessments) : null;
+  const activeKickRank = activePlayer ? getPlayerCombineRank(activePlayer.id, 'kickDistanceMeters', evaluatedAssessments) : null;
 
   // Calculate squad average InterchangeIQ score
   const teamAvgScore = evaluatedAssessments.length > 0
@@ -444,30 +540,77 @@ export default function PlayerGrowthScreen({
           </div>
         </div>
 
-        {/* Squad Header Summary Line */}
+        {/* Squad Header Summary Line (Interactive Filter Tiles) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/10">
-          <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">Tested Roster</span>
+          <button
+            onClick={() => setTileFilter(tileFilter === 'tested' ? 'all' : 'tested')}
+            className={`p-3 rounded-2xl text-left transition cursor-pointer border ${
+              tileFilter === 'tested'
+                ? 'bg-blue-500/25 border-blue-400 ring-2 ring-blue-400/80 shadow-md scale-[1.01]'
+                : 'bg-white/5 border-white/10 hover:bg-white/10'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">Tested Roster</span>
+              {tileFilter === 'tested' && <span className="text-[9px] bg-blue-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">Filtered</span>}
+            </div>
             <span className="text-lg font-black text-white">{squadTestedCount} / {players.length} Players</span>
-          </div>
-          <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">Total Assessments</span>
+            <span className="text-[10px] text-blue-200/70 block mt-0.5">Click to filter tested list</span>
+          </button>
+
+          <button
+            onClick={() => setTileFilter(tileFilter === 'assessments' ? 'all' : 'assessments')}
+            className={`p-3 rounded-2xl text-left transition cursor-pointer border ${
+              tileFilter === 'assessments'
+                ? 'bg-indigo-500/25 border-indigo-400 ring-2 ring-indigo-400/80 shadow-md scale-[1.01]'
+                : 'bg-white/5 border-white/10 hover:bg-white/10'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">Total Assessments</span>
+              {tileFilter === 'assessments' && <span className="text-[9px] bg-indigo-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">Filtered</span>}
+            </div>
             <span className="text-lg font-black text-white">{totalAssessments} Completed</span>
-          </div>
-          <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">Squad Avg Rating</span>
+            <span className="text-[10px] text-indigo-200/70 block mt-0.5">Click to view roster with logs</span>
+          </button>
+
+          <button
+            onClick={() => setTileFilter(tileFilter === 'tested' ? 'all' : 'tested')}
+            className={`p-3 rounded-2xl text-left transition cursor-pointer border ${
+              tileFilter === 'tested'
+                ? 'bg-emerald-500/25 border-emerald-400 ring-2 ring-emerald-400/80 shadow-md scale-[1.01]'
+                : 'bg-white/5 border-white/10 hover:bg-white/10'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">Squad Avg Rating</span>
+              {tileFilter === 'tested' && <span className="text-[9px] bg-emerald-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">Filtered</span>}
+            </div>
             <span className="text-lg font-black text-emerald-400">{teamAvgScore} / 5.0</span>
-          </div>
-          <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Avg Kick Penetration</span>
+            <span className="text-[10px] text-emerald-200/70 block mt-0.5">Click to filter tested players</span>
+          </button>
+
+          <button
+            onClick={() => setTileFilter(tileFilter === 'kick' ? 'all' : 'kick')}
+            className={`p-3 rounded-2xl text-left transition cursor-pointer border ${
+              tileFilter === 'kick'
+                ? 'bg-amber-500/25 border-amber-400 ring-2 ring-amber-400/80 shadow-md scale-[1.01]'
+                : 'bg-white/5 border-white/10 hover:bg-white/10'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Avg Kick Penetration</span>
+              {tileFilter === 'kick' && <span className="text-[9px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">Filtered</span>}
+            </div>
             <span className="text-lg font-black text-amber-300">{teamAvgKickDist}m ({teamAvgOppFoot}/10 Opp Foot)</span>
-          </div>
+            <span className="text-[10px] text-amber-200/70 block mt-0.5">Click to filter kicking logs</span>
+          </button>
         </div>
       </div>
 
       {/* COMBINE & TESTING SUMMARY DASHBOARD */}
       <div className="bg-white rounded-3xl border border-[var(--line)] p-6 shadow-sm space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black">
               <BarChart3 className="w-5 h-5" />
@@ -480,12 +623,56 @@ export default function PlayerGrowthScreen({
                 </span>
               </h3>
               <p className="text-xs text-gray-500 font-semibold mt-0.5">
-                Overview of completed physical combine tests, skill evaluations, and squad tier benchmarks.
+                Physical combine benchmarks, skill evaluations, and interchange tier analytics.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Scope Switcher: All Squad vs Selected Player Dropdown */}
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+              <button
+                onClick={() => setDashboardViewScope('squad')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  dashboardViewScope === 'squad'
+                    ? 'bg-white text-indigo-900 shadow-sm border border-gray-200'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                <span>👥 Squad Overview</span>
+              </button>
+
+              <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                dashboardViewScope === 'selected'
+                  ? 'bg-white text-indigo-900 shadow-sm border border-gray-200'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}>
+                <User className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <select
+                  value={dashboardViewScope === 'selected' ? activePlayerId : ''}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    if (newId) {
+                      onSelectPlayerId(newId);
+                      setDashboardViewScope('selected');
+                    }
+                  }}
+                  className="bg-transparent text-xs font-black text-gray-900 border-none outline-none cursor-pointer pr-1 py-0.5"
+                >
+                  <option value="" disabled={dashboardViewScope === 'selected'}>
+                    Select Player...
+                  </option>
+                  {players.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      #{p.number} {p.name} ({p.primaryZone})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 pointer-events-none -ml-1" />
+              </div>
+            </div>
+
             {/* Season Filter Dropdown */}
             {availableSeasons.length > 0 && (
               <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5">
@@ -516,207 +703,477 @@ export default function PlayerGrowthScreen({
 
         {showDashboardSummary && (
           <div className="space-y-6">
-            {/* Combine Leaderboards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {/* 20m Sprint Leader */}
-              <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/60 border border-blue-200/80 p-3.5 rounded-2xl relative overflow-hidden">
-                <span className="text-[10px] font-black uppercase tracking-wider text-blue-800 block mb-1">
-                  ⚡ 20m Sprint Leader
-                </span>
-                {fastestSprintItem ? (
-                  <div>
-                    <span className="font-black text-gray-900 text-sm block truncate">
-                      {(fastestSprintItem as any).player?.name || 'Unknown'}
-                    </span>
-                    <div className="flex items-baseline justify-between mt-1">
-                      <span className="text-xl font-black text-blue-700">
-                        {(fastestSprintItem as any).strVal}
-                      </span>
-                      <span className="text-[10px] font-bold text-blue-600">
-                        #{(fastestSprintItem as any).player?.number}
-                      </span>
+            {dashboardViewScope === 'selected' ? (
+              /* SELECTED PLAYER COMBINE DASHBOARD */
+              <div className="space-y-5">
+                {/* Selected Player Banner */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl shadow-sm border border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 font-black text-lg flex items-center justify-center shadow-md">
+                      #{activePlayer?.number}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-base font-black text-white">{activePlayer?.name}</h4>
+                        <span className="px-2 py-0.5 bg-white/10 text-amber-300 text-[10px] font-extrabold rounded-md uppercase">
+                          {activePlayer?.primaryZone}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 font-medium mt-0.5">
+                        {activePlayerLatestRecord
+                          ? `Latest Assessment: ${activePlayerLatestRecord.date} (${activePlayerLatestRecord.seasonLabel})`
+                          : 'No combine testing record logged yet.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {activePlayerGrade && (
+                    <div className="flex items-center gap-3 self-start sm:self-center bg-white/10 px-4 py-2 rounded-xl border border-white/15">
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-slate-300 uppercase block">InterchangeIQ Grade</span>
+                        <span className="text-base font-black text-amber-300">
+                          {activePlayerGrade.overallScore.toFixed(1)} / 5.0
+                        </span>
+                      </div>
+                      <div className={`px-3 py-1 rounded-lg text-xs font-black ${activePlayerGrade.overallTier.badgeBg}`}>
+                        {activePlayerGrade.overallTier.title}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {activePlayerLatestRecord ? (
+                  <div className="space-y-5">
+                    {/* Selected Player Combine Test Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {/* 20m Sprint */}
+                      <div className="bg-gradient-to-br from-blue-50/90 to-indigo-50/70 border border-blue-200 p-3.5 rounded-2xl relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-blue-900">
+                            ⚡ 20m Sprint
+                          </span>
+                          {activeSprintRank?.rank && (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-blue-600 text-white rounded-md">
+                              Rank #{activeSprintRank.rank} / {activeSprintRank.total}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-2xl font-black text-blue-900 block mt-1">
+                          {activePlayerLatestRecord.sprint20m || 'N/A'}
+                        </span>
+                        <span className="text-[10px] font-semibold text-blue-700 block mt-1">
+                          Squad Leader: <b className="font-extrabold text-blue-900">{fastestSprintItem?.strVal || 'N/A'}</b>
+                        </span>
+                      </div>
+
+                      {/* Agility Shuttle */}
+                      <div className="bg-gradient-to-br from-purple-50/90 to-indigo-50/70 border border-purple-200 p-3.5 rounded-2xl relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-purple-900">
+                            🏃 Agility Shuttle
+                          </span>
+                          {activeAgilityRank?.rank && (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-purple-600 text-white rounded-md">
+                              Rank #{activeAgilityRank.rank} / {activeAgilityRank.total}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-2xl font-black text-purple-900 block mt-1">
+                          {activePlayerLatestRecord.agilityTime || 'N/A'}
+                        </span>
+                        <span className="text-[10px] font-semibold text-purple-700 block mt-1">
+                          Squad Leader: <b className="font-extrabold text-purple-900">{fastestAgilityItem?.strVal || 'N/A'}</b>
+                        </span>
+                      </div>
+
+                      {/* Vertical Jump */}
+                      <div className="bg-gradient-to-br from-amber-50/90 to-orange-50/70 border border-amber-200 p-3.5 rounded-2xl relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                            🦘 Standing Vertical
+                          </span>
+                          {activeVerticalRank?.rank && (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-amber-600 text-white rounded-md">
+                              Rank #{activeVerticalRank.rank} / {activeVerticalRank.total}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-2xl font-black text-amber-900 block mt-1">
+                          {activePlayerLatestRecord.standingVerticalCm ? `${activePlayerLatestRecord.standingVerticalCm} cm` : 'N/A'}
+                        </span>
+                        <span className="text-[10px] font-semibold text-amber-700 block mt-1">
+                          Squad Leader: <b className="font-extrabold text-amber-900">{highestVerticalItem?.cm ? `${highestVerticalItem.cm} cm` : 'N/A'}</b>
+                        </span>
+                      </div>
+
+                      {/* 2km Time Trial */}
+                      <div className="bg-gradient-to-br from-emerald-50/90 to-teal-50/70 border border-emerald-200 p-3.5 rounded-2xl relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-900">
+                            🫁 2km Aerobic Trial
+                          </span>
+                          {activeTimeTrialRank?.rank && (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-emerald-600 text-white rounded-md">
+                              Rank #{activeTimeTrialRank.rank} / {activeTimeTrialRank.total}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-2xl font-black text-emerald-900 block mt-1">
+                          {activePlayerLatestRecord.timeTrial2km || 'N/A'}
+                        </span>
+                        <span className="text-[10px] font-semibold text-emerald-700 block mt-1">
+                          Yo-Yo Level: <b className="font-extrabold text-emerald-900">{activePlayerLatestRecord.yoyoLevel || 'N/A'}</b>
+                        </span>
+                      </div>
+
+                      {/* Kick Penetration */}
+                      <div className="bg-gradient-to-br from-rose-50/90 to-pink-50/70 border border-rose-200 p-3.5 rounded-2xl relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-rose-900">
+                            🦵 Kicking Penetration
+                          </span>
+                          {activeKickRank?.rank && (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-rose-600 text-white rounded-md">
+                              Rank #{activeKickRank.rank} / {activeKickRank.total}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-2xl font-black text-rose-900 block mt-1">
+                          {activePlayerLatestRecord.kickDistanceMeters ? `${activePlayerLatestRecord.kickDistanceMeters}m` : 'N/A'}
+                        </span>
+                        <span className="text-[10px] font-semibold text-rose-700 block mt-1">
+                          Opp Foot: <b className="font-extrabold text-rose-900">{activePlayerLatestRecord.oppositeFootRating || 0}/10</b>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Skill Breakdown Grid for Selected Player */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                        <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-amber-500" />
+                          <span>{activePlayer.name}'s AFL Skill & Physical Benchmark Profile</span>
+                        </h4>
+                        <button
+                          onClick={() => handleOpenAddModal(activePlayer.id, 'all')}
+                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Log New Test</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                          <span className="text-[10px] font-bold text-gray-500 block uppercase">Dominant Kick</span>
+                          <span className="text-sm font-black text-gray-900 block">{activePlayerLatestRecord.kickDistanceMeters} meters</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                          <span className="text-[10px] font-bold text-gray-500 block uppercase">Kick Accuracy</span>
+                          <span className="text-sm font-black text-indigo-600 block">{activePlayerLatestRecord.kickAccuracyRating} / 10</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                          <span className="text-[10px] font-bold text-gray-500 block uppercase">Opposite Foot</span>
+                          <span className="text-sm font-black text-amber-600 block">{activePlayerLatestRecord.oppositeFootRating} / 10</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                          <span className="text-[10px] font-bold text-gray-500 block uppercase">Handball Skills</span>
+                          <span className="text-sm font-black text-blue-600 block">{activePlayerLatestRecord.handballRating} / 10</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                          <span className="text-[10px] font-bold text-gray-500 block uppercase">Marking Ability</span>
+                          <span className="text-sm font-black text-emerald-600 block">{activePlayerLatestRecord.markingRating} / 10</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                          <span className="text-[10px] font-bold text-gray-500 block uppercase">Tackling & Defense</span>
+                          <span className="text-sm font-black text-purple-600 block">{activePlayerLatestRecord.tacklingRating} / 10</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <span className="text-xs text-gray-400 italic">No sprint data</span>
+                  <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-300 space-y-3">
+                    <p className="text-sm font-bold text-gray-600">
+                      No combine testing records logged for <b>{activePlayer?.name}</b> yet.
+                    </p>
+                    <button
+                      onClick={() => handleOpenAddModal(activePlayer?.id, 'all')}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer"
+                    >
+                      + Record First Combine Assessment for {activePlayer?.name}
+                    </button>
+                  </div>
                 )}
               </div>
-
-              {/* Agility Leader */}
-              <div className="bg-gradient-to-br from-purple-50/80 to-indigo-50/60 border border-purple-200/80 p-3.5 rounded-2xl relative overflow-hidden">
-                <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 block mb-1">
-                  🏃 Agility Shuttle Leader
-                </span>
-                {fastestAgilityItem ? (
-                  <div>
-                    <span className="font-black text-gray-900 text-sm block truncate">
-                      {(fastestAgilityItem as any).player?.name || 'Unknown'}
+            ) : (
+              /* SQUAD OVERVIEW DASHBOARD */
+              <div className="space-y-6">
+                {/* Combine Leaderboards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {/* 20m Sprint Leader */}
+                  <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/60 border border-blue-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-800 block mb-1">
+                      ⚡ 20m Sprint Leader
                     </span>
-                    <div className="flex items-baseline justify-between mt-1">
-                      <span className="text-xl font-black text-purple-700">
-                        {(fastestAgilityItem as any).strVal}
-                      </span>
-                      <span className="text-[10px] font-bold text-purple-600">
-                        #{(fastestAgilityItem as any).player?.number}
+                    {fastestSprintItem ? (
+                      <div>
+                        <span className="font-black text-gray-900 text-sm block truncate">
+                          {(fastestSprintItem as any).player?.name || 'Unknown'}
+                        </span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-xl font-black text-blue-700">
+                            {(fastestSprintItem as any).strVal}
+                          </span>
+                          <span className="text-[10px] font-bold text-blue-600">
+                            #{(fastestSprintItem as any).player?.number}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No sprint data</span>
+                    )}
+                  </div>
+
+                  {/* Agility Leader */}
+                  <div className="bg-gradient-to-br from-purple-50/80 to-indigo-50/60 border border-purple-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 block mb-1">
+                      🏃 Agility Shuttle Leader
+                    </span>
+                    {fastestAgilityItem ? (
+                      <div>
+                        <span className="font-black text-gray-900 text-sm block truncate">
+                          {(fastestAgilityItem as any).player?.name || 'Unknown'}
+                        </span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-xl font-black text-purple-700">
+                            {(fastestAgilityItem as any).strVal}
+                          </span>
+                          <span className="text-[10px] font-bold text-purple-600">
+                            #{(fastestAgilityItem as any).player?.number}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No agility data</span>
+                    )}
+                  </div>
+
+                  {/* Vertical Jump Leader */}
+                  <div className="bg-gradient-to-br from-amber-50/80 to-orange-50/60 border border-amber-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block mb-1">
+                      🦘 Standing Vertical Jump
+                    </span>
+                    {highestVerticalItem ? (
+                      <div>
+                        <span className="font-black text-gray-900 text-sm block truncate">
+                          {(highestVerticalItem as any).player?.name || 'Unknown'}
+                        </span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-xl font-black text-amber-700">
+                            {(highestVerticalItem as any).cm} cm
+                          </span>
+                          <span className="text-[10px] font-bold text-amber-600">
+                            #{(highestVerticalItem as any).player?.number}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No jump data</span>
+                    )}
+                  </div>
+
+                  {/* 2km Time Trial Leader */}
+                  <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/60 border border-emerald-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block mb-1">
+                      🫁 2km Aerobic Trial
+                    </span>
+                    {bestTimeTrialItem ? (
+                      <div>
+                        <span className="font-black text-gray-900 text-sm block truncate">
+                          {(bestTimeTrialItem as any).player?.name || 'Unknown'}
+                        </span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-xl font-black text-emerald-700">
+                            {(bestTimeTrialItem as any).strVal}
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-600">
+                            #{(bestTimeTrialItem as any).player?.number}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No time trial data</span>
+                    )}
+                  </div>
+
+                  {/* Kick Power Leader */}
+                  <div className="bg-gradient-to-br from-rose-50/80 to-pink-50/60 border border-rose-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 block mb-1">
+                      🦵 Kicking Penetration
+                    </span>
+                    {longestKickItem ? (
+                      <div>
+                        <span className="font-black text-gray-900 text-sm block truncate">
+                          {(longestKickItem as any).player?.name || 'Unknown'}
+                        </span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-xl font-black text-rose-700">
+                            {(longestKickItem as any).m} meters
+                          </span>
+                          <span className="text-[10px] font-bold text-rose-600">
+                            #{(longestKickItem as any).player?.number}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No kicking data</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* InterchangeIQ Squad Tier Breakdown Bar */}
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                        Squad InterchangeIQ Rating Tier Distribution
                       </span>
                     </div>
-                  </div>
-                ) : (
-                  <span className="text-xs text-gray-400 italic">No agility data</span>
-                )}
-              </div>
-
-              {/* Vertical Jump Leader */}
-              <div className="bg-gradient-to-br from-amber-50/80 to-orange-50/60 border border-amber-200/80 p-3.5 rounded-2xl relative overflow-hidden">
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block mb-1">
-                  🦘 Standing Vertical Jump
-                </span>
-                {highestVerticalItem ? (
-                  <div>
-                    <span className="font-black text-gray-900 text-sm block truncate">
-                      {(highestVerticalItem as any).player?.name || 'Unknown'}
+                    <span className="text-xs font-bold text-gray-500">
+                      Squad Average: <b className="text-indigo-600 font-black">{teamAvgScore} / 5.0</b> ({evaluatedAssessments.length} Evaluated)
                     </span>
-                    <div className="flex items-baseline justify-between mt-1">
-                      <span className="text-xl font-black text-amber-700">
-                        {(highestVerticalItem as any).cm} cm
-                      </span>
-                      <span className="text-[10px] font-bold text-amber-600">
-                        #{(highestVerticalItem as any).player?.number}
-                      </span>
-                    </div>
                   </div>
-                ) : (
-                  <span className="text-xs text-gray-400 italic">No jump data</span>
-                )}
-              </div>
 
-              {/* 2km Time Trial Leader */}
-              <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/60 border border-emerald-200/80 p-3.5 rounded-2xl relative overflow-hidden">
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block mb-1">
-                  🫁 2km Aerobic Trial
-                </span>
-                {bestTimeTrialItem ? (
-                  <div>
-                    <span className="font-black text-gray-900 text-sm block truncate">
-                      {(bestTimeTrialItem as any).player?.name || 'Unknown'}
-                    </span>
-                    <div className="flex items-baseline justify-between mt-1">
-                      <span className="text-xl font-black text-emerald-700">
-                        {(bestTimeTrialItem as any).strVal}
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-600">
-                        #{(bestTimeTrialItem as any).player?.number}
-                      </span>
-                    </div>
+                  {/* Visual Distribution Stack Bar */}
+                  <div className="w-full h-3.5 bg-gray-200 rounded-full overflow-hidden flex shadow-inner">
+                    {evaluatedAssessments.length > 0 ? (
+                      <>
+                        <div
+                          style={{ width: `${(tierDistribution.elite / evaluatedAssessments.length) * 100}%` }}
+                          className="h-full bg-emerald-500 hover:opacity-90 transition cursor-pointer"
+                          onClick={() => setTileFilter(tileFilter === 'elite' ? 'all' : 'elite')}
+                          title={`Click to filter Elite Tier (${tierDistribution.elite})`}
+                        />
+                        <div
+                          style={{ width: `${(tierDistribution.advanced / evaluatedAssessments.length) * 100}%` }}
+                          className="h-full bg-blue-500 hover:opacity-90 transition cursor-pointer"
+                          onClick={() => setTileFilter(tileFilter === 'advanced' ? 'all' : 'advanced')}
+                          title={`Click to filter Advanced Tier (${tierDistribution.advanced})`}
+                        />
+                        <div
+                          style={{ width: `${(tierDistribution.developing / evaluatedAssessments.length) * 100}%` }}
+                          className="h-full bg-amber-400 hover:opacity-90 transition cursor-pointer"
+                          onClick={() => setTileFilter(tileFilter === 'developing' ? 'all' : 'developing')}
+                          title={`Click to filter Developing Tier (${tierDistribution.developing})`}
+                        />
+                        <div
+                          style={{ width: `${(tierDistribution.emerging / evaluatedAssessments.length) * 100}%` }}
+                          className="h-full bg-orange-400 hover:opacity-90 transition cursor-pointer"
+                          onClick={() => setTileFilter(tileFilter === 'emerging' ? 'all' : 'emerging')}
+                          title={`Click to filter Emerging Tier (${tierDistribution.emerging})`}
+                        />
+                        <div
+                          style={{ width: `${(tierDistribution.needsDev / evaluatedAssessments.length) * 100}%` }}
+                          className="h-full bg-rose-500 hover:opacity-90 transition cursor-pointer"
+                          onClick={() => setTileFilter(tileFilter === 'needsDev' ? 'all' : 'needsDev')}
+                          title={`Click to filter Needs Dev (${tierDistribution.needsDev})`}
+                        />
+                      </>
+                    ) : (
+                      <div className="w-full h-full bg-gray-200" />
+                    )}
                   </div>
-                ) : (
-                  <span className="text-xs text-gray-400 italic">No time trial data</span>
-                )}
-              </div>
 
-              {/* Kick Power Leader */}
-              <div className="bg-gradient-to-br from-rose-50/80 to-pink-50/60 border border-rose-200/80 p-3.5 rounded-2xl relative overflow-hidden">
-                <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 block mb-1">
-                  🦵 Kicking Penetration
-                </span>
-                {longestKickItem ? (
-                  <div>
-                    <span className="font-black text-gray-900 text-sm block truncate">
-                      {(longestKickItem as any).player?.name || 'Unknown'}
-                    </span>
-                    <div className="flex items-baseline justify-between mt-1">
-                      <span className="text-xl font-black text-rose-700">
-                        {(longestKickItem as any).m} meters
+                  {/* Tier Legend Pills (Active Filter Buttons) */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-bold">
+                    <button
+                      onClick={() => setTileFilter(tileFilter === 'elite' ? 'all' : 'elite')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                        tileFilter === 'elite'
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-600 ring-2 ring-emerald-400 font-black shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-emerald-300'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${tileFilter === 'elite' ? 'bg-slate-950' : 'bg-emerald-500'}`} />
+                      <span>🟢 Elite Tier (4.5+):</span>
+                      <span className={tileFilter === 'elite' ? 'text-slate-950 font-black' : 'text-emerald-700 font-black'}>
+                        {tierDistribution.elite}
                       </span>
-                      <span className="text-[10px] font-bold text-rose-600">
-                        #{(longestKickItem as any).player?.number}
+                    </button>
+
+                    <button
+                      onClick={() => setTileFilter(tileFilter === 'advanced' ? 'all' : 'advanced')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                        tileFilter === 'advanced'
+                          ? 'bg-blue-500 text-white border-blue-600 ring-2 ring-blue-400 font-black shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${tileFilter === 'advanced' ? 'bg-white' : 'bg-blue-500'}`} />
+                      <span>🔵 Advanced (3.5 - 4.4):</span>
+                      <span className={tileFilter === 'advanced' ? 'text-white font-black' : 'text-blue-700 font-black'}>
+                        {tierDistribution.advanced}
                       </span>
-                    </div>
+                    </button>
+
+                    <button
+                      onClick={() => setTileFilter(tileFilter === 'developing' ? 'all' : 'developing')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                        tileFilter === 'developing'
+                          ? 'bg-amber-400 text-slate-950 border-amber-500 ring-2 ring-amber-300 font-black shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-amber-300'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${tileFilter === 'developing' ? 'bg-slate-950' : 'bg-amber-400'}`} />
+                      <span>🟡 Developing (2.5 - 3.4):</span>
+                      <span className={tileFilter === 'developing' ? 'text-slate-950 font-black' : 'text-amber-700 font-black'}>
+                        {tierDistribution.developing}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setTileFilter(tileFilter === 'emerging' ? 'all' : 'emerging')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                        tileFilter === 'emerging'
+                          ? 'bg-orange-500 text-white border-orange-600 ring-2 ring-orange-400 font-black shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-orange-300'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${tileFilter === 'emerging' ? 'bg-white' : 'bg-orange-400'}`} />
+                      <span>🟠 Emerging (1.5 - 2.4):</span>
+                      <span className={tileFilter === 'emerging' ? 'text-white font-black' : 'text-orange-700 font-black'}>
+                        {tierDistribution.emerging}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setTileFilter(tileFilter === 'needsDev' ? 'all' : 'needsDev')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                        tileFilter === 'needsDev'
+                          ? 'bg-rose-500 text-white border-rose-600 ring-2 ring-rose-400 font-black shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-rose-300'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${tileFilter === 'needsDev' ? 'bg-white' : 'bg-rose-500'}`} />
+                      <span>🔴 Needs Dev (&lt; 1.5):</span>
+                      <span className={tileFilter === 'needsDev' ? 'text-white font-black' : 'text-rose-700 font-black'}>
+                        {tierDistribution.needsDev}
+                      </span>
+                    </button>
+
+                    {tileFilter !== 'all' && (
+                      <button
+                        onClick={() => setTileFilter('all')}
+                        className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-[10px] font-black rounded-xl transition cursor-pointer ml-auto flex items-center gap-1"
+                      >
+                        <span>Clear Tile Filter ({filteredPlayers.length} matched)</span>
+                      </button>
+                    )}
                   </div>
-                ) : (
-                  <span className="text-xs text-gray-400 italic">No kicking data</span>
-                )}
-              </div>
-            </div>
-
-            {/* InterchangeIQ Squad Tier Breakdown Bar */}
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                    Squad InterchangeIQ Rating Tier Distribution
-                  </span>
-                </div>
-                <span className="text-xs font-bold text-gray-500">
-                  Squad Average: <b className="text-indigo-600 font-black">{teamAvgScore} / 5.0</b> ({evaluatedAssessments.length} Evaluated)
-                </span>
-              </div>
-
-              {/* Visual Distribution Stack Bar */}
-              <div className="w-full h-3.5 bg-gray-200 rounded-full overflow-hidden flex shadow-inner">
-                {evaluatedAssessments.length > 0 ? (
-                  <>
-                    <div
-                      style={{ width: `${(tierDistribution.elite / evaluatedAssessments.length) * 100}%` }}
-                      className="h-full bg-emerald-500 hover:opacity-90 transition"
-                      title={`Elite: ${tierDistribution.elite}`}
-                    />
-                    <div
-                      style={{ width: `${(tierDistribution.advanced / evaluatedAssessments.length) * 100}%` }}
-                      className="h-full bg-blue-500 hover:opacity-90 transition"
-                      title={`Advanced: ${tierDistribution.advanced}`}
-                    />
-                    <div
-                      style={{ width: `${(tierDistribution.developing / evaluatedAssessments.length) * 100}%` }}
-                      className="h-full bg-amber-400 hover:opacity-90 transition"
-                      title={`Developing: ${tierDistribution.developing}`}
-                    />
-                    <div
-                      style={{ width: `${(tierDistribution.emerging / evaluatedAssessments.length) * 100}%` }}
-                      className="h-full bg-orange-400 hover:opacity-90 transition"
-                      title={`Emerging: ${tierDistribution.emerging}`}
-                    />
-                    <div
-                      style={{ width: `${(tierDistribution.needsDev / evaluatedAssessments.length) * 100}%` }}
-                      className="h-full bg-rose-500 hover:opacity-90 transition"
-                      title={`Needs Dev: ${tierDistribution.needsDev}`}
-                    />
-                  </>
-                ) : (
-                  <div className="w-full h-full bg-gray-200" />
-                )}
-              </div>
-
-              {/* Tier Legend Pills */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-bold">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  <span className="text-gray-700">🟢 Elite Tier (5.0):</span>
-                  <span className="text-emerald-700 font-black">{tierDistribution.elite}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                  <span className="text-gray-700">🔵 Advanced (4.0):</span>
-                  <span className="text-blue-700 font-black">{tierDistribution.advanced}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                  <span className="text-gray-700">🟡 Developing (3.0):</span>
-                  <span className="text-amber-700 font-black">{tierDistribution.developing}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
-                  <span className="text-gray-700">🟠 Emerging (2.0):</span>
-                  <span className="text-orange-700 font-black">{tierDistribution.emerging}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  <span className="text-gray-700">🔴 Needs Dev (1.0):</span>
-                  <span className="text-rose-700 font-black">{tierDistribution.needsDev}</span>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

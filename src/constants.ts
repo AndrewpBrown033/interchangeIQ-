@@ -1383,7 +1383,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 8,
     gameSenseRating: 8,
     overallInterchangeIqScore: 3.8,
-    overallRatingBadge: 'Advanced Tier',
+    overallRatingBadge: 'Advanced',
     developmentGoals: 'Build opposite foot kicking power and repeat sprint endurance.',
     coachNotes: 'Captain set the benchmark early in pre-season.'
   },
@@ -1409,7 +1409,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 9,
     gameSenseRating: 9,
     overallInterchangeIqScore: 4.6,
-    overallRatingBadge: 'Elite Tier',
+    overallRatingBadge: 'Elite',
     developmentGoals: 'Lead midfield stoppage setup and maintain elite work rate.',
     coachNotes: 'Massive YoY gains! Sprint down by 0.14s, 2km time trial improved by 33s.'
   },
@@ -1435,7 +1435,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 6,
     gameSenseRating: 7,
     overallInterchangeIqScore: 3.3,
-    overallRatingBadge: 'Developing Tier',
+    overallRatingBadge: 'Developing',
     developmentGoals: 'Improve aerial jump timing and forward pressure tackling.',
     coachNotes: 'Natural forward line instincts. Focus on aerobic base.'
   },
@@ -1461,7 +1461,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 8,
     gameSenseRating: 8,
     overallInterchangeIqScore: 4.2,
-    overallRatingBadge: 'Advanced Tier',
+    overallRatingBadge: 'Advanced',
     developmentGoals: 'Focus on set shot routine consistency under fatigue.',
     coachNotes: 'Gained +8m on kick distance! Strong overhead mark in pack situations.'
   },
@@ -1487,7 +1487,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 8,
     gameSenseRating: 8,
     overallInterchangeIqScore: 3.6,
-    overallRatingBadge: 'Advanced Tier',
+    overallRatingBadge: 'Advanced',
     developmentGoals: 'Enhance right foot exit kicking out of defense.',
     coachNotes: 'Vice Captain leadership in key defender line.'
   },
@@ -1513,7 +1513,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 9,
     gameSenseRating: 9,
     overallInterchangeIqScore: 4.5,
-    overallRatingBadge: 'Elite Tier',
+    overallRatingBadge: 'Elite',
     developmentGoals: 'Direct backline zone shifts during transition.',
     coachNotes: 'Elite defensive rating. Right foot exit kick is now a weapon.'
   },
@@ -1539,7 +1539,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 7,
     gameSenseRating: 8,
     overallInterchangeIqScore: 3.9,
-    overallRatingBadge: 'Advanced Tier',
+    overallRatingBadge: 'Advanced',
     developmentGoals: 'Improve wing running patterns and defensive tracking.',
     coachNotes: 'Excellent natural speed on the wing.'
   },
@@ -1565,7 +1565,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 8,
     gameSenseRating: 9,
     overallInterchangeIqScore: 4.7,
-    overallRatingBadge: 'Elite Tier',
+    overallRatingBadge: 'Elite',
     developmentGoals: 'Maintain top-level wing endurance and inside 50 delivery.',
     coachNotes: 'First player under 8 mins in 2km trial! Fastest 20m sprint in squad (3.22s).'
   },
@@ -1591,7 +1591,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 7,
     gameSenseRating: 7,
     overallInterchangeIqScore: 3.4,
-    overallRatingBadge: 'Developing Tier',
+    overallRatingBadge: 'Developing',
     developmentGoals: 'Increase vertical jump reach and hitout direction targeting.',
     coachNotes: 'Tallest player on roster. High ceiling.'
   },
@@ -1617,7 +1617,7 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
     tacklingRating: 8,
     gameSenseRating: 8,
     overallInterchangeIqScore: 4.3,
-    overallRatingBadge: 'Advanced Tier',
+    overallRatingBadge: 'Advanced',
     developmentGoals: 'Follow up hitouts as extra midfielder around stoppages.',
     coachNotes: 'Squad leader in vertical jump (61cm)! +9cm gain YoY.'
   }
