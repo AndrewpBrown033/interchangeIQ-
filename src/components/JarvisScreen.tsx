@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Player, Drill, TrainingState, SkillAssessment, ApiKeySettings } from '../types';
+import { Player, Drill, TrainingState, SkillAssessment, ApiKeySettings, Rotation } from '../types';
+import { getZoneForPosition } from '../constants';
 import {
   Bot,
   Sparkles,
@@ -16,7 +17,9 @@ import {
   Edit3,
   Check,
   Search,
-  Cpu
+  Cpu,
+  Zap,
+  Users
 } from 'lucide-react';
 
 interface Message {
@@ -37,8 +40,107 @@ interface ConversationThread {
   messages: Message[];
 }
 
+export interface JarvisActionItem {
+  id: string;
+  type: 'swap' | 'assign';
+  outPlayer?: Player;
+  inPlayer?: Player;
+  targetPlayer?: Player;
+  slotKey?: string;
+  reason: string;
+  zoneBadge?: 'FWD' | 'MID' | 'BACK' | 'RUCK' | 'POS';
+}
+
+function detectJarvisActionRecommendations(content: string, squad: Player[]): JarvisActionItem[] {
+  const actions: JarvisActionItem[] = [];
+  if (!content) return actions;
+
+  // 1. Structured tag check: [ACTION: SWAP | OUT: #X ... | IN: #Y ... | REASON: ...]
+  const swapRegex = /\[ACTION:\s*SWAP\s*\|\s*OUT:\s*#?(\d+)?\s*([^\|]+)\|\s*IN:\s*#?(\d+)?\s*([^\|]+)(?:\|\s*REASON:\s*([^\]]+))?\]/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = swapRegex.exec(content)) !== null) {
+    const outNum = match[1];
+    const outName = match[2]?.trim();
+    const inNum = match[3];
+    const inName = match[4]?.trim();
+    const reason = match[5]?.trim() || 'Recommended rotation swap';
+
+    const outP = squad.find(p => (outNum && p.number === outNum) || (outName && p.name.toLowerCase().includes(outName.toLowerCase())));
+    const inP = squad.find(p => (inNum && p.number === inNum) || (inName && p.name.toLowerCase().includes(inName.toLowerCase())));
+
+    if (outP && inP) {
+      const zone = inP.primaryZone || (inP.positions?.[0] ? getZoneForPosition(inP.positions[0]) : 'POS');
+      const zoneBadge = zone === 'FWD' ? 'FWD' : zone === 'MID' ? 'MID' : zone === 'DEF' ? 'BACK' : zone === 'RUCK' ? 'RUCK' : 'POS';
+      actions.push({
+        id: `jact-${outP.id}-${inP.id}-${actions.length}`,
+        type: 'swap',
+        outPlayer: outP,
+        inPlayer: inP,
+        reason,
+        zoneBadge,
+      });
+    }
+  }
+
+  // 2. Structured tag check: [ACTION: ASSIGN | PLAYER: #X ... | SLOT: C | REASON: ...]
+  const assignRegex = /\[ACTION:\s*ASSIGN\s*\|\s*PLAYER:\s*#?(\d+)?\s*([^\|]+)\|\s*SLOT:\s*([^\|]+)(?:\|\s*REASON:\s*([^\]]+))?\]/gi;
+  while ((match = assignRegex.exec(content)) !== null) {
+    const pNum = match[1];
+    const pName = match[2]?.trim();
+    const slot = match[3]?.trim();
+    const reason = match[4]?.trim() || `Assign to position ${slot}`;
+
+    const targetP = squad.find(p => (pNum && p.number === pNum) || (pName && p.name.toLowerCase().includes(pName.toLowerCase())));
+    if (targetP && slot) {
+      const zone = targetP.primaryZone || (targetP.positions?.[0] ? getZoneForPosition(targetP.positions[0]) : 'POS');
+      const zoneBadge = zone === 'FWD' ? 'FWD' : zone === 'MID' ? 'MID' : zone === 'DEF' ? 'BACK' : zone === 'RUCK' ? 'RUCK' : 'POS';
+      actions.push({
+        id: `jact-assign-${targetP.id}-${slot}-${actions.length}`,
+        type: 'assign',
+        targetPlayer: targetP,
+        slotKey: slot,
+        reason,
+        zoneBadge,
+      });
+    }
+  }
+
+  // 3. Fallback pattern match for markdown OUT #X Name ➔ IN #Y Name
+  if (actions.length === 0) {
+    const textSwapRegex = /OUT\s+#(\d+)\s+([^\(\n➔\->]+).*?(?:➔|->)\s+IN\s+#(\d+)\s+([^\(\n]+)/gi;
+    while ((match = textSwapRegex.exec(content)) !== null) {
+      const outNum = match[1];
+      const inNum = match[3];
+
+      const outP = squad.find(p => p.number === outNum);
+      const inP = squad.find(p => p.number === inNum);
+
+      if (outP && inP) {
+        const zone = inP.primaryZone || (inP.positions?.[0] ? getZoneForPosition(inP.positions[0]) : 'POS');
+        const zoneBadge = zone === 'FWD' ? 'FWD' : zone === 'MID' ? 'MID' : zone === 'DEF' ? 'BACK' : zone === 'RUCK' ? 'RUCK' : 'POS';
+        actions.push({
+          id: `jact-text-${outP.id}-${inP.id}-${actions.length}`,
+          type: 'swap',
+          outPlayer: outP,
+          inPlayer: inP,
+          reason: `Position Match (${inP.positions?.join('/') || inP.primaryZone}) - OUT #${outP.number} ➔ IN #${inP.number}`,
+          zoneBadge,
+        });
+      }
+    }
+  }
+
+  return actions;
+}
+
 interface JarvisScreenProps {
   players: Player[];
+  onUpdatePlayers?: (players: Player[]) => void;
+  lineup?: Record<string, string>;
+  onUpdateLineup?: (lineup: Record<string, string>) => void;
+  rotations?: Rotation[];
+  onUpdateRotations?: (rotations: Rotation[]) => void;
   drills: Drill[];
   growthRecords?: SkillAssessment[];
   trainingState: TrainingState;
@@ -56,6 +158,11 @@ const DEFAULT_WELCOME_MESSAGE: Message = {
 
 export default function JarvisScreen({
   players,
+  onUpdatePlayers,
+  lineup,
+  onUpdateLineup,
+  rotations,
+  onUpdateRotations,
   drills,
   growthRecords = [],
   trainingState,
@@ -65,6 +172,8 @@ export default function JarvisScreen({
 }: JarvisScreenProps) {
   // Navigation sub-tab: 'thread' or 'history'
   const [activeTab, setActiveTab] = useState<'thread' | 'history'>('thread');
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [appliedActionIds, setAppliedActionIds] = useState<Record<string, boolean>>({});
 
   // Load saved conversation threads
   const [threads, setThreads] = useState<ConversationThread[]>(() => {
@@ -390,6 +499,60 @@ export default function JarvisScreen({
     onNavigateTab('training');
   };
 
+  const handleApplyJarvisAction = (action: JarvisActionItem) => {
+    if (action.type === 'swap' && action.outPlayer && action.inPlayer) {
+      const outId = action.outPlayer.id;
+      const inId = action.inPlayer.id;
+
+      let updatedLineup = { ...(lineup || {}) };
+      const slotKey = Object.keys(updatedLineup).find(k => updatedLineup[k] === outId);
+
+      if (slotKey) {
+        updatedLineup[slotKey] = inId;
+      } else {
+        const openSlot = Object.keys(updatedLineup).find(k => !updatedLineup[k]);
+        if (openSlot) updatedLineup[openSlot] = inId;
+      }
+
+      if (onUpdateLineup) {
+        onUpdateLineup(updatedLineup);
+      }
+
+      if (rotations && onUpdateRotations) {
+        const newRot: Rotation = {
+          id: `rot-${Date.now()}`,
+          planId: 'jarvis-ai',
+          quarter: 1,
+          minute: 5,
+          type: 'onfield',
+          outId: outId,
+          inId: inId,
+          out: `#${action.outPlayer.number} ${action.outPlayer.name}`,
+          inn: `#${action.inPlayer.number} ${action.inPlayer.name}`,
+          applied: true,
+          status: 'applied',
+          note: `Executed from Jarvis AI Recommendation (${action.reason})`,
+        };
+        onUpdateRotations([...rotations, newRot]);
+      }
+
+      setAppliedActionIds(prev => ({ ...prev, [action.id]: true }));
+      setActionNotice(`⚡ Action Executed! Swapped OUT #${action.outPlayer.number} ${action.outPlayer.name} for IN #${action.inPlayer.number} ${action.inPlayer.name}!`);
+      setTimeout(() => setActionNotice(null), 4000);
+    } else if (action.type === 'assign' && action.targetPlayer && action.slotKey) {
+      let updatedLineup = { ...(lineup || {}) };
+      updatedLineup[action.slotKey] = action.targetPlayer.id;
+
+      if (onUpdateLineup) {
+        onUpdateLineup(updatedLineup);
+      }
+
+      setAppliedActionIds(prev => ({ ...prev, [action.id]: true }));
+      setActionNotice(`⚡ Action Executed! Assigned #${action.targetPlayer.number} ${action.targetPlayer.name} to ${action.slotKey}!`);
+      setTimeout(() => setActionNotice(null), 4000);
+    }
+  };
+
   const filteredHistoryThreads = threads.filter((t) => {
     if (!historySearch.trim()) return true;
     const q = historySearch.toLowerCase();
@@ -489,7 +652,22 @@ export default function JarvisScreen({
         </div>
       </div>
 
-      {/* Notice Banner */}
+      {/* Notice Banners */}
+      {actionNotice && (
+        <div className="bg-purple-50 border-2 border-purple-300 text-purple-950 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold animate-fadeIn shadow-sm">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-purple-600 shrink-0" />
+            <span>{actionNotice}</span>
+          </div>
+          <button
+            onClick={() => onNavigateTab('gameday')}
+            className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-black transition cursor-pointer shrink-0 shadow-xs"
+          >
+            View GameDay Lineup
+          </button>
+        </div>
+      )}
+
       {addedPlanNotice && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold animate-fadeIn">
           <div className="flex items-center gap-2">
@@ -645,6 +823,81 @@ export default function JarvisScreen({
                           </div>
                         </div>
                       )}
+
+                      {/* Actionable Position Recommendations Card */}
+                      {isAssistant && (() => {
+                        const recActions = detectJarvisActionRecommendations(msg.content, players);
+                        if (recActions.length === 0) return null;
+
+                        return (
+                          <div className="bg-purple-50/90 border-2 border-purple-200 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <span className="text-[10px] font-black uppercase text-purple-950 flex items-center gap-1.5 tracking-wider">
+                                <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
+                                <span>Jarvis Recommended Position Actions ({recActions.length})</span>
+                              </span>
+                              <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-md border border-purple-200">
+                                Position Logic Enabled
+                              </span>
+                            </div>
+
+                            <div className="space-y-2 pt-0.5">
+                              {recActions.map((act) => {
+                                const isDone = appliedActionIds[act.id];
+                                return (
+                                  <div key={act.id} className="p-3 bg-white/95 rounded-xl border border-purple-200 shadow-2xs flex items-center justify-between gap-3 flex-wrap">
+                                    <div className="space-y-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase border ${
+                                          act.zoneBadge === 'FWD' ? 'bg-orange-100 text-orange-950 border-orange-300' :
+                                          act.zoneBadge === 'MID' ? 'bg-blue-100 text-blue-950 border-blue-300' :
+                                          act.zoneBadge === 'BACK' ? 'bg-emerald-100 text-emerald-950 border-emerald-300' :
+                                          'bg-purple-100 text-purple-950 border-purple-300'
+                                        }`}>
+                                          {act.zoneBadge} Position Match
+                                        </span>
+                                        {act.type === 'swap' && act.outPlayer && act.inPlayer && (
+                                          <span className="text-xs font-black text-slate-950">
+                                            OUT #{act.outPlayer.number} {act.outPlayer.nick || act.outPlayer.name} ➔ IN #{act.inPlayer.number} {act.inPlayer.nick || act.inPlayer.name}
+                                          </span>
+                                        )}
+                                        {act.type === 'assign' && act.targetPlayer && act.slotKey && (
+                                          <span className="text-xs font-black text-slate-950">
+                                            Assign #{act.targetPlayer.number} {act.targetPlayer.name} ➔ {act.slotKey}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-[11px] text-slate-600 font-medium">{act.reason}</p>
+                                    </div>
+
+                                    <button
+                                      disabled={isDone}
+                                      onClick={() => handleApplyJarvisAction(act)}
+                                      className={`px-3 py-1.5 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 ${
+                                        isDone
+                                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default'
+                                          : 'bg-purple-700 hover:bg-purple-800 text-white active:scale-95'
+                                      }`}
+                                    >
+                                      {isDone ? (
+                                        <>
+                                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                          <span>Action Executed</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Zap className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                                          <span>Apply Action Now</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {!isAssistant && (

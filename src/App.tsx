@@ -2306,6 +2306,11 @@ export default function App() {
         {activeTab === 'jarvis' && (
           <JarvisScreen
             players={players}
+            onUpdatePlayers={setPlayers}
+            lineup={lineup}
+            onUpdateLineup={setLineup}
+            rotations={rotations}
+            onUpdateRotations={setRotations}
             drills={drills}
             growthRecords={growthRecords}
             trainingState={trainingState}
