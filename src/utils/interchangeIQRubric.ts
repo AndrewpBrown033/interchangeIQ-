@@ -352,3 +352,95 @@ export function calculateInterchangeIQGrade(params: {
     overallTier: INTERCHANGE_IQ_SCALE[numericRating]
   };
 }
+
+// ---------------------------------------------------------------------------
+// InterchangeIQ Height Classification — Small / Medium / Tall + 1-5 rating,
+// benchmarked against CDC stature-for-age percentiles for youth athletes.
+// Applied automatically whenever a player's heightCm is entered (> 0).
+// ---------------------------------------------------------------------------
+
+export type HeightGroup = 'Small' | 'Medium' | 'Tall';
+
+export interface HeightBand {
+  low: number;  // cm - lower bound of the Medium band
+  high: number; // cm - upper bound of the Medium band
+}
+
+// Medium band per age cohort/gender, taken directly from the published
+// single-age table (U12=age12, U14=age14, U16=age16, U18=age18 — same
+// age-to-band convention already used for the combine benchmarks above).
+// U10 and Seniors weren't published, so they're a straight-line extrapolation
+// of the age12->age13 (and age17->age18) trend rather than real CDC figures —
+// treat those two cohorts as an estimate.
+export const HEIGHT_MEDIUM_BAND: Record<Gender, Record<AgeGroup, HeightBand>> = {
+  Male: {
+    U10: { low: 134, high: 146 }, // extrapolated
+    U12: { low: 148, high: 160 },
+    U14: { low: 162, high: 174 },
+    U16: { low: 170, high: 182 },
+    U18: { low: 173, high: 185 },
+    Seniors: { low: 173, high: 185 }, // assumed stable post-18
+  },
+  Female: {
+    U10: { low: 142, high: 153 }, // extrapolated
+    U12: { low: 150, high: 161 },
+    U14: { low: 156, high: 168 },
+    U16: { low: 158, high: 170 },
+    U18: { low: 160, high: 172 },
+    Seniors: { low: 160, high: 172 }, // assumed stable post-18
+  }
+};
+
+const HEIGHT_RATING_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
+  1: 'Very Small',
+  2: 'Small',
+  3: 'Medium',
+  4: 'Tall',
+  5: 'Exceptional Height'
+};
+
+export interface HeightGradingResult {
+  group: HeightGroup;
+  rating: 1 | 2 | 3 | 4 | 5;
+  label: string;
+  tier: RubricLevel; // same badge/color styling as the InterchangeIQ scale
+}
+
+// Classifies a raw height (cm) against the age/gender Medium band, using a
+// +/-5cm buffer either side of that band to produce the finer 1-5 rating
+// (e.g. 16yo male: <165=1, 165-170=2, 170-182=3, 182-187=4, >187=5).
+export function classifyHeight(heightCm: number, gender: Gender, ageGroup: AgeGroup): HeightGradingResult | null {
+  if (!heightCm || heightCm <= 0 || isNaN(heightCm)) return null;
+  const band = HEIGHT_MEDIUM_BAND[gender]?.[ageGroup];
+  if (!band) return null;
+
+  let rating: 1 | 2 | 3 | 4 | 5;
+  let group: HeightGroup;
+  if (heightCm < band.low - 5) { rating = 1; group = 'Small'; }
+  else if (heightCm < band.low) { rating = 2; group = 'Small'; }
+  else if (heightCm <= band.high) { rating = 3; group = 'Medium'; }
+  else if (heightCm <= band.high + 5) { rating = 4; group = 'Tall'; }
+  else { rating = 5; group = 'Tall'; }
+
+  return { group, rating, label: HEIGHT_RATING_LABELS[rating], tier: INTERCHANGE_IQ_SCALE[rating] };
+}
+
+// Resolves a player's effective height group: calculated from heightCm
+// whenever one is recorded (always takes precedence), otherwise falls back
+// to a manual heightGroupOverride flag, otherwise null (unknown).
+export function resolvePlayerHeightGroup(player: {
+  heightCm?: number;
+  gender?: Gender;
+  ageGroup?: AgeGroup;
+  heightGroupOverride?: HeightGroup;
+}): { group: HeightGroup; rating: (1 | 2 | 3 | 4 | 5) | null; source: 'calculated' | 'manual' } | null {
+  if (player.heightCm && player.heightCm > 0) {
+    const result = classifyHeight(player.heightCm, player.gender || 'Female', player.ageGroup || 'U16');
+    if (result) return { group: result.group, rating: result.rating, source: 'calculated' };
+  }
+  if (player.heightGroupOverride) {
+    return { group: player.heightGroupOverride, rating: null, source: 'manual' };
+  }
+  return null;
+}
+

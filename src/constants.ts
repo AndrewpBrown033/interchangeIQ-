@@ -1871,3 +1871,17 @@ export const DEMO_TEAM_SAMPLE_HISTORY: GameHistory[] = [
     ],
   },
 ];
+
+// Position height convention (Small / Medium / Tall) — mirrors the
+// heightPreference set on each AFL_POSITIONAL_RUBRIC group in
+// src/utils/aflPositionalRubric.ts, expressed per raw position code so it
+// can be shown directly on position picker buttons.
+export const POSITION_HEIGHT_FACTOR: Record<string, 'Small' | 'Medium' | 'Tall'> = {
+  LFP: 'Small', FF: 'Tall', RFP: 'Small',
+  LHF: 'Small', CHF: 'Tall', RHF: 'Small',
+  C: 'Medium', ROV: 'Medium', RR: 'Medium', R: 'Tall',
+  LW: 'Medium', RW: 'Medium',
+  LBF: 'Medium', CHB: 'Tall', RBF: 'Medium',
+  LBP: 'Medium', FB: 'Tall', RBP: 'Medium',
+};
+

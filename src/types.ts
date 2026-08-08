@@ -14,6 +14,10 @@ export interface Player {
   slotTimes?: Record<string, number>;
   // Physical & Preferred Attributes
   heightCm?: number;
+  // Manual Small/Medium/Tall flag used only while heightCm is 0/unrecorded.
+  // Ignored once a real heightCm is entered — the calculated group always
+  // takes priority over this flag.
+  heightGroupOverride?: 'Small' | 'Medium' | 'Tall';
   weightKg?: number;
   preferredFoot?: 'Right' | 'Left' | 'Dual';
   // Core Skill Ratings (1-10)

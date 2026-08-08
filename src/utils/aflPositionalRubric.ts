@@ -1,5 +1,5 @@
 import { Player, SkillAssessment } from '../types';
-import { Gender, AgeGroup } from './interchangeIQRubric';
+import { Gender, AgeGroup, HeightGroup, resolvePlayerHeightGroup } from './interchangeIQRubric';
 
 export interface PositionProgression {
   u10: string[];
@@ -25,6 +25,10 @@ export interface PositionalRubricGroup {
     girls: string;
   };
   progression: PositionProgression;
+  // AFL positional height convention (e.g. Ruck/Key posts favor Tall,
+  // crumbing small forwards favor Small) — factored into suitabilityScore.
+  heightPreference: HeightGroup;
+  heightNote: string;
 }
 
 export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
@@ -34,6 +38,8 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
     code: 'KPD',
     slots: ['FB', 'CHB'],
     iconEmoji: '🛡️',
+    heightPreference: 'Tall',
+    heightNote: 'Last line of defense against key forwards — height wins one-on-one marking contests.',
     coreSkills: [
       'Spoiling basics',
       'Simple marking — chest marks first',
@@ -62,6 +68,8 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
     code: 'RDEF',
     slots: ['LHB', 'RHB', 'LBP', 'RBP', 'BP', 'HBF'],
     iconEmoji: '🏃',
+    heightPreference: 'Medium',
+    heightNote: 'Rebounding defender role — mobility and reading the ball matter as much as height.',
     coreSkills: [
       'Run & carry',
       'Short accurate kicking',
@@ -89,6 +97,8 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
     code: 'KFWD',
     slots: ['FF', 'CHF'],
     iconEmoji: '🎯',
+    heightPreference: 'Tall',
+    heightNote: 'Key forward target who leads and marks overhead inside 50.',
     coreSkills: [
       'Simple leading patterns',
       'Basic marking',
@@ -116,6 +126,8 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
     code: 'SFWD',
     slots: ['LFP', 'RFP', 'FP', 'LHF', 'RHF', 'HFF'],
     iconEmoji: '⚡',
+    heightPreference: 'Small',
+    heightNote: 'Crumbing forward role thrives on agility and a low centre of gravity, not height.',
     coreSkills: [
       'Crumbing basics',
       'Pressure acts',
@@ -143,6 +155,8 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
     code: 'MID',
     slots: ['C', 'LW', 'RW', 'W', 'R', 'RR', 'MID'],
     iconEmoji: '🔥',
+    heightPreference: 'Medium',
+    heightNote: 'Engine room role — height is a bonus at stoppages/throw-ins, not a requirement.',
     coreSkills: [
       'Clean hands',
       'Short kicking under pressure',
@@ -171,6 +185,8 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
     code: 'RUCK',
     slots: ['RK', 'RUCK'],
     iconEmoji: '⛰️',
+    heightPreference: 'Tall',
+    heightNote: 'Ruck contests are won in the air — taller athletes get a clear reach and tap advantage.',
     coreSkills: [
       'Basic tap work',
       'Follow-up effort',
@@ -201,6 +217,33 @@ export interface PositionEvaluation {
   whyComment: string;
   ageStageExpectation: string;
   growthFocus: string;
+}
+
+// Height-fit adjustment, on the same pre-division scale as the existing
+// preferred-position bonus (a flat +10 there). A calculated height rating
+// (from a real heightCm) that falls squarely in a position's ideal band adds
+// a stronger nudge than a manual heightGroupOverride flag, since the flag is
+// unverified. Height with no data at all (heightCm=0 and no override) is
+// fully neutral — it never penalizes a player for not having height on file.
+const HEIGHT_GROUP_RATING: Record<HeightGroup, 1 | 2 | 3 | 4 | 5> = { Small: 2, Medium: 3, Tall: 4 };
+const IDEAL_RATING_RANGE: Record<HeightGroup, [number, number]> = {
+  Tall: [4, 5],
+  Medium: [2, 4],
+  Small: [1, 3],
+};
+
+function getHeightFitBonus(player: Player, preference: HeightGroup): number {
+  const resolved = resolvePlayerHeightGroup(player);
+  if (!resolved) return 0; // no height data at all — neutral, never penalized
+
+  const rating = resolved.rating ?? HEIGHT_GROUP_RATING[resolved.group];
+  const [lo, hi] = IDEAL_RATING_RANGE[preference];
+  const scale = resolved.source === 'calculated' ? 1 : 0.5; // manual flag counts for less than a measured height
+
+  if (rating >= lo && rating <= hi) return 20 * scale;   // squarely in the ideal band
+  const distance = rating < lo ? lo - rating : rating - hi;
+  if (distance === 1) return 0;                          // one tier outside — neutral
+  return -15 * scale;                                     // clear mismatch (e.g. Small player evaluated for Ruck)
 }
 
 export function evaluatePlayerPositionalRubric(
@@ -237,6 +280,7 @@ export function evaluatePlayerPositionalRubric(
   // 1. Key Defender Evaluation (FB/CHB)
   let kpdScore = (spoiling * 20) + (marking * 20) + (gameSense * 20) + (tackling * 15) + (kickAcc * 15) + (fitness * 10);
   if (preferredPosStr.includes('FB') || preferredPosStr.includes('CHB') || player.primaryZone === 'Defenders') kpdScore += 10;
+  kpdScore += getHeightFitBonus(player, AFL_POSITIONAL_RUBRIC.KPD.heightPreference);
   kpdScore = Math.min(100, Math.round(kpdScore / 10));
 
   let kpdExpectation = '';
@@ -268,6 +312,7 @@ export function evaluatePlayerPositionalRubric(
   // 2. Running Defender Evaluation (HB/BP)
   let rdefScore = (kickAcc * 25) + (tackling * 20) + (gameSense * 20) + (handball * 15) + (defTransition * 10) + (fitness * 10);
   if (preferredPosStr.includes('HB') || preferredPosStr.includes('BP') || preferredPosStr.includes('HBF')) rdefScore += 10;
+  rdefScore += getHeightFitBonus(player, AFL_POSITIONAL_RUBRIC.RDEF.heightPreference);
   rdefScore = Math.min(100, Math.round(rdefScore / 10));
 
   let rdefExpectation = '';
@@ -299,6 +344,7 @@ export function evaluatePlayerPositionalRubric(
   // 3. Key Forward Evaluation (FF/CHF)
   let kfwdScore = (marking * 25) + (leading * 20) + (kickAcc * 20) + (overheadMark * 15) + (gameSense * 10) + (fitness * 10);
   if (preferredPosStr.includes('FF') || preferredPosStr.includes('CHF')) kfwdScore += 10;
+  kfwdScore += getHeightFitBonus(player, AFL_POSITIONAL_RUBRIC.KFWD.heightPreference);
   kfwdScore = Math.min(100, Math.round(kfwdScore / 10));
 
   let kfwdExpectation = '';
@@ -330,6 +376,7 @@ export function evaluatePlayerPositionalRubric(
   // 4. Small / Running Forward Evaluation (FP/HFF)
   let sfwdScore = (pressure * 25) + (crumbing * 20) + (tackling * 20) + (snapGoal * 15) + (gameSense * 10) + (fitness * 10);
   if (preferredPosStr.includes('FP') || preferredPosStr.includes('HFF') || preferredPosStr.includes('LFP') || preferredPosStr.includes('RFP')) sfwdScore += 10;
+  sfwdScore += getHeightFitBonus(player, AFL_POSITIONAL_RUBRIC.SFWD.heightPreference);
   sfwdScore = Math.min(100, Math.round(sfwdScore / 10));
 
   let sfwdExpectation = '';
@@ -361,6 +408,7 @@ export function evaluatePlayerPositionalRubric(
   // 5. Midfielder Evaluation (Centre / Wing / Rover)
   let midScore = (handball * 25) + (kickAcc * 20) + (gameSense * 20) + (fitness * 15) + (tackling * 10) + (oppFoot * 10);
   if (preferredPosStr.includes('MID') || preferredPosStr.includes('C') || preferredPosStr.includes('WING') || preferredPosStr.includes('ROVER') || player.primaryZone === 'Midfielders') midScore += 10;
+  midScore += getHeightFitBonus(player, AFL_POSITIONAL_RUBRIC.MID.heightPreference);
   midScore = Math.min(100, Math.round(midScore / 10));
 
   let midExpectation = '';
@@ -392,6 +440,7 @@ export function evaluatePlayerPositionalRubric(
   // 6. Ruck Evaluation
   let ruckScore = (ruckTap * 25) + (marking * 20) + (tackling * 20) + (fitness * 20) + (gameSense * 15);
   if (preferredPosStr.includes('RK') || preferredPosStr.includes('RUCK')) ruckScore += 15;
+  ruckScore += getHeightFitBonus(player, AFL_POSITIONAL_RUBRIC.RUCK.heightPreference);
   ruckScore = Math.min(100, Math.round(ruckScore / 10));
 
   let ruckExpectation = '';
