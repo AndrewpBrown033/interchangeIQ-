@@ -389,94 +389,6 @@ export default function App() {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // One-time seed: populate the sandbox "Demo Team" with a realistic sample
-  // squad, 3 completed games, a live match-day lineup, and 2 saved lineup
-  // templates, so new/Provisional users exploring the demo have something
-  // populated to look at instead of an empty squad. Scoped strictly to
-  // DEMO_TEAM_ID via its own localStorage/Firestore keys — never touches any
-  // real team's data. Guarded by a one-time flag so it won't stomp over
-  // anything a user has since changed on the demo team themselves.
-  useEffect(() => {
-    const SEED_FLAG = 'iiq_demo_seeded_v1';
-    if (localStorage.getItem(SEED_FLAG) === '1') return;
-
-    let hasRealData = false;
-    try {
-      const existingCacheRaw = localStorage.getItem(`iiq_team_data_${DEMO_TEAM_ID}`);
-      if (existingCacheRaw) {
-        const existing = JSON.parse(existingCacheRaw);
-        hasRealData = Array.isArray(existing.history) && existing.history.length > 0;
-      }
-    } catch (e) {
-      console.warn('Demo team seed: failed to inspect existing cache:', e);
-    }
-    if (hasRealData) {
-      localStorage.setItem(SEED_FLAG, '1');
-      return;
-    }
-
-    const seedData = {
-      players: normalizePlayers(DEMO_TEAM_SAMPLE_PLAYERS),
-      lineup: normalizeLineup(DEMO_TEAM_SAMPLE_LINEUP),
-      score: {
-        quarter: 1,
-        home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
-        away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
-      },
-      gameInfo: { team: 'Demo Team', round: 'Round 4', date: new Date().toISOString().slice(0, 10), opponent: '' },
-      rotations: [],
-      plans: [{ id: 'plan1', name: 'Q1 Rotation' }],
-      activePlanIds: ['plan1'],
-      history: DEMO_TEAM_SAMPLE_HISTORY,
-      savedLineups: DEMO_TEAM_SAMPLE_SAVED_LINEUPS,
-      drills: DEFAULT_DRILLS,
-      growthRecords: DEFAULT_GROWTH_RECORDS,
-      trainingState: {
-        view: 'library' as const, filter: 'All', activeId: 'one-v-one-kick-tennis', step: 0, motionPaused: false, plans: [], activePlanId: null,
-      },
-    };
-
-    try {
-      localStorage.setItem(`iiq_team_data_${DEMO_TEAM_ID}`, JSON.stringify(seedData));
-    } catch (e) {
-      console.warn('Demo team seed: failed to write local cache:', e);
-    }
-    localStorage.setItem(SEED_FLAG, '1');
-
-    // If the demo team happens to already be the active team, reflect the
-    // seeded data immediately instead of waiting for a team switch.
-    if (activeTeamId === DEMO_TEAM_ID) {
-      setPlayers(seedData.players);
-      setLineup(seedData.lineup);
-      setHistory(seedData.history);
-      setSavedLineups(seedData.savedLineups);
-    }
-
-    // Best-effort cloud sync so the seeded demo data shows up on other
-    // devices too. Uses merge so it never clobbers the demo team's profile
-    // fields (name, showTraining, etc.) already in the same Firestore doc.
-    (async () => {
-      try {
-        if (!auth.currentUser) {
-          try {
-            await signInAnonymously(auth);
-          } catch (authErr) {
-            console.warn('Demo team seed: anonymous auth notice:', authErr);
-          }
-        }
-        await setDoc(doc(db, 'teams', DEMO_TEAM_ID), {
-          id: DEMO_TEAM_ID,
-          name: 'Demo Team',
-          ...seedData,
-          updatedAt: Date.now(),
-        }, { merge: true });
-      } catch (err) {
-        console.warn('Demo team seed: cloud sync notice (local seed still applied):', err);
-      }
-    })();
-    // Intentionally run once on mount only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Helper to generate a fresh, team-isolated squad (populated with default AFL squad template)
   const createFreshSquadForTeam = (_teamId: string): Player[] => {
@@ -1458,18 +1370,32 @@ export default function App() {
         isSyncingFromServerRef.current = true;
         setIsSyncingFromServer(true);
 
+        // The Demo Team is a sandbox every Provisional/new user lands on. If
+        // its doc hasn't been seeded with the sample squad/games/lineup yet
+        // (first-ever load, or a doc that was auto-created blank before this
+        // sample data existed), inject the sample dataset right here — the
+        // exact place this data actually gets loaded into the app — instead
+        // of via a separate effect that could race this listener and lose.
+        // The `sampleDataSeeded` marker (persisted below) makes this run
+        // at most once per demo doc, so it never clobbers real edits.
+        const isDemoUnseeded = activeTeamId === DEMO_TEAM_ID && data.sampleDataSeeded !== true;
+
         const remoteTeamName = data.name || data.gameInfo?.team;
         const bestTeamName = (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name))
           ? activeTeamObj.name
           : ((remoteTeamName && !['Unnamed Squad', 'New Team'].includes(remoteTeamName)) ? remoteTeamName : 'My Squad');
 
-        const activePlayers = (data.players && Array.isArray(data.players) && data.players.length > 0)
-          ? normalizePlayers(data.players)
-          : (cachedLocalPlayers.length > 0
-              ? cachedLocalPlayers
-              : (players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS)));
+        const activePlayers = isDemoUnseeded
+          ? normalizePlayers(DEMO_TEAM_SAMPLE_PLAYERS)
+          : ((data.players && Array.isArray(data.players) && data.players.length > 0)
+              ? normalizePlayers(data.players)
+              : (cachedLocalPlayers.length > 0
+                  ? cachedLocalPlayers
+                  : (players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS))));
 
-        const activeLineup = (data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) ? data.lineup : (cachedLocalData?.lineup || {});
+        const activeLineup = isDemoUnseeded
+          ? normalizeLineup(DEMO_TEAM_SAMPLE_LINEUP)
+          : ((data.lineup && typeof data.lineup === 'object' && !Array.isArray(data.lineup)) ? data.lineup : (cachedLocalData?.lineup || {}));
         const defaultScore: Score = {
           quarter: 1,
           home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
@@ -1484,8 +1410,12 @@ export default function App() {
         const activePlanIdsLoaded = (data.activePlanIds && Array.isArray(data.activePlanIds) && data.activePlanIds.some((id: string) => activePlans.some(p => p.id === id)))
           ? data.activePlanIds
           : activePlans.map((p: any) => p.id);
-        const activeHistory = (data.history && Array.isArray(data.history)) ? data.history : (cachedLocalData?.history || []);
-        const activeSavedLineups = (data.savedLineups && Array.isArray(data.savedLineups)) ? data.savedLineups : (cachedLocalData?.savedLineups || []);
+        const activeHistory = isDemoUnseeded
+          ? DEMO_TEAM_SAMPLE_HISTORY
+          : ((data.history && Array.isArray(data.history)) ? data.history : (cachedLocalData?.history || []));
+        const activeSavedLineups = isDemoUnseeded
+          ? DEMO_TEAM_SAMPLE_SAVED_LINEUPS
+          : ((data.savedLineups && Array.isArray(data.savedLineups)) ? data.savedLineups : (cachedLocalData?.savedLineups || []));
         const activeDrills = (data.drills && Array.isArray(data.drills)) ? parseDrillList(data.drills) : (cachedLocalData?.drills || []);
         const activeGrowthRecords = (data.growthRecords && Array.isArray(data.growthRecords)) ? data.growthRecords : (cachedLocalData?.growthRecords || []);
         const defaultTrainingState: TrainingState = {
@@ -1533,6 +1463,22 @@ export default function App() {
         if (data.growthRecords || cachedLocalData?.growthRecords) setGrowthRecords(activeGrowthRecords);
         setTrainingState(activeTrainingState);
 
+        // Persist the demo sample seed back to Firestore (merge, so it never
+        // touches the doc's profile fields like showTraining/name) and mark
+        // it seeded so this branch is a no-op on every subsequent load.
+        if (isDemoUnseeded) {
+          setDoc(doc(db, 'teams', DEMO_TEAM_ID), {
+            ...incomingDataToSync,
+            sampleDataSeeded: true,
+            updatedAt: Date.now(),
+          }, { merge: true }).catch((err) => console.warn('Demo team seed: cloud write notice:', err));
+          try {
+            localStorage.setItem(`iiq_team_data_${DEMO_TEAM_ID}`, JSON.stringify(incomingDataToSync));
+          } catch (e) {
+            console.warn('Demo team seed: failed to write local cache:', e);
+          }
+        }
+
         setLastSyncedAt(data.updatedAt || Date.now());
         setCloudConnected(true);
 
@@ -1549,11 +1495,16 @@ export default function App() {
         setCloudConnected(true);
         setLastSyncedAt(Date.now());
 
-        const bestTeamName = (activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name)) ? activeTeamObj.name : 'My Squad';
+        const isNewDemoTeam = activeTeamId === DEMO_TEAM_ID;
+        const bestTeamName = isNewDemoTeam
+          ? 'Demo Team'
+          : ((activeTeamObj?.name && !['Unnamed Squad', 'New Team'].includes(activeTeamObj.name)) ? activeTeamObj.name : 'My Squad');
 
-        const freshPlayers: Player[] = (cachedLocalPlayers.length > 0)
-          ? cachedLocalPlayers
-          : (players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS));
+        const freshPlayers: Player[] = isNewDemoTeam
+          ? normalizePlayers(DEMO_TEAM_SAMPLE_PLAYERS)
+          : ((cachedLocalPlayers.length > 0)
+              ? cachedLocalPlayers
+              : (players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS)));
 
         const freshScore: Score = cachedLocalData?.score || {
           quarter: 1,
@@ -1577,19 +1528,22 @@ export default function App() {
           plans: [],
           activePlanId: null,
         };
+        const freshLineup = isNewDemoTeam ? normalizeLineup(DEMO_TEAM_SAMPLE_LINEUP) : (cachedLocalData?.lineup || {});
+        const freshHistory = isNewDemoTeam ? DEMO_TEAM_SAMPLE_HISTORY : (cachedLocalData?.history || []);
+        const freshSavedLineups = isNewDemoTeam ? DEMO_TEAM_SAMPLE_SAVED_LINEUPS : (cachedLocalData?.savedLineups || []);
 
         const initialDataToSync = {
           id: activeTeamId,
           name: bestTeamName,
           players: freshPlayers,
-          lineup: cachedLocalData?.lineup || {},
+          lineup: freshLineup,
           score: freshScore,
           gameInfo: freshGameInfo,
           rotations: cachedLocalData?.rotations || [],
           plans: freshPlans,
           activePlanIds: freshActivePlanIds,
-          history: cachedLocalData?.history || [],
-          savedLineups: cachedLocalData?.savedLineups || [],
+          history: freshHistory,
+          savedLineups: freshSavedLineups,
           drills: sanitizeDrillList(drills),
           growthRecords: cachedLocalData?.growthRecords || growthRecords,
           trainingState: freshTrainingState,
@@ -1598,17 +1552,29 @@ export default function App() {
         lastPublishedSerializedRef.current = JSON.stringify(initialDataToSync);
 
         setPlayers(freshPlayers);
-        setLineup(cachedLocalData?.lineup || {});
+        setLineup(freshLineup);
         setScore(freshScore);
         setGameInfo(freshGameInfo);
-        setSavedLineups(cachedLocalData?.savedLineups || []);
-        setHistory(cachedLocalData?.history || []);
+        setSavedLineups(freshSavedLineups);
+        setHistory(freshHistory);
         setRotations(cachedLocalData?.rotations || []);
         setPlans(freshPlans);
         setActivePlanIds(freshActivePlanIds);
         setTrainingState(freshTrainingState);
 
-        setDoc(docRef, { ...initialDataToSync, updatedAt: Date.now() }).catch(err => console.warn("Error creating team doc:", err.message));
+        setDoc(docRef, {
+          ...initialDataToSync,
+          ...(isNewDemoTeam ? { sampleDataSeeded: true } : {}),
+          updatedAt: Date.now(),
+        }).catch(err => console.warn("Error creating team doc:", err.message));
+
+        if (isNewDemoTeam) {
+          try {
+            localStorage.setItem(`iiq_team_data_${DEMO_TEAM_ID}`, JSON.stringify(initialDataToSync));
+          } catch (e) {
+            console.warn('Demo team seed: failed to write local cache:', e);
+          }
+        }
 
         currentTeamSyncedIdRef.current = activeTeamId;
 
