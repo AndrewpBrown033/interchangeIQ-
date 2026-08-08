@@ -121,7 +121,7 @@ export default function PlayerGrowthScreen({
   
   // InterchangeIQ Demographics
   const [formGender, setFormGender] = useState<Gender>('Female');
-  const [formAgeGroup, setFormAgeGroup] = useState<AgeGroup>('U14');
+  const [formAgeGroup, setFormAgeGroup] = useState<AgeGroup>('U16');
 
   // Fitness & Combine states
   const [formTimeTrial, setFormTimeTrial] = useState('08:45');
@@ -129,29 +129,29 @@ export default function PlayerGrowthScreen({
   const [formSprint, setFormSprint] = useState('3.45s');
   const [formAgility, setFormAgility] = useState('8.90s');
   const [formVertical, setFormVertical] = useState<number>(48);
-  const [formFitnessRating, setFormFitnessRating] = useState(4);
+  const [formFitnessRating, setFormFitnessRating] = useState(7);
   
   // Kicking states
   const [formPreferredFoot, setFormPreferredFoot] = useState<'Right' | 'Left' | 'Dual'>('Right');
   const [formKickDistance, setFormKickDistance] = useState(32);
-  const [formKickAccuracy, setFormKickAccuracy] = useState(4);
+  const [formKickAccuracy, setFormKickAccuracy] = useState(7);
   const [formOppositeFoot, setFormOppositeFoot] = useState(5);
   
   // Skill ratings
-  const [formHandball, setFormHandball] = useState(4);
-  const [formMarking, setFormMarking] = useState(4);
-  const [formTackling, setFormTackling] = useState(4);
-  const [formGameSense, setFormGameSense] = useState(4);
+  const [formHandball, setFormHandball] = useState(7);
+  const [formMarking, setFormMarking] = useState(7);
+  const [formTackling, setFormTackling] = useState(7);
+  const [formGameSense, setFormGameSense] = useState(7);
 
   // Position-Specific Rubric Attributes
-  const [formSpoiling, setFormSpoiling] = useState(4);
-  const [formOverheadMarking, setFormOverheadMarking] = useState(4);
-  const [formCrumbing, setFormCrumbing] = useState(4);
-  const [formPressureActs, setFormPressureActs] = useState(4);
-  const [formRuckTap, setFormRuckTap] = useState(4);
-  const [formLeadingTiming, setFormLeadingTiming] = useState(4);
-  const [formSnapGoal, setFormSnapGoal] = useState(4);
-  const [formDefensiveTransition, setFormDefensiveTransition] = useState(4);
+  const [formSpoiling, setFormSpoiling] = useState(7);
+  const [formOverheadMarking, setFormOverheadMarking] = useState(7);
+  const [formCrumbing, setFormCrumbing] = useState(7);
+  const [formPressureActs, setFormPressureActs] = useState(7);
+  const [formRuckTap, setFormRuckTap] = useState(7);
+  const [formLeadingTiming, setFormLeadingTiming] = useState(7);
+  const [formSnapGoal, setFormSnapGoal] = useState(7);
+  const [formDefensiveTransition, setFormDefensiveTransition] = useState(7);
 
   // Notes
   const [formGoals, setFormGoals] = useState('');
@@ -229,7 +229,7 @@ export default function PlayerGrowthScreen({
       tacklingRating: rec.tacklingRating,
       gameSenseRating: rec.gameSenseRating,
       gender: rec.gender || p?.gender || 'Female',
-      ageGroup: rec.ageGroup || p?.ageGroup || 'U14'
+      ageGroup: rec.ageGroup || p?.ageGroup || 'U16'
     });
     return { record: rec, player: p, grade };
   });
@@ -283,7 +283,7 @@ export default function PlayerGrowthScreen({
         tacklingRating: activePlayerLatestRecord.tacklingRating,
         gameSenseRating: activePlayerLatestRecord.gameSenseRating,
         gender: activePlayerLatestRecord.gender || activePlayer.gender || 'Female',
-        ageGroup: activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U14'
+        ageGroup: activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U16'
       })
     : null;
 
@@ -362,33 +362,33 @@ export default function PlayerGrowthScreen({
     setFormSeasonLabel('2026 Pre-Season');
 
     setFormGender(targetPlayer?.gender || 'Female');
-    setFormAgeGroup(targetPlayer?.ageGroup || 'U14');
+    setFormAgeGroup(targetPlayer?.ageGroup || 'U16');
     
     // Autofill from latest record if available
     const last = growthRecords.filter(r => r.playerId === targetId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     if (last) {
       setFormPreferredFoot(last.preferredFoot || 'Right');
       setFormKickDistance(last.kickDistanceMeters || 32);
-      setFormKickAccuracy(last.kickAccuracyRating || 4);
+      setFormKickAccuracy(last.kickAccuracyRating || 7);
       setFormOppositeFoot(last.oppositeFootRating || 5);
       setFormTimeTrial(last.timeTrial2km || '08:45');
       setFormYoyo(last.yoyoLevel || '15.0');
       setFormSprint(last.sprint20m || '3.45s');
       setFormAgility(last.agilityTime || '8.90s');
       setFormVertical(last.standingVerticalCm || 48);
-      setFormFitnessRating(last.fitnessRating || 4);
-      setFormHandball(last.handballRating || 4);
-      setFormMarking(last.markingRating || 4);
-      setFormTackling(last.tacklingRating || 4);
-      setFormGameSense(last.gameSenseRating || 4);
-      setFormSpoiling(last.spoilingRating || 4);
-      setFormOverheadMarking(last.overheadMarkingRating || 4);
-      setFormCrumbing(last.crumbingRating || 4);
-      setFormPressureActs(last.pressureActsRating || 4);
-      setFormRuckTap(last.ruckTapRating || 4);
-      setFormLeadingTiming(last.leadingTimingRating || 4);
-      setFormSnapGoal(last.snapGoalRating || 4);
-      setFormDefensiveTransition(last.defensiveTransitionRating || 4);
+      setFormFitnessRating(last.fitnessRating || 7);
+      setFormHandball(last.handballRating || 7);
+      setFormMarking(last.markingRating || 7);
+      setFormTackling(last.tacklingRating || 7);
+      setFormGameSense(last.gameSenseRating || 7);
+      setFormSpoiling(last.spoilingRating || 7);
+      setFormOverheadMarking(last.overheadMarkingRating || 7);
+      setFormCrumbing(last.crumbingRating || 7);
+      setFormPressureActs(last.pressureActsRating || 7);
+      setFormRuckTap(last.ruckTapRating || 7);
+      setFormLeadingTiming(last.leadingTimingRating || 7);
+      setFormSnapGoal(last.snapGoalRating || 7);
+      setFormDefensiveTransition(last.defensiveTransitionRating || 7);
       setFormGoals(last.developmentGoals || '');
       setFormNotes('');
     } else {
@@ -428,7 +428,7 @@ export default function PlayerGrowthScreen({
     setFormDate(record.date);
     setFormSeasonLabel(record.seasonLabel);
     setFormGender(record.gender || targetPlayer?.gender || 'Female');
-    setFormAgeGroup(record.ageGroup || targetPlayer?.ageGroup || 'U14');
+    setFormAgeGroup(record.ageGroup || targetPlayer?.ageGroup || 'U16');
     setFormPreferredFoot(record.preferredFoot);
     setFormKickDistance(record.kickDistanceMeters);
     setFormKickAccuracy(record.kickAccuracyRating);
@@ -443,14 +443,14 @@ export default function PlayerGrowthScreen({
     setFormMarking(record.markingRating);
     setFormTackling(record.tacklingRating);
     setFormGameSense(record.gameSenseRating);
-    setFormSpoiling(record.spoilingRating || 4);
-    setFormOverheadMarking(record.overheadMarkingRating || 4);
-    setFormCrumbing(record.crumbingRating || 4);
-    setFormPressureActs(record.pressureActsRating || 4);
-    setFormRuckTap(record.ruckTapRating || 4);
-    setFormLeadingTiming(record.leadingTimingRating || 4);
-    setFormSnapGoal(record.snapGoalRating || 4);
-    setFormDefensiveTransition(record.defensiveTransitionRating || 4);
+    setFormSpoiling(record.spoilingRating || 7);
+    setFormOverheadMarking(record.overheadMarkingRating || 7);
+    setFormCrumbing(record.crumbingRating || 7);
+    setFormPressureActs(record.pressureActsRating || 7);
+    setFormRuckTap(record.ruckTapRating || 7);
+    setFormLeadingTiming(record.leadingTimingRating || 7);
+    setFormSnapGoal(record.snapGoalRating || 7);
+    setFormDefensiveTransition(record.defensiveTransitionRating || 7);
     setFormGoals(record.developmentGoals || '');
     setFormNotes(record.coachNotes || '');
     setShowAddModal(true);
@@ -787,6 +787,56 @@ export default function PlayerGrowthScreen({
                   )}
                 </div>
 
+                {/* Player Skill Profile — same bar-graphic used on the Team view,
+                    sourced from the player's static profile ratings, so the
+                    full picture (profile + combine history) lives in one place. */}
+                {activePlayer && (() => {
+                  const pKickAcc = activePlayer.kickAccuracyRating ?? 7;
+                  const pKickDist = activePlayer.kickDistanceMeters ?? 45;
+                  const pOppFoot = activePlayer.oppositeFootRating ?? 6;
+                  const pHandball = activePlayer.handballRating ?? 8;
+                  const pMarking = activePlayer.markingRating ?? 7;
+                  const pTackling = activePlayer.tacklingRating ?? 8;
+                  const pGameSense = activePlayer.gameSenseRating ?? 8;
+                  const pFitness = activePlayer.fitnessRating ?? 7;
+
+                  const bars: [string, string, string, number, string][] = [
+                    ['⚡ Kick Accuracy', `${pKickAcc}/10`, 'text-emerald-700', (pKickAcc / 10) * 100, 'bg-emerald-500'],
+                    ['👟 Kick Distance', `${pKickDist} meters`, 'text-blue-700', Math.min(100, (pKickDist / 60) * 100), 'bg-blue-500'],
+                    ['🦵 Opposite Foot Competency', `${pOppFoot}/10`, 'text-indigo-700', (pOppFoot / 10) * 100, 'bg-indigo-500'],
+                    ['🤾 Handball Speed & Accuracy', `${pHandball}/10`, 'text-emerald-700', (pHandball / 10) * 100, 'bg-emerald-500'],
+                    ['🤲 Marking (Chest & Overhead)', `${pMarking}/10`, 'text-purple-700', (pMarking / 10) * 100, 'bg-purple-500'],
+                    ['🛡️ Tackling & Defensive Effort', `${pTackling}/10`, 'text-amber-700', (pTackling / 10) * 100, 'bg-amber-500'],
+                    ['🧠 Game Sense & Decision Speed', `${pGameSense}/10`, 'text-indigo-700', (pGameSense / 10) * 100, 'bg-indigo-600'],
+                    ['🏃 Endurance & Work Rate', `${pFitness}/10`, 'text-[#0E7A48]', (pFitness / 10) * 100, 'bg-green-600'],
+                  ];
+
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                          <Award className="w-4 h-4 text-emerald-600" />
+                          <span>Player Skill Profile</span>
+                        </h4>
+                        <span className="text-[9px] text-gray-400 font-semibold">From Team Roster Profile</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                        {bars.map(([label, value, valueColor, pct, barColor]) => (
+                          <div key={label}>
+                            <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                              <span>{label}</span>
+                              <span className={valueColor}>{value}</span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }}></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {activePlayerLatestRecord ? (
                   <div className="space-y-5">
                     {/* Selected Player Combine Test Cards */}
@@ -943,35 +993,35 @@ export default function PlayerGrowthScreen({
                         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Spoiling</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.spoilingRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.spoilingRating || 7}/10</span>
                           </div>
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Overhead Mark</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.overheadMarkingRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.overheadMarkingRating || 7}/10</span>
                           </div>
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Crumbing</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.crumbingRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.crumbingRating || 7}/10</span>
                           </div>
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Pressure Acts</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.pressureActsRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.pressureActsRating || 7}/10</span>
                           </div>
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Ruck Tap</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.ruckTapRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.ruckTapRating || 7}/10</span>
                           </div>
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Leading Timing</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.leadingTimingRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.leadingTimingRating || 7}/10</span>
                           </div>
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Snap Goal</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.snapGoalRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.snapGoalRating || 7}/10</span>
                           </div>
                           <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
                             <span className="text-[9px] font-bold text-gray-500 block">Def Transition</span>
-                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.defensiveTransitionRating || 4}/10</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.defensiveTransitionRating || 7}/10</span>
                           </div>
                         </div>
                       </div>
@@ -990,7 +1040,7 @@ export default function PlayerGrowthScreen({
                                 <h4 className="text-sm font-black text-white flex items-center gap-2">
                                   <span>{activePlayer.name}'s Positional Rubric & AI Recommendation</span>
                                   <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase">
-                                    {activePlayerLatestRecord.gender || activePlayer.gender || 'Female'} {activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U14'}
+                                    {activePlayerLatestRecord.gender || activePlayer.gender || 'Female'} {activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U16'}
                                   </span>
                                 </h4>
                                 <p className="text-xs text-indigo-200 font-medium">
@@ -1074,7 +1124,7 @@ export default function PlayerGrowthScreen({
                               </p>
                               <div className="bg-white/5 p-2.5 rounded-lg border border-white/10 text-[11px] text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <span>
-                                  <strong>AFL Age Milestone ({activePlayerLatestRecord.gender || activePlayer.gender || 'Female'} {activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U14'}):</strong> {topChoice.ageStageExpectation}
+                                  <strong>AFL Age Milestone ({activePlayerLatestRecord.gender || activePlayer.gender || 'Female'} {activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U16'}):</strong> {topChoice.ageStageExpectation}
                                 </span>
                                 <span className="text-[10px] bg-amber-400/20 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-300/30 shrink-0">
                                   Focus: {topChoice.growthFocus}
@@ -1520,7 +1570,7 @@ export default function PlayerGrowthScreen({
                   tacklingRating: earliestRecord.tacklingRating,
                   gameSenseRating: earliestRecord.gameSenseRating,
                   gender: earliestRecord.gender || activePlayer?.gender || 'Female',
-                  ageGroup: earliestRecord.ageGroup || activePlayer?.ageGroup || 'U14'
+                  ageGroup: earliestRecord.ageGroup || activePlayer?.ageGroup || 'U16'
                 });
 
                 const latestGrade = calculateInterchangeIQGrade({
@@ -1537,7 +1587,7 @@ export default function PlayerGrowthScreen({
                   tacklingRating: latestRecord.tacklingRating,
                   gameSenseRating: latestRecord.gameSenseRating,
                   gender: latestRecord.gender || activePlayer?.gender || 'Female',
-                  ageGroup: latestRecord.ageGroup || activePlayer?.ageGroup || 'U14'
+                  ageGroup: latestRecord.ageGroup || activePlayer?.ageGroup || 'U16'
                 });
 
                 const gradeDelta = (latestGrade.overallScore - earliestGrade.overallScore).toFixed(1);
@@ -1718,6 +1768,158 @@ export default function PlayerGrowthScreen({
                 </div>
               )}
 
+              {/* SEASON-ON-SEASON GROWTH TREND — plots every logged assessment
+                  (not just earliest vs latest) so the full growth arc is visible */}
+              {playerRecords.length >= 2 && (() => {
+                const seasonPoints = playerRecords.map((rec) => {
+                  const grade = calculateInterchangeIQGrade({
+                    sprint20m: rec.sprint20m,
+                    agilityTime: rec.agilityTime,
+                    standingVerticalCm: rec.standingVerticalCm,
+                    timeTrial2km: rec.timeTrial2km,
+                    yoyoLevel: rec.yoyoLevel,
+                    fitnessRating: rec.fitnessRating,
+                    kickAccuracyRating: rec.kickAccuracyRating,
+                    oppositeFootRating: rec.oppositeFootRating,
+                    handballRating: rec.handballRating,
+                    markingRating: rec.markingRating,
+                    tacklingRating: rec.tacklingRating,
+                    gameSenseRating: rec.gameSenseRating,
+                    gender: rec.gender || activePlayer?.gender || 'Female',
+                    ageGroup: rec.ageGroup || activePlayer?.ageGroup || 'U16'
+                  });
+                  return { record: rec, grade };
+                });
+
+                const TIER_HEX: Record<1 | 2 | 3 | 4 | 5, string> = {
+                  5: '#10b981', 4: '#3b82f6', 3: '#f59e0b', 2: '#f97316', 1: '#f43f5e'
+                };
+
+                const width = 900;
+                const height = 260;
+                const padL = 40;
+                const padR = 30;
+                const padT = 24;
+                const padB = 56;
+                const plotW = width - padL - padR;
+                const plotH = height - padT - padB;
+                const n = seasonPoints.length;
+
+                const xFor = (i: number) => n === 1 ? padL + plotW / 2 : padL + (i * plotW) / (n - 1);
+                const yFor = (score: number) => padT + ((5 - score) / 4) * plotH;
+
+                const linePath = seasonPoints
+                  .map((sp, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(sp.grade.overallScore)}`)
+                  .join(' ');
+
+                // Simple sparkline helper for a raw metric row below the main chart
+                const buildSparkline = (values: (number | null)[], invert: boolean) => {
+                  const valid = values.filter((v): v is number => v !== null);
+                  if (valid.length < 2) return null;
+                  const min = Math.min(...valid);
+                  const max = Math.max(...valid);
+                  const range = max - min || 1;
+                  const sparkW = 220;
+                  const sparkH = 32;
+                  const pts = values.map((v, i) => {
+                    if (v === null) return null;
+                    const norm = (v - min) / range; // 0..1
+                    const y = invert ? norm * sparkH : sparkH - norm * sparkH;
+                    const x = values.length === 1 ? sparkW / 2 : (i * sparkW) / (values.length - 1);
+                    return { x, y };
+                  });
+                  const validPts = pts.filter((p): p is { x: number; y: number } => p !== null);
+                  const path = validPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                  return { path, sparkW, sparkH, pts: validPts };
+                };
+
+                const sprintSpark = buildSparkline(playerRecords.map(r => parseSeconds(r.sprint20m)), false);
+                const vertSpark = buildSparkline(playerRecords.map(r => r.standingVerticalCm ?? null), true);
+
+                return (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-indigo-600" />
+                          <span>Season-on-Season Growth Trend</span>
+                        </h4>
+                        <p className="text-[11px] text-gray-500 font-semibold mt-0.5">
+                          Overall InterchangeIQ Score across all {n} logged testing sessions for {activePlayer.name}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ minWidth: 520 }}>
+                        {/* Gridlines + tier labels 1-5 */}
+                        {[1, 2, 3, 4, 5].map((tier) => (
+                          <g key={tier}>
+                            <line
+                              x1={padL} x2={width - padR}
+                              y1={yFor(tier)} y2={yFor(tier)}
+                              stroke="#E2E8F0" strokeWidth={1}
+                            />
+                            <text x={padL - 8} y={yFor(tier) + 3} textAnchor="end" fontSize="10" fontWeight="700" fill="#94A3B8">
+                              {tier}
+                            </text>
+                          </g>
+                        ))}
+
+                        {/* Trend line */}
+                        <path d={linePath} fill="none" stroke="#6366F1" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+
+                        {/* Points + labels */}
+                        {seasonPoints.map((sp, i) => (
+                          <g key={sp.record.id}>
+                            <circle cx={xFor(i)} cy={yFor(sp.grade.overallScore)} r={6} fill={TIER_HEX[sp.grade.overallTier.rating]} stroke="#fff" strokeWidth={2} />
+                            <text x={xFor(i)} y={yFor(sp.grade.overallScore) - 12} textAnchor="middle" fontSize="11" fontWeight="900" fill="#1E293B">
+                              {sp.grade.overallScore.toFixed(1)}
+                            </text>
+                            <text
+                              x={xFor(i)} y={height - padB + 18} textAnchor="middle" fontSize="9.5" fontWeight="700" fill="#64748B"
+                              transform={n > 5 ? `rotate(-25 ${xFor(i)} ${height - padB + 18})` : undefined}
+                            >
+                              {sp.record.seasonLabel}
+                            </text>
+                          </g>
+                        ))}
+                      </svg>
+                    </div>
+
+                    {/* Mini raw-metric sparklines */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                      {sprintSpark && (
+                        <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-black uppercase text-blue-900">⚡ 20m Sprint (lower = better)</span>
+                            <span className="text-[10px] font-bold text-blue-700">{earliestRecord.sprint20m || 'N/A'} → {latestRecord.sprint20m || 'N/A'}</span>
+                          </div>
+                          <svg viewBox={`0 0 ${sprintSpark.sparkW} ${sprintSpark.sparkH}`} className="w-full h-8">
+                            <path d={sprintSpark.path} fill="none" stroke="#2563EB" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            {sprintSpark.pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#2563EB" />)}
+                          </svg>
+                        </div>
+                      )}
+                      {vertSpark && (
+                        <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-black uppercase text-amber-900">🦘 Standing Vertical (higher = better)</span>
+                            <span className="text-[10px] font-bold text-amber-700">
+                              {earliestRecord.standingVerticalCm ? `${earliestRecord.standingVerticalCm}cm` : 'N/A'} → {latestRecord.standingVerticalCm ? `${latestRecord.standingVerticalCm}cm` : 'N/A'}
+                            </span>
+                          </div>
+                          <svg viewBox={`0 0 ${vertSpark.sparkW} ${vertSpark.sparkH}`} className="w-full h-8">
+                            <path d={vertSpark.path} fill="none" stroke="#D97706" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            {vertSpark.pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#D97706" />)}
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Historical Testing Timeline & Skill Metrics */}
               {playerRecords.length > 0 && (
                 <div className="space-y-6 pt-2">
@@ -1741,7 +1943,7 @@ export default function PlayerGrowthScreen({
                         tacklingRating: rec.tacklingRating,
                         gameSenseRating: rec.gameSenseRating,
                         gender: rec.gender || activePlayer?.gender || 'Female',
-                        ageGroup: rec.ageGroup || activePlayer?.ageGroup || 'U14'
+                        ageGroup: rec.ageGroup || activePlayer?.ageGroup || 'U16'
                       });
 
                       return (
@@ -1787,7 +1989,7 @@ export default function PlayerGrowthScreen({
                               <span className="text-2xl">{recGrade.overallTier.emoji}</span>
                               <div>
                                 <span className="text-[9px] font-black uppercase text-indigo-300 tracking-wider block">
-                                  InterchangeIQ Overall Grade ({rec.gender || activePlayer?.gender || 'Female'} {rec.ageGroup || activePlayer?.ageGroup || 'U14'})
+                                  InterchangeIQ Overall Grade ({rec.gender || activePlayer?.gender || 'Female'} {rec.ageGroup || activePlayer?.ageGroup || 'U16'})
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <span className="font-black text-base text-white">
