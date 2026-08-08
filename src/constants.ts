@@ -1,4 +1,4 @@
-import { Player, Drill, SkillAssessment, TeamProfile, GameHistory, LineupTemplate } from './types';
+import { Player, Rotation, Drill, SkillAssessment, TeamProfile, GameHistory, LineupTemplate } from './types';
 
 export const APP_VERSION = 'v1.6';
 
@@ -89,10 +89,31 @@ export const POSITION_FULL_NAMES: Record<string, string> = {
 };
 
 export function normalizePosition(pos: string): string {
+  if (!pos) return '';
   if (pos === 'M1') return 'C';
   if (pos === 'M2') return 'ROV';
   if (pos === 'M3') return 'RR';
   return pos;
+}
+
+export function stripSideFromPosition(pos: string): string {
+  if (!pos) return '';
+  let norm = normalizePosition(pos).toUpperCase();
+  if (norm === 'LFP' || norm === 'RFP' || norm === 'FP-L' || norm === 'FP-R' || norm === 'FP') return 'FP';
+  if (norm === 'LHF' || norm === 'RHF' || norm === 'HF-L' || norm === 'HF-R' || norm === 'HF' || norm === 'LHB' || norm === 'RHB') return 'HF';
+  if (norm === 'LW' || norm === 'RW' || norm === 'W-L' || norm === 'W-R' || norm === 'W') return 'W';
+  if (norm === 'LBF' || norm === 'RBF' || norm === 'HB-L' || norm === 'HB-R' || norm === 'HB') return 'HB';
+  if (norm === 'LBP' || norm === 'RBP' || norm === 'BP-L' || norm === 'BP-R' || norm === 'BP') return 'BP';
+  if (norm.endsWith('-L') || norm.endsWith('-R')) return norm.slice(0, -2);
+  return norm;
+}
+
+export function matchPositions(pos1: string, pos2: string): boolean {
+  if (!pos1 || !pos2) return false;
+  const n1 = normalizePosition(pos1);
+  const n2 = normalizePosition(pos2);
+  if (n1 === n2) return true;
+  return stripSideFromPosition(n1) === stripSideFromPosition(n2);
 }
 
 export function getZoneForPosition(pos: string): 'FWD' | 'MID' | 'DEF' | 'RUCK' {
@@ -131,6 +152,86 @@ export function normalizePlayers<T extends { positions?: string[] }>(playersList
     });
     return changed ? { ...p, positions: normPositions } : p;
   });
+}
+
+export interface RotationGap {
+  id: string;
+  type: 'empty_slot' | 'unassigned_plan' | 'unassigned_bench';
+  title: string;
+  description: string;
+  slotKey?: string;
+  playerId?: string;
+  rotId?: string;
+}
+
+export function detectRotationGaps(
+  players: Player[],
+  lineup: Record<string, string>,
+  rotations: Rotation[],
+  currentQuarter: number
+): RotationGap[] {
+  const gaps: RotationGap[] = [];
+  if (!Array.isArray(players)) return gaps;
+
+  const assignedPlayerIds = new Set(Object.values(lineup || {}).filter(Boolean));
+  const availableBenchPlayers = players.filter(
+    (p) => p.status === 'available' && !assignedPlayerIds.has(p.id)
+  );
+
+  // 1. Vacant On-Field Position Slots
+  POSITIONS.forEach(([posKey]) => {
+    const normKey = normalizePosition(posKey);
+    if (!lineup[normKey] && !lineup[posKey] && availableBenchPlayers.length > 0) {
+      gaps.push({
+        id: `gap-slot-${posKey}`,
+        type: 'empty_slot',
+        title: `Vacant Field Slot: ${posKey}`,
+        description: `Position ${posKey} (${POSITION_FULL_NAMES[posKey] || posKey}) is unassigned with ${availableBenchPlayers.length} bench player(s) available.`,
+        slotKey: normKey,
+      });
+    }
+  });
+
+  // 2. Scheduled Rotations missing IN or OUT player in current quarter
+  (rotations || []).forEach((r) => {
+    if (r.quarter === currentQuarter && !r.applied) {
+      if (!r.outId || !r.inId) {
+        gaps.push({
+          id: `gap-rot-${r.id}`,
+          type: 'unassigned_plan',
+          title: `Incomplete Rotation Entry @ Q${r.quarter} ${r.minute}:00`,
+          description: `Scheduled rotation at min ${r.minute} is missing ${!r.outId ? 'OUT player' : 'IN player'}.`,
+          rotId: r.id,
+        });
+      }
+    }
+  });
+
+  // 3. Bench players with NO scheduled rotation in current quarter
+  const activePlanRotations = (rotations || []).filter((r) => r.quarter === currentQuarter && !r.applied);
+  const plannedPlayerIds = new Set<string>();
+  activePlanRotations.forEach((r) => {
+    if (r.outId) plannedPlayerIds.add(r.outId);
+    if (r.inId) plannedPlayerIds.add(r.inId);
+    if (r.groupP1Id) plannedPlayerIds.add(r.groupP1Id);
+    if (r.groupP2Id) plannedPlayerIds.add(r.groupP2Id);
+    if (r.groupP3Id) plannedPlayerIds.add(r.groupP3Id);
+  });
+
+  availableBenchPlayers.forEach((p) => {
+    if (!plannedPlayerIds.has(p.id)) {
+      const prefStr = p.positions && p.positions.length > 0 ? p.positions.join('/') : p.primaryZone;
+      gaps.push({
+        id: `gap-bench-${p.id}`,
+        type: 'unassigned_bench',
+        title: `Unscheduled Bench Player: #${p.number} ${p.nick || p.name}`,
+        description: `Player has no planned rotation for Q${currentQuarter} (Pref Position: ${prefStr}).`,
+        playerId: p.id,
+      });
+    }
+  });
+
+  return gaps;
 }
 
 export const DEFAULT_PLAYERS: Player[] = [

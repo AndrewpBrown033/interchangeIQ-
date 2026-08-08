@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Player, Rotation, Plan, LineupTemplate, TeamProfile } from '../types';
-import { POSITIONS, POSITION_GROUPS, POSITION_FULL_NAMES } from '../constants';
-import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers, ArrowLeft, ShieldCheck, Users } from 'lucide-react';
+import { POSITIONS, POSITION_GROUPS, POSITION_FULL_NAMES, matchPositions, detectRotationGaps, RotationGap } from '../constants';
+import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, AlertTriangle, Sparkles, FolderOpen, Save, Layers, ArrowLeft, ShieldCheck, Users, Bot } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 import ThreeWayRotationModal, { ThreeWayGroupEditData } from './ThreeWayRotationModal';
 
@@ -161,6 +161,72 @@ export default function RotationsScreen({
   const planRotations = rotations
     .filter((r) => r.planId === (currentPlan?.id || ''))
     .sort((a, b) => a.quarter - b.quarter || a.minute - b.minute);
+
+  const rotationGaps = useMemo(() => {
+    let allGaps: RotationGap[] = [];
+    [1, 2, 3, 4].forEach((q) => {
+      const qGaps = detectRotationGaps(players, lineup, planRotations, q);
+      allGaps = [...allGaps, ...qGaps];
+    });
+    const uniqueMap = new Map<string, RotationGap>();
+    allGaps.forEach((g) => uniqueMap.set(g.id, g));
+    return Array.from(uniqueMap.values());
+  }, [players, lineup, planRotations]);
+
+  const handleAutoFillPlanGaps = () => {
+    if (!rotationGaps.length) return;
+    const nextRotations = [...rotations];
+    let addedCount = 0;
+
+    rotationGaps.forEach((gap) => {
+      if (gap.type === 'unassigned_bench' && gap.playerId) {
+        const p = players.find((pl) => pl.id === gap.playerId);
+        if (p && currentPlan) {
+          const prefPos = p.positions && p.positions.length > 0 ? p.positions[0] : null;
+          const onFieldPlayerId = Object.values(lineup).find((id) => Boolean(id));
+          if (onFieldPlayerId) {
+            const outP = players.find((pl) => pl.id === onFieldPlayerId);
+            const newRot: Rotation = {
+              id: `rot-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              planId: currentPlan.id,
+              quarter: 1,
+              minute: 5,
+              outId: onFieldPlayerId,
+              inId: p.id,
+              out: outP ? `#${outP.number} ${outP.name}` : 'Field',
+              inn: `#${p.number} ${p.name}`,
+              type: 'bench',
+              applied: false,
+              status: 'scheduled',
+              note: `Auto-filled for preferred position ${prefPos || p.primaryZone}`,
+            };
+            nextRotations.push(newRot);
+            addedCount++;
+          }
+        }
+      }
+    });
+
+    if (addedCount > 0) {
+      onUpdateRotations(nextRotations);
+    }
+  };
+
+  const handleAskJarvisFixPlanGaps = () => {
+    if (!rotationGaps.length) return;
+    const gapListText = rotationGaps.map((g) => `• ${g.title}: ${g.description}`).join('\n');
+    const benchStr = players
+      .filter((p) => p.status === 'available')
+      .map((p) => `#${p.number} ${p.name} (Pref: ${(p.positions || []).join('/') || p.primaryZone})`)
+      .join(', ');
+
+    const prompt = `I'm building a rotation plan "${currentPlan?.name || 'Standard Plan'}" and have flagged ${rotationGaps.length} rotation gap(s):\n${gapListText}\n\nAvailable squad players:\n${benchStr}\n\nPlease analyze these rotation gaps, assign players based on preferred positions (treating Left and Right positions as equal), and design an optimal multi-quarter rotation schedule!`;
+
+    localStorage.setItem('iiq_pending_jarvis_prompt', prompt);
+    if (onNavigate) {
+      onNavigate('jarvis');
+    }
+  };
 
   const threeWayGroups = useMemo(() => {
     return getThreeWayGroups(planRotations, players);
@@ -527,6 +593,48 @@ export default function RotationsScreen({
           </button>
         </div>
       </div>
+
+      {/* Rotation Gap Alert Card */}
+      {rotationGaps.length > 0 && (
+        <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+              <span className="font-black text-xs text-amber-950 uppercase tracking-wide">
+                Rotation Plan Gaps Flagged ({rotationGaps.length} Issue{rotationGaps.length > 1 ? 's' : ''})
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleAutoFillPlanGaps}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-slate-950 shrink-0" />
+                <span>Auto-Fill Gaps (Preferred Positions)</span>
+              </button>
+              <button
+                onClick={handleAskJarvisFixPlanGaps}
+                className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white font-black text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Bot className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                <span>Ask Jarvis AI to Resolve</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+            {rotationGaps.map((gap) => (
+              <div key={gap.id} className="p-2.5 bg-white/90 border border-amber-200 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <b className="text-amber-950 font-extrabold block">{gap.title}</b>
+                  <p className="text-amber-900 text-[11px] font-medium leading-tight">{gap.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Plans Navigation List */}

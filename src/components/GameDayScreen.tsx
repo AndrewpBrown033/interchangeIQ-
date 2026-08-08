@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Score, Rotation, Plan, GameInfo, ApiKeySettings } from '../types';
-import { POSITIONS, POSITION_GROUPS, normalizePosition, getZoneForPosition } from '../constants';
-import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp, Sparkles, Camera } from 'lucide-react';
+import { POSITIONS, POSITION_GROUPS, normalizePosition, getZoneForPosition, matchPositions, stripSideFromPosition, detectRotationGaps, RotationGap, POSITION_FULL_NAMES } from '../constants';
+import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp, Sparkles, Camera, Bot } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 import LineupPhotoImport from './LineupPhotoImport';
 
@@ -536,6 +536,7 @@ export default function GameDayScreen({
     is5MinMarkReached: boolean;
     secondsUntil5Min: number;
     suggestionsList: RotationSuggestionItem[];
+    gaps?: RotationGap[];
   } => {
     const elapsedSeconds = Math.max(0, 15 * 60 - clockRemaining);
     const is5MinMarkReached = elapsedSeconds >= 300;
@@ -585,6 +586,7 @@ export default function GameDayScreen({
         is5MinMarkReached,
         secondsUntil5Min,
         suggestionsList: [],
+        gaps: detectRotationGaps(players, lineup, rotations, score.quarter),
       };
     }
 
@@ -602,7 +604,30 @@ export default function GameDayScreen({
 
       let matched = false;
 
-      // 1. Direct Swap - Primary Zone Match in remaining bench
+      // 1. Direct Swap - Preferred Position Match (treating Left and Right positions as equivalent)
+      const prefCandidates = availBench.filter((p) => {
+        const normPos = getNormPositions(p);
+        return outSlot && normPos.some((pos) => matchPositions(pos, outSlot));
+      });
+      if (prefCandidates.length > 0) {
+        const inPlayer = prefCandidates[0];
+        suggestionsList.push({
+          id: `sug-pref-${outPlayer.id}-${inPlayer.id}-${suggestionsList.length}`,
+          type: 'direct',
+          priorityLabel: 'Preferred Position Match',
+          outPlayer,
+          inPlayer,
+          outSlot,
+          reason: `#${inPlayer.number} ${inPlayer.name} prefers position ${outSlot} (L/R equivalent: ${getNormPositions(inPlayer).join('/')})`,
+          suggestionText: `OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || outZone}) ➔ IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name} (Pref Pos: ${getNormPositions(inPlayer).join('/')})`,
+        });
+        availOnGround = availOnGround.filter((p) => p.id !== outPlayer.id);
+        availBench = availBench.filter((p) => p.id !== inPlayer.id);
+        matched = true;
+        continue;
+      }
+
+      // 2. Direct Swap - Primary Zone Match in remaining bench
       const primaryCandidates = availBench.filter((p) => p.primaryZone === outZone);
       if (primaryCandidates.length > 0) {
         const inPlayer = primaryCandidates[0];
@@ -615,29 +640,6 @@ export default function GameDayScreen({
           outSlot,
           reason: `#${inPlayer.number} ${inPlayer.name} primary zone is ${outZone} (${fmt(inPlayer.bench)} bench rest)`,
           suggestionText: `OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || outZone}) ➔ IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name} (Primary Zone: ${outZone})`,
-        });
-        availOnGround = availOnGround.filter((p) => p.id !== outPlayer.id);
-        availBench = availBench.filter((p) => p.id !== inPlayer.id);
-        matched = true;
-        continue;
-      }
-
-      // 2. Direct Swap - Preferred Position Match in remaining bench
-      const prefCandidates = availBench.filter((p) => {
-        const normPos = getNormPositions(p);
-        return (outSlot && normPos.includes(normalizePosition(outSlot))) || normPos.some((pos) => getZoneForPosition(pos) === outZone);
-      });
-      if (prefCandidates.length > 0) {
-        const inPlayer = prefCandidates[0];
-        suggestionsList.push({
-          id: `sug-${outPlayer.id}-${inPlayer.id}-${suggestionsList.length}`,
-          type: 'direct',
-          priorityLabel: 'Preferred Position Match',
-          outPlayer,
-          inPlayer,
-          outSlot,
-          reason: `#${inPlayer.number} ${inPlayer.name} prefers ${outSlot || outZone} (${getNormPositions(inPlayer).join('/')})`,
-          suggestionText: `OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || outZone}) ➔ IN #${inPlayer.number} ${inPlayer.nick || inPlayer.name} (Pref Pos: ${getNormPositions(inPlayer).join('/')})`,
         });
         availOnGround = availOnGround.filter((p) => p.id !== outPlayer.id);
         availBench = availBench.filter((p) => p.id !== inPlayer.id);
@@ -734,6 +736,8 @@ export default function GameDayScreen({
 
     const firstItem = suggestionsList[0];
 
+    const gaps = detectRotationGaps(players, lineup, rotations, score.quarter);
+
     return {
       needRest,
       fresh,
@@ -750,10 +754,67 @@ export default function GameDayScreen({
       is5MinMarkReached,
       secondsUntil5Min,
       suggestionsList,
+      gaps,
     };
   };
 
   const insights = coachingInsights();
+
+  const handleAutoFillGaps = () => {
+    if (!insights.gaps || insights.gaps.length === 0) return;
+
+    const nextLineup = { ...lineup };
+    const nextRotations = [...rotations];
+    let changesCount = 0;
+
+    insights.gaps.forEach((gap) => {
+      if (gap.type === 'empty_slot' && gap.slotKey) {
+        const assignedIds = new Set(Object.values(nextLineup).filter(Boolean));
+        const avail = players.filter((p) => p.status === 'available' && !assignedIds.has(p.id));
+        if (avail.length > 0) {
+          const prefMatch = avail.find((p) => (p.positions || []).some((pos) => matchPositions(pos, gap.slotKey!)));
+          const chosen = prefMatch || avail.find((p) => p.primaryZone === getZoneForPosition(gap.slotKey!)) || avail[0];
+          nextLineup[gap.slotKey] = chosen.id;
+          changesCount++;
+        }
+      } else if (gap.type === 'unassigned_plan' && gap.rotId) {
+        const rotIndex = nextRotations.findIndex((r) => r.id === gap.rotId);
+        if (rotIndex !== -1) {
+          const r = nextRotations[rotIndex];
+          const assignedIds = new Set(Object.values(nextLineup).filter(Boolean));
+          const avail = players.filter((p) => p.status === 'available' && !assignedIds.has(p.id));
+          if (!r.inId && avail.length > 0) {
+            const outPlayer = players.find((p) => p.id === r.outId);
+            const outSlot = outPlayer ? Object.keys(nextLineup).find((k) => nextLineup[k] === outPlayer.id) : null;
+            const prefMatch = outSlot ? avail.find((p) => (p.positions || []).some((pos) => matchPositions(pos, outSlot))) : null;
+            const chosen = prefMatch || avail[0];
+            nextRotations[rotIndex] = { ...r, inId: chosen.id, inn: `#${chosen.number} ${chosen.name}` };
+            changesCount++;
+          }
+        }
+      }
+    });
+
+    if (changesCount > 0) {
+      onUpdateLineup(nextLineup);
+      onUpdateRotations(nextRotations);
+    }
+  };
+
+  const handleAskJarvisFixGaps = () => {
+    if (!insights.gaps || insights.gaps.length === 0) return;
+    const gapListText = insights.gaps.map((g) => `• ${g.title}: ${g.description}`).join('\n');
+    const assignedIds = new Set(Object.values(lineup).filter(Boolean));
+    const availBench = players.filter((p) => p.status === 'available' && !assignedIds.has(p.id));
+    const benchStr = availBench.map((p) => `#${p.number} ${p.name} (Pref: ${(p.positions || []).join('/') || p.primaryZone})`).join(', ');
+
+    const prompt = `I have ${insights.gaps.length} rotation gap(s) flagged for Quarter ${score.quarter}:\n${gapListText}\n\nAvailable bench players:\n${benchStr}\n\nPlease analyze these gaps, suggest position placements (treating Left and Right positions as equivalent), and provide an optimal tactical rotation plan!`;
+
+    localStorage.setItem('iiq_pending_jarvis_prompt', prompt);
+    if (onNavigate) {
+      onNavigate('jarvis');
+    }
+  };
 
   // Score handlers
   const handleScore = (side: 'home' | 'away', type: 'goal' | 'behind' | 'undoGoal' | 'undoBehind') => {
@@ -1586,6 +1647,48 @@ export default function GameDayScreen({
             ) : (
               <div className="bg-[#E6F6EE] border-l-4 border-[var(--green)] p-3 rounded-xl">
                 <p className="text-xs font-bold text-[#0E7A48]">All scheduled Q{score.quarter} rotations have been applied successfully.</p>
+              </div>
+            )}
+
+            {/* Rotation Gap Flag & Jarvis Assistance Card */}
+            {insights.gaps && insights.gaps.length > 0 && (
+              <div className="p-3.5 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-xs mb-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="font-black text-xs text-amber-950 uppercase tracking-wide">
+                      Rotation Gap Flagged ({insights.gaps.length} Issue{insights.gaps.length > 1 ? 's' : ''})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={handleAutoFillGaps}
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3 text-slate-950 shrink-0" />
+                      <span>Auto-Fill Gaps</span>
+                    </button>
+                    <button
+                      onClick={handleAskJarvisFixGaps}
+                      className="px-2.5 py-1 bg-purple-700 hover:bg-purple-800 text-white font-black text-[11px] rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <Bot className="w-3 h-3 text-amber-300 shrink-0" />
+                      <span>Ask Jarvis AI to Resolve</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  {insights.gaps.map((gap) => (
+                    <div key={gap.id} className="p-2 bg-white/90 border border-amber-200 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <b className="text-amber-950 font-extrabold block">{gap.title}</b>
+                        <p className="text-amber-900 text-[11px] font-medium leading-tight">{gap.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
