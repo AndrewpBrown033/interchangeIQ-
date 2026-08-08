@@ -136,6 +136,13 @@ export default function TeamScreen({
   const preferredFoot = activePlayer?.preferredFoot ?? 'Right';
   const gender = activePlayer?.gender ?? 'Female';
   const ageGroup = activePlayer?.ageGroup ?? 'U16';
+  // Full 1-5 InterchangeIQ height grade (Very Small -> Exceptional Height)
+  // when a real height is on file; the 3-way group is all we can show when
+  // only the manual flag is set (no measured height to grade precisely).
+  const activePlayerHeightGrade = (activePlayer?.heightCm && activePlayer.heightCm > 0)
+    ? classifyHeight(activePlayer.heightCm, gender, ageGroup)
+    : null;
+  const activePlayerHeightResult = activePlayer ? resolvePlayerHeightGroup(activePlayer) : null;
 
   // Primary static player attributes (independent of snapshot combine tests)
   const kickAcc = activePlayer?.kickAccuracyRating ?? 7;
@@ -705,6 +712,19 @@ export default function TeamScreen({
                   <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Height</span>
                     <span className="text-base font-black text-slate-900 mt-0.5 block">{heightCm} cm</span>
+                    {activePlayerHeightGrade ? (
+                      <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-black border ${activePlayerHeightGrade.tier.badgeText}`}>
+                        {activePlayerHeightGrade.tier.emoji} {activePlayerHeightGrade.label} ({activePlayerHeightGrade.rating}/5)
+                      </span>
+                    ) : activePlayerHeightResult ? (
+                      <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-black border bg-slate-100 text-slate-600 border-slate-300">
+                        📏 {activePlayerHeightResult.group} (flagged)
+                      </span>
+                    ) : (
+                      <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-black border bg-slate-100 text-slate-400 border-slate-200">
+                        Not recorded
+                      </span>
+                    )}
                   </div>
                   <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Weight</span>
@@ -904,6 +924,25 @@ export default function TeamScreen({
                     <span className="text-[10px] bg-amber-400/20 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-300/30">
                       Focus: {topChoice.growthFocus}
                     </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-800/50">
+                    <span className="text-[11px] text-indigo-200">
+                      <strong>Position height preference:</strong> {topChoice.group.heightPreference}
+                    </span>
+                    {activePlayerHeightGrade ? (
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${activePlayerHeightGrade.tier.badgeText}`}>
+                        {activePlayerHeightGrade.tier.emoji} {activePlayerHeightGrade.label} ({activePlayerHeightGrade.rating}/5)
+                      </span>
+                    ) : activePlayerHeightResult ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded border bg-white/10 text-indigo-200 border-white/20">
+                        📏 {activePlayerHeightResult.group} (flagged)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded border bg-white/10 text-indigo-300 border-white/20">
+                        Height not recorded — not factored in
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -1553,6 +1592,9 @@ export default function TeamScreen({
                 const rawFldPos = Object.keys(lineup).find((k) => lineup[k] === p.id);
                 const fldPos = rawFldPos ? normalizePosition(rawFldPos) : undefined;
                 const heightResult = resolvePlayerHeightGroup(p);
+                const heightGrade = (p.heightCm && p.heightCm > 0)
+                  ? classifyHeight(p.heightCm, p.gender || 'Female', p.ageGroup || 'U16')
+                  : null;
 
                 return (
                   <div
@@ -1608,12 +1650,19 @@ export default function TeamScreen({
                           <span className="text-[9px] text-gray-400 font-medium italic">No preferred pos</span>
                         )}
 
-                        {heightResult && (
+                        {heightGrade ? (
+                          <span
+                            className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${heightGrade.tier.badgeText}`}
+                            title="Calculated from height/gender/age"
+                          >
+                            {heightGrade.tier.emoji} {heightGrade.label} ({heightGrade.rating}/5)
+                          </span>
+                        ) : heightResult && (
                           <span
                             className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-slate-50 text-slate-700 border-slate-300"
-                            title={heightResult.source === 'manual' ? 'Manually flagged (height not recorded)' : 'Calculated from height/gender/age'}
+                            title="Manually flagged (height not recorded)"
                           >
-                            📏 {heightResult.group}{heightResult.source === 'manual' ? ' (flag)' : ''}
+                            📏 {heightResult.group} (flag)
                           </span>
                         )}
                       </div>
