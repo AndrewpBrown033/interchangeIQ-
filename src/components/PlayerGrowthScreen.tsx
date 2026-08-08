@@ -3,10 +3,28 @@ import { Player, SkillAssessment } from '../types';
 import {
   TrendingUp, Award, Zap, Target, Plus, Calendar, Activity,
   ChevronRight, ArrowUpRight, Sparkles, CheckCircle2, Search, Filter,
-  FileSpreadsheet, Edit3, Trash2, Flame, BookOpen, Layers, Trophy
+  FileSpreadsheet, Edit3, Trash2, Flame, BookOpen, Layers, Trophy, ChevronDown, ChevronUp, BarChart3
 } from 'lucide-react';
 import SkillRubricModal from './SkillRubricModal';
 import { calculateInterchangeIQGrade, Gender, AgeGroup, INTERCHANGE_IQ_SCALE } from '../utils/interchangeIQRubric';
+
+function parseSeconds(val?: string): number | null {
+  if (!val) return null;
+  const cleaned = val.replace(/[^0-9.]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
+function parseTimeToSeconds(val?: string): number | null {
+  if (!val) return null;
+  const parts = val.trim().split(':');
+  if (parts.length === 2) {
+    const m = parseInt(parts[0], 10);
+    const s = parseInt(parts[1], 10);
+    if (!isNaN(m) && !isNaN(s)) return m * 60 + s;
+  }
+  return parseSeconds(val);
+}
 
 interface PlayerGrowthScreenProps {
   players: Player[];
@@ -28,6 +46,10 @@ export default function PlayerGrowthScreen({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRubricModal, setShowRubricModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<SkillAssessment | null>(null);
+
+  // Dashboard filter & toggle states
+  const [dashboardSeasonFilter, setDashboardSeasonFilter] = useState<string>('All');
+  const [showDashboardSummary, setShowDashboardSummary] = useState<boolean>(true);
 
   // Score selection callback from Rubric Modal
   const handleRubricScoreSelect = (
@@ -126,6 +148,98 @@ export default function PlayerGrowthScreen({
     oppFootDelta = latestRecord.oppositeFootRating - earliestRecord.oppositeFootRating;
     fitnessRatingDelta = latestRecord.fitnessRating - earliestRecord.fitnessRating;
   }
+
+  // Dashboard level analytics computations
+  const availableSeasons = Array.from(new Set(growthRecords.map(r => r.seasonLabel).filter(Boolean)));
+  const filteredDashboardRecords = dashboardSeasonFilter === 'All'
+    ? growthRecords
+    : growthRecords.filter(r => r.seasonLabel === dashboardSeasonFilter);
+
+  // Latest record per player inside filtered records
+  const playerLatestMap = new Map<string, SkillAssessment>();
+  filteredDashboardRecords.forEach(rec => {
+    const existing = playerLatestMap.get(rec.playerId);
+    if (!existing || new Date(rec.date).getTime() > new Date(existing.date).getTime()) {
+      playerLatestMap.set(rec.playerId, rec);
+    }
+  });
+
+  const latestAssessments = Array.from(playerLatestMap.values());
+  const evaluatedAssessments = latestAssessments.map(rec => {
+    const p = players.find(player => player.id === rec.playerId);
+    const grade = calculateInterchangeIQGrade({
+      sprint20m: rec.sprint20m,
+      agilityTime: rec.agilityTime,
+      standingVerticalCm: rec.standingVerticalCm,
+      timeTrial2km: rec.timeTrial2km,
+      yoyoLevel: rec.yoyoLevel,
+      fitnessRating: rec.fitnessRating,
+      kickAccuracyRating: rec.kickAccuracyRating,
+      oppositeFootRating: rec.oppositeFootRating,
+      handballRating: rec.handballRating,
+      markingRating: rec.markingRating,
+      tacklingRating: rec.tacklingRating,
+      gameSenseRating: rec.gameSenseRating,
+      gender: rec.gender || p?.gender || 'Female',
+      ageGroup: rec.ageGroup || p?.ageGroup || 'U16'
+    });
+    return { record: rec, player: p, grade };
+  });
+
+  // Calculate squad average InterchangeIQ score
+  const teamAvgScore = evaluatedAssessments.length > 0
+    ? (evaluatedAssessments.reduce((acc, curr) => acc + curr.grade.overallScore, 0) / evaluatedAssessments.length).toFixed(1)
+    : 'N/A';
+
+  const teamAvgKickDist = evaluatedAssessments.length > 0
+    ? Math.round(evaluatedAssessments.reduce((acc, curr) => acc + curr.record.kickDistanceMeters, 0) / evaluatedAssessments.length)
+    : 0;
+
+  const teamAvgOppFoot = evaluatedAssessments.length > 0
+    ? (evaluatedAssessments.reduce((acc, curr) => acc + curr.record.oppositeFootRating, 0) / evaluatedAssessments.length).toFixed(1)
+    : '0.0';
+
+  // Tier distribution counts
+  const tierDistribution = {
+    elite: evaluatedAssessments.filter(e => e.grade.overallScore >= 4.5).length,
+    advanced: evaluatedAssessments.filter(e => e.grade.overallScore >= 3.5 && e.grade.overallScore < 4.5).length,
+    developing: evaluatedAssessments.filter(e => e.grade.overallScore >= 2.5 && e.grade.overallScore < 3.5).length,
+    emerging: evaluatedAssessments.filter(e => e.grade.overallScore >= 1.5 && e.grade.overallScore < 2.5).length,
+    needsDev: evaluatedAssessments.filter(e => e.grade.overallScore < 1.5).length,
+  };
+
+  // Combine Leaders
+  let fastestSprintItem: { player?: Player; record?: SkillAssessment; time: number; strVal: string } | null = null;
+  let fastestAgilityItem: { player?: Player; record?: SkillAssessment; time: number; strVal: string } | null = null;
+  let highestVerticalItem: { player?: Player; record?: SkillAssessment; cm: number } | null = null;
+  let bestTimeTrialItem: { player?: Player; record?: SkillAssessment; sec: number; strVal: string } | null = null;
+  let longestKickItem: { player?: Player; record?: SkillAssessment; m: number } | null = null;
+
+  evaluatedAssessments.forEach(({ record, player }) => {
+    // Sprint 20m
+    const spSec = parseSeconds(record.sprint20m);
+    if (spSec !== null && (!fastestSprintItem || spSec < fastestSprintItem.time)) {
+      fastestSprintItem = { player, record, time: spSec, strVal: record.sprint20m };
+    }
+    // Agility
+    const agSec = parseSeconds(record.agilityTime);
+    if (agSec !== null && (!fastestAgilityItem || agSec < fastestAgilityItem.time)) {
+      fastestAgilityItem = { player, record, time: agSec, strVal: record.agilityTime };
+    }
+    // Vertical Jump
+    if (record.standingVerticalCm && (!highestVerticalItem || record.standingVerticalCm > highestVerticalItem.cm)) {
+      highestVerticalItem = { player, record, cm: record.standingVerticalCm };
+    }
+    // 2km Time Trial
+    const ttSec = parseTimeToSeconds(record.timeTrial2km);
+    if (ttSec !== null && (!bestTimeTrialItem || ttSec < bestTimeTrialItem.sec)) {
+      bestTimeTrialItem = { player, record, sec: ttSec, strVal: record.timeTrial2km };
+    }
+    // Kicking Distance
+    if (record.kickDistanceMeters && (!longestKickItem || record.kickDistanceMeters > longestKickItem.m)) {
+      longestKickItem = { player, record, m: record.kickDistanceMeters };
+    }
+  });
 
   // Open Add Assessment Modal with task mode focus
   const handleOpenAddModal = (
@@ -330,25 +444,281 @@ export default function PlayerGrowthScreen({
           </div>
         </div>
 
-        {/* Squad Metrics Row */}
+        {/* Squad Header Summary Line */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/10">
           <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">Tested Players</span>
-            <span className="text-lg font-black text-white">{squadTestedCount} / {players.length} Squad</span>
+            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">Tested Roster</span>
+            <span className="text-lg font-black text-white">{squadTestedCount} / {players.length} Players</span>
           </div>
           <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
             <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">Total Assessments</span>
-            <span className="text-lg font-black text-white">{totalAssessments} Recorded</span>
+            <span className="text-lg font-black text-white">{totalAssessments} Completed</span>
           </div>
           <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">Avg Kick Gain (YoY)</span>
-            <span className="text-lg font-black text-emerald-400">+6.8 meters</span>
+            <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">Squad Avg Rating</span>
+            <span className="text-lg font-black text-emerald-400">{teamAvgScore} / 5.0</span>
           </div>
           <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Opposite Foot Growth</span>
-            <span className="text-lg font-black text-amber-300">+2.4 Rating Pts</span>
+            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Avg Kick Penetration</span>
+            <span className="text-lg font-black text-amber-300">{teamAvgKickDist}m ({teamAvgOppFoot}/10 Opp Foot)</span>
           </div>
         </div>
+      </div>
+
+      {/* COMBINE & TESTING SUMMARY DASHBOARD */}
+      <div className="bg-white rounded-3xl border border-[var(--line)] p-6 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
+                <span>Combine & Skills Testing Summary Dashboard</span>
+                <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg border border-emerald-200">
+                  InterchangeIQ Grading
+                </span>
+              </h3>
+              <p className="text-xs text-gray-500 font-semibold mt-0.5">
+                Overview of completed physical combine tests, skill evaluations, and squad tier benchmarks.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Season Filter Dropdown */}
+            {availableSeasons.length > 0 && (
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5">
+                <Filter className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-bold text-gray-500">Event:</span>
+                <select
+                  value={dashboardSeasonFilter}
+                  onChange={(e) => setDashboardSeasonFilter(e.target.value)}
+                  className="bg-transparent text-xs font-black text-gray-800 focus:outline-none cursor-pointer"
+                >
+                  <option value="All">All Testing Events ({growthRecords.length})</option>
+                  {availableSeasons.map(season => (
+                    <option key={season} value={season}>{season}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowDashboardSummary(!showDashboardSummary)}
+              className="p-2 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition cursor-pointer"
+              title={showDashboardSummary ? "Collapse Dashboard" : "Expand Dashboard"}
+            >
+              {showDashboardSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {showDashboardSummary && (
+          <div className="space-y-6">
+            {/* Combine Leaderboards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {/* 20m Sprint Leader */}
+              <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/60 border border-blue-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-800 block mb-1">
+                  ⚡ 20m Sprint Leader
+                </span>
+                {fastestSprintItem ? (
+                  <div>
+                    <span className="font-black text-gray-900 text-sm block truncate">
+                      {(fastestSprintItem as any).player?.name || 'Unknown'}
+                    </span>
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-xl font-black text-blue-700">
+                        {(fastestSprintItem as any).strVal}
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-600">
+                        #{(fastestSprintItem as any).player?.number}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No sprint data</span>
+                )}
+              </div>
+
+              {/* Agility Leader */}
+              <div className="bg-gradient-to-br from-purple-50/80 to-indigo-50/60 border border-purple-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 block mb-1">
+                  🏃 Agility Shuttle Leader
+                </span>
+                {fastestAgilityItem ? (
+                  <div>
+                    <span className="font-black text-gray-900 text-sm block truncate">
+                      {(fastestAgilityItem as any).player?.name || 'Unknown'}
+                    </span>
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-xl font-black text-purple-700">
+                        {(fastestAgilityItem as any).strVal}
+                      </span>
+                      <span className="text-[10px] font-bold text-purple-600">
+                        #{(fastestAgilityItem as any).player?.number}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No agility data</span>
+                )}
+              </div>
+
+              {/* Vertical Jump Leader */}
+              <div className="bg-gradient-to-br from-amber-50/80 to-orange-50/60 border border-amber-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block mb-1">
+                  🦘 Standing Vertical Jump
+                </span>
+                {highestVerticalItem ? (
+                  <div>
+                    <span className="font-black text-gray-900 text-sm block truncate">
+                      {(highestVerticalItem as any).player?.name || 'Unknown'}
+                    </span>
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-xl font-black text-amber-700">
+                        {(highestVerticalItem as any).cm} cm
+                      </span>
+                      <span className="text-[10px] font-bold text-amber-600">
+                        #{(highestVerticalItem as any).player?.number}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No jump data</span>
+                )}
+              </div>
+
+              {/* 2km Time Trial Leader */}
+              <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/60 border border-emerald-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block mb-1">
+                  🫁 2km Aerobic Trial
+                </span>
+                {bestTimeTrialItem ? (
+                  <div>
+                    <span className="font-black text-gray-900 text-sm block truncate">
+                      {(bestTimeTrialItem as any).player?.name || 'Unknown'}
+                    </span>
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-xl font-black text-emerald-700">
+                        {(bestTimeTrialItem as any).strVal}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-600">
+                        #{(bestTimeTrialItem as any).player?.number}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No time trial data</span>
+                )}
+              </div>
+
+              {/* Kick Power Leader */}
+              <div className="bg-gradient-to-br from-rose-50/80 to-pink-50/60 border border-rose-200/80 p-3.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 block mb-1">
+                  🦵 Kicking Penetration
+                </span>
+                {longestKickItem ? (
+                  <div>
+                    <span className="font-black text-gray-900 text-sm block truncate">
+                      {(longestKickItem as any).player?.name || 'Unknown'}
+                    </span>
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-xl font-black text-rose-700">
+                        {(longestKickItem as any).m} meters
+                      </span>
+                      <span className="text-[10px] font-bold text-rose-600">
+                        #{(longestKickItem as any).player?.number}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No kicking data</span>
+                )}
+              </div>
+            </div>
+
+            {/* InterchangeIQ Squad Tier Breakdown Bar */}
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-500" />
+                  <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                    Squad InterchangeIQ Rating Tier Distribution
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-gray-500">
+                  Squad Average: <b className="text-indigo-600 font-black">{teamAvgScore} / 5.0</b> ({evaluatedAssessments.length} Evaluated)
+                </span>
+              </div>
+
+              {/* Visual Distribution Stack Bar */}
+              <div className="w-full h-3.5 bg-gray-200 rounded-full overflow-hidden flex shadow-inner">
+                {evaluatedAssessments.length > 0 ? (
+                  <>
+                    <div
+                      style={{ width: `${(tierDistribution.elite / evaluatedAssessments.length) * 100}%` }}
+                      className="h-full bg-emerald-500 hover:opacity-90 transition"
+                      title={`Elite: ${tierDistribution.elite}`}
+                    />
+                    <div
+                      style={{ width: `${(tierDistribution.advanced / evaluatedAssessments.length) * 100}%` }}
+                      className="h-full bg-blue-500 hover:opacity-90 transition"
+                      title={`Advanced: ${tierDistribution.advanced}`}
+                    />
+                    <div
+                      style={{ width: `${(tierDistribution.developing / evaluatedAssessments.length) * 100}%` }}
+                      className="h-full bg-amber-400 hover:opacity-90 transition"
+                      title={`Developing: ${tierDistribution.developing}`}
+                    />
+                    <div
+                      style={{ width: `${(tierDistribution.emerging / evaluatedAssessments.length) * 100}%` }}
+                      className="h-full bg-orange-400 hover:opacity-90 transition"
+                      title={`Emerging: ${tierDistribution.emerging}`}
+                    />
+                    <div
+                      style={{ width: `${(tierDistribution.needsDev / evaluatedAssessments.length) * 100}%` }}
+                      className="h-full bg-rose-500 hover:opacity-90 transition"
+                      title={`Needs Dev: ${tierDistribution.needsDev}`}
+                    />
+                  </>
+                ) : (
+                  <div className="w-full h-full bg-gray-200" />
+                )}
+              </div>
+
+              {/* Tier Legend Pills */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-bold">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span className="text-gray-700">🟢 Elite Tier (5.0):</span>
+                  <span className="text-emerald-700 font-black">{tierDistribution.elite}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                  <span className="text-gray-700">🔵 Advanced (4.0):</span>
+                  <span className="text-blue-700 font-black">{tierDistribution.advanced}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                  <span className="text-gray-700">🟡 Developing (3.0):</span>
+                  <span className="text-amber-700 font-black">{tierDistribution.developing}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+                  <span className="text-gray-700">🟠 Emerging (2.0):</span>
+                  <span className="text-orange-700 font-black">{tierDistribution.emerging}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                  <span className="text-gray-700">🔴 Needs Dev (1.0):</span>
+                  <span className="text-rose-700 font-black">{tierDistribution.needsDev}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Grid: Player Selector Sidebar & Detailed Progression View */}
@@ -445,7 +815,7 @@ export default function PlayerGrowthScreen({
           </div>
         </div>
 
-        {/* Selected Player Detailed Growth View */}
+        {/* Selected Player Detailed Growth & YoY Card */}
         <div className="lg:col-span-2 space-y-6">
           {activePlayer ? (
             <div className="bg-white p-6 rounded-3xl border border-[var(--line)] shadow-sm space-y-6">
@@ -466,7 +836,7 @@ export default function PlayerGrowthScreen({
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 font-semibold mt-1">
-                      AFL Girls Growth & Skill Milestones
+                      Year-on-Year Growth & InterchangeIQ Skill Grading
                     </p>
                   </div>
                 </div>
@@ -482,61 +852,214 @@ export default function PlayerGrowthScreen({
                 </div>
               </div>
 
-              {/* Progress Summary Badges (Delta comparison) */}
-              {playerRecords.length >= 2 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block">
-                        Kick Distance Growth
-                      </span>
-                      <span className="text-lg font-black text-emerald-700">
-                        {kickDistDelta >= 0 ? `+${kickDistDelta}m` : `${kickDistDelta}m`}
-                      </span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-black">
-                      <ArrowUpRight className="w-5 h-5" />
-                    </div>
-                  </div>
+              {/* DEDICATED PLAYER YoY DETAIL CARD */}
+              {playerRecords.length >= 2 && earliestRecord && latestRecord ? (() => {
+                const earliestGrade = calculateInterchangeIQGrade({
+                  sprint20m: earliestRecord.sprint20m,
+                  agilityTime: earliestRecord.agilityTime,
+                  standingVerticalCm: earliestRecord.standingVerticalCm,
+                  timeTrial2km: earliestRecord.timeTrial2km,
+                  yoyoLevel: earliestRecord.yoyoLevel,
+                  fitnessRating: earliestRecord.fitnessRating,
+                  kickAccuracyRating: earliestRecord.kickAccuracyRating,
+                  oppositeFootRating: earliestRecord.oppositeFootRating,
+                  handballRating: earliestRecord.handballRating,
+                  markingRating: earliestRecord.markingRating,
+                  tacklingRating: earliestRecord.tacklingRating,
+                  gameSenseRating: earliestRecord.gameSenseRating,
+                  gender: earliestRecord.gender || activePlayer?.gender || 'Female',
+                  ageGroup: earliestRecord.ageGroup || activePlayer?.ageGroup || 'U16'
+                });
 
-                  <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
-                        Opposite Foot Growth
-                      </span>
-                      <span className="text-lg font-black text-amber-700">
-                        {oppFootDelta >= 0 ? `+${oppFootDelta.toFixed(1)} pts` : `${oppFootDelta.toFixed(1)} pts`}
-                      </span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black">
-                      <Sparkles className="w-5 h-5" />
-                    </div>
-                  </div>
+                const latestGrade = calculateInterchangeIQGrade({
+                  sprint20m: latestRecord.sprint20m,
+                  agilityTime: latestRecord.agilityTime,
+                  standingVerticalCm: latestRecord.standingVerticalCm,
+                  timeTrial2km: latestRecord.timeTrial2km,
+                  yoyoLevel: latestRecord.yoyoLevel,
+                  fitnessRating: latestRecord.fitnessRating,
+                  kickAccuracyRating: latestRecord.kickAccuracyRating,
+                  oppositeFootRating: latestRecord.oppositeFootRating,
+                  handballRating: latestRecord.handballRating,
+                  markingRating: latestRecord.markingRating,
+                  tacklingRating: latestRecord.tacklingRating,
+                  gameSenseRating: latestRecord.gameSenseRating,
+                  gender: latestRecord.gender || activePlayer?.gender || 'Female',
+                  ageGroup: latestRecord.ageGroup || activePlayer?.ageGroup || 'U16'
+                });
 
-                  <div className="bg-indigo-50/70 border border-indigo-200 p-3.5 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider block">
-                        Overall Fitness
-                      </span>
-                      <span className="text-lg font-black text-indigo-700">
-                        {fitnessRatingDelta >= 0 ? `+${fitnessRatingDelta} / 10` : `${fitnessRatingDelta} / 10`}
-                      </span>
+                const gradeDelta = (latestGrade.overallScore - earliestGrade.overallScore).toFixed(1);
+                const isGradeUp = Number(gradeDelta) >= 0;
+
+                const spEarly = parseSeconds(earliestRecord.sprint20m);
+                const spLate = parseSeconds(latestRecord.sprint20m);
+                const spDelta = (spEarly !== null && spLate !== null) ? (spLate - spEarly).toFixed(2) : null;
+
+                const agEarly = parseSeconds(earliestRecord.agilityTime);
+                const agLate = parseSeconds(latestRecord.agilityTime);
+                const agDelta = (agEarly !== null && agLate !== null) ? (agLate - agEarly).toFixed(2) : null;
+
+                const vertDelta = (latestRecord.standingVerticalCm && earliestRecord.standingVerticalCm)
+                  ? latestRecord.standingVerticalCm - earliestRecord.standingVerticalCm
+                  : null;
+
+                return (
+                  <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 shadow-lg border border-indigo-950 space-y-5">
+                    {/* YoY Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-800/50 pb-4">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider block">
+                          Year-on-Year (YoY) Growth Detail Card
+                        </span>
+                        <h4 className="text-base font-black text-white flex items-center gap-2 mt-0.5">
+                          <span>{earliestRecord.seasonLabel}</span>
+                          <span className="text-indigo-400">➔</span>
+                          <span>{latestRecord.seasonLabel}</span>
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">
+                        <Trophy className="w-4 h-4 text-amber-400" />
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-indigo-200 block">Grade Progression</span>
+                          <span className="font-black text-xs text-white">
+                            {earliestGrade.overallTier.title} ({earliestGrade.overallScore}) ➔ {latestGrade.overallTier.title} ({latestGrade.overallScore})
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ml-1 ${
+                          isGradeUp ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'
+                        }`}>
+                          {isGradeUp ? `+${gradeDelta} Pts` : `${gradeDelta} Pts`}
+                        </span>
+                      </div>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500 text-white flex items-center justify-center font-black">
-                      <Activity className="w-5 h-5" />
+
+                    {/* YoY Side-by-Side Comparison Table */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden text-xs">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-white/10 text-indigo-200 font-black text-[10px] uppercase border-b border-white/10">
+                            <th className="p-3">Combine Metric</th>
+                            <th className="p-3">{earliestRecord.seasonLabel}</th>
+                            <th className="p-3">{latestRecord.seasonLabel}</th>
+                            <th className="p-3 text-right">YoY Delta Gain</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 font-medium">
+                          {/* 20m Sprint */}
+                          <tr className="hover:bg-white/5 transition">
+                            <td className="p-3 font-bold text-blue-200 flex items-center gap-1.5">
+                              <span>⚡ 20m Sprint</span>
+                            </td>
+                            <td className="p-3 text-gray-300">{earliestRecord.sprint20m || 'N/A'}</td>
+                            <td className="p-3 font-bold text-white">{latestRecord.sprint20m || 'N/A'}</td>
+                            <td className="p-3 text-right">
+                              {spDelta !== null ? (
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                  Number(spDelta) <= 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300'
+                                }`}>
+                                  {Number(spDelta) <= 0 ? `${spDelta}s (Faster)` : `+${spDelta}s`}
+                                </span>
+                              ) : '-'}
+                            </td>
+                          </tr>
+
+                          {/* Agility Shuttle */}
+                          <tr className="hover:bg-white/5 transition">
+                            <td className="p-3 font-bold text-purple-200 flex items-center gap-1.5">
+                              <span>🏃 Agility Shuttle</span>
+                            </td>
+                            <td className="p-3 text-gray-300">{earliestRecord.agilityTime || 'N/A'}</td>
+                            <td className="p-3 font-bold text-white">{latestRecord.agilityTime || 'N/A'}</td>
+                            <td className="p-3 text-right">
+                              {agDelta !== null ? (
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                  Number(agDelta) <= 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300'
+                                }`}>
+                                  {Number(agDelta) <= 0 ? `${agDelta}s (Faster)` : `+${agDelta}s`}
+                                </span>
+                              ) : '-'}
+                            </td>
+                          </tr>
+
+                          {/* Standing Vertical Jump */}
+                          <tr className="hover:bg-white/5 transition">
+                            <td className="p-3 font-bold text-amber-200 flex items-center gap-1.5">
+                              <span>🦘 Standing Vertical</span>
+                            </td>
+                            <td className="p-3 text-gray-300">{earliestRecord.standingVerticalCm ? `${earliestRecord.standingVerticalCm} cm` : 'N/A'}</td>
+                            <td className="p-3 font-bold text-white">{latestRecord.standingVerticalCm ? `${latestRecord.standingVerticalCm} cm` : 'N/A'}</td>
+                            <td className="p-3 text-right">
+                              {vertDelta !== null ? (
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                  vertDelta >= 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300'
+                                }`}>
+                                  {vertDelta >= 0 ? `+${vertDelta} cm` : `${vertDelta} cm`}
+                                </span>
+                              ) : '-'}
+                            </td>
+                          </tr>
+
+                          {/* Kicking Distance */}
+                          <tr className="hover:bg-white/5 transition">
+                            <td className="p-3 font-bold text-emerald-200 flex items-center gap-1.5">
+                              <span>🦵 Kick Distance</span>
+                            </td>
+                            <td className="p-3 text-gray-300">{earliestRecord.kickDistanceMeters} meters</td>
+                            <td className="p-3 font-bold text-white">{latestRecord.kickDistanceMeters} meters</td>
+                            <td className="p-3 text-right">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                kickDistDelta >= 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300'
+                              }`}>
+                                {kickDistDelta >= 0 ? `+${kickDistDelta} meters` : `${kickDistDelta} meters`}
+                              </span>
+                            </td>
+                          </tr>
+
+                          {/* Opposite Foot Rating */}
+                          <tr className="hover:bg-white/5 transition">
+                            <td className="p-3 font-bold text-amber-200 flex items-center gap-1.5">
+                              <span>⭐ Opposite Foot</span>
+                            </td>
+                            <td className="p-3 text-gray-300">{earliestRecord.oppositeFootRating} / 10</td>
+                            <td className="p-3 font-bold text-white">{latestRecord.oppositeFootRating} / 10</td>
+                            <td className="p-3 text-right">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                oppFootDelta >= 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300'
+                              }`}>
+                                {oppFootDelta >= 0 ? `+${oppFootDelta.toFixed(1)} Pts` : `${oppFootDelta.toFixed(1)} Pts`}
+                              </span>
+                            </td>
+                          </tr>
+
+                          {/* 2km Time Trial */}
+                          <tr className="hover:bg-white/5 transition">
+                            <td className="p-3 font-bold text-indigo-200 flex items-center gap-1.5">
+                              <span>🫁 2km Time Trial</span>
+                            </td>
+                            <td className="p-3 text-gray-300">{earliestRecord.timeTrial2km || 'N/A'}</td>
+                            <td className="p-3 font-bold text-white">{latestRecord.timeTrial2km || 'N/A'}</td>
+                            <td className="p-3 text-right">
+                              <span className="text-[10px] font-bold text-indigo-300">
+                                Level {latestRecord.yoyoLevel || 'N/A'} Yo-Yo
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </div>
-              ) : playerRecords.length === 1 ? (
-                <div className="p-3.5 bg-blue-50/80 border border-blue-100 rounded-2xl text-xs font-semibold text-blue-900 flex items-center justify-between">
-                  <span>1 baseline test recorded for {activePlayer.name}. Add a second assessment to track year-on-year growth deltas!</span>
+                );
+              })() : playerRecords.length === 1 ? (
+                <div className="p-4 bg-blue-50/80 border border-blue-100 rounded-2xl text-xs font-semibold text-blue-900 flex items-center justify-between">
+                  <span>1 baseline test recorded for {activePlayer.name}. Add a second assessment to generate full Year-on-Year (YoY) side-by-side growth deltas!</span>
                 </div>
               ) : (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl text-center space-y-2">
+                <div className="p-6 bg-gray-50 border border-gray-200 rounded-2xl text-center space-y-2">
                   <p className="text-xs text-gray-500 font-semibold">No fitness or kicking testing records saved for {activePlayer.name} yet.</p>
                   <button
                     onClick={() => handleOpenAddModal(activePlayer.id)}
-                    className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition"
+                    className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition cursor-pointer"
                   >
                     Log First Testing Session
                   </button>

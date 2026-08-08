@@ -32,6 +32,7 @@ interface PlanModeViewProps {
   currentQuarter?: number;
   activePlanIds?: string[];
   onTogglePlanRunning?: (planId: string) => void;
+  teamName?: string;
 }
 
 const POSITION_DESCRIPTIONS: Record<string, string> = {
@@ -73,6 +74,7 @@ export default function PlanModeView({
   currentQuarter = 1,
   activePlanIds = [],
   onTogglePlanRunning,
+  teamName = 'Active Squad',
 }: PlanModeViewProps) {
   const [selectedPlanId, setSelectedPlanId] = useState<string>(plans[0]?.id || '');
 
@@ -210,6 +212,10 @@ export default function PlanModeView({
           </button>
 
           <div className="text-slate-600 text-xs font-bold flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-slate-900 text-amber-400 font-black text-[10px] border border-slate-700">
+              {teamName}
+            </span>
+            <span className="text-slate-300">•</span>
             <span>Quarter {selectedQuarter}</span>
             <span className="text-slate-300">•</span>
             <span className="text-slate-900 font-black">Plan Mode</span>

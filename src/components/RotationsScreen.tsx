@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Player, Rotation, Plan, LineupTemplate } from '../types';
+import { Player, Rotation, Plan, LineupTemplate, TeamProfile } from '../types';
 import { POSITIONS, POSITION_GROUPS, POSITION_FULL_NAMES } from '../constants';
-import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers, ArrowLeft } from 'lucide-react';
+import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, Sparkles, FolderOpen, Save, Layers, ArrowLeft, ShieldCheck, Users } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 import ThreeWayRotationModal, { ThreeWayGroupEditData } from './ThreeWayRotationModal';
 
@@ -88,6 +88,9 @@ interface RotationsScreenProps {
   lineup: Record<string, string>;
   onUpdateLineup: (lineup: Record<string, string>) => void;
   onNavigate?: (tab: string) => void;
+  teams?: TeamProfile[];
+  activeTeamId?: string | null;
+  onSelectTeam?: (teamId: string) => void;
 }
 
 export default function RotationsScreen({
@@ -101,7 +104,12 @@ export default function RotationsScreen({
   lineup,
   onUpdateLineup,
   onNavigate,
+  teams,
+  activeTeamId,
+  onSelectTeam,
 }: RotationsScreenProps) {
+  const activeTeamObj = teams?.find((t) => t.id === activeTeamId) || null;
+  const activeTeamName = activeTeamObj?.name || 'Active Squad';
   const [selectedPlanId, setSelectedPlanId] = useState<string>(plans[0]?.id || '');
 
   React.useEffect(() => {
@@ -427,6 +435,46 @@ export default function RotationsScreen({
 
   return (
     <div className="space-y-6">
+      {/* Active Team Alignment Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-indigo-500/20">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shrink-0 shadow-xs">
+            ⚡
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">
+                Active Squad Context
+              </span>
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold uppercase border border-emerald-500/30">
+                Rotations Aligned
+              </span>
+            </div>
+            <h3 className="font-black text-base text-white flex items-center gap-2">
+              <span>{activeTeamName}</span>
+              <span className="text-xs font-semibold text-slate-300">({players.length} squad members)</span>
+            </h3>
+          </div>
+        </div>
+
+        {teams && teams.length > 1 && onSelectTeam && (
+          <div className="flex items-center gap-2 bg-white/10 p-1.5 px-3 rounded-xl border border-white/15">
+            <span className="text-xs font-extrabold text-slate-200 shrink-0">Selected Team:</span>
+            <select
+              value={activeTeamId || ''}
+              onChange={(e) => onSelectTeam(e.target.value)}
+              className="px-3 py-1 rounded-lg bg-slate-900 text-white font-extrabold text-xs border border-slate-700 focus:outline-none cursor-pointer"
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.id} className="text-slate-900 font-bold">
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       {/* Top action header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
         <div className="flex items-center gap-3">
@@ -1201,6 +1249,7 @@ export default function RotationsScreen({
         rotations={rotations}
         onUpdateRotations={onUpdateRotations}
         editingGroupData={editingThreeWayData}
+        teamName={activeTeamName}
       />
 
       {/* Visual Oval Plan Mode View Modal */}
@@ -1217,6 +1266,7 @@ export default function RotationsScreen({
           onUpdatePlans={onUpdatePlans}
           activePlanIds={activePlanIds}
           onTogglePlanRunning={onTogglePlanRunning}
+          teamName={activeTeamName}
         />
       )}
     </div>

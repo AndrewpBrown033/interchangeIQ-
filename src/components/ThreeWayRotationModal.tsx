@@ -25,6 +25,7 @@ interface ThreeWayRotationModalProps {
   rotations: Rotation[];
   onUpdateRotations: (rotations: Rotation[]) => void;
   editingGroupData?: ThreeWayGroupEditData | null;
+  teamName?: string;
 }
 
 export default function ThreeWayRotationModal({
@@ -38,6 +39,7 @@ export default function ThreeWayRotationModal({
   rotations,
   onUpdateRotations,
   editingGroupData,
+  teamName = 'Active Squad',
 }: ThreeWayRotationModalProps) {
   // Filter available players
   const availablePlayers = players.filter((p) => p.status === 'available');
@@ -257,6 +259,11 @@ export default function ThreeWayRotationModal({
               <RefreshCw className="w-5 h-5 animate-spin-slow" />
             </div>
             <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[10px] font-extrabold uppercase text-amber-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+                  {teamName} Roster
+                </span>
+              </div>
               <h3 className="font-black text-base tracking-tight text-white flex items-center gap-2">
                 <span>{editingGroupData ? 'Edit 3-Way Rotation Group' : '3-Way Set Rotation Generator'}</span>
                 <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-amber-500 text-black rounded-md">
@@ -266,7 +273,7 @@ export default function ThreeWayRotationModal({
               <p className="text-xs text-slate-300 font-medium">
                 {editingGroupData
                   ? 'Modify players, cycle interval, or active quarters for this 3-way set'
-                  : 'Continuous 3-girl rotation between 2 field positions & 1 bench spot'}
+                  : 'Continuous 3-player rotation between 2 field positions & 1 bench spot'}
               </p>
             </div>
           </div>

@@ -3,7 +3,7 @@ import {
   Player, Score, Rotation, Plan, LineupTemplate, GameInfo, GameHistory,
   Drill, TrainingState, AuditLogEntry, TeamProfile, UserProfile, SkillAssessment, ApiKeySettings, NotificationSettings
 } from './types';
-import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers, DEMO_TEAM, DEMO_TEAM_ID, DEMO_TEAM_SAMPLE_PLAYERS, DEMO_TEAM_SAMPLE_LINEUP, DEMO_TEAM_SAMPLE_SAVED_LINEUPS, DEMO_TEAM_SAMPLE_HISTORY } from './constants';
+import { DEFAULT_PLAYERS, DEFAULT_DRILLS, DEFAULT_GROWTH_RECORDS, APP_VERSION, normalizeLineup, normalizePlayers, DEMO_TEAM, DEMO_TEAM_ID, DEMO_TEAM_SAMPLE_PLAYERS, DEMO_TEAM_SAMPLE_LINEUP, DEMO_TEAM_SAMPLE_SAVED_LINEUPS, DEMO_TEAM_SAMPLE_HISTORY, DEMO_TEAM_SAMPLE_GROWTH_RECORDS } from './constants';
 
 // Firebase Integrations
 import { auth, db, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, ensureFirebaseAuthSession, User } from './lib/firebase';
@@ -433,34 +433,53 @@ export default function App() {
     try {
       const cached = localStorage.getItem(`iiq_team_data_${teamId}`);
       const canonicalName = targetTeam?.name || 'My Squad';
+      const defaultPlanId = `plan-${teamId}-q1`;
+      const defaultPlans: Plan[] = [{ id: defaultPlanId, name: 'Q1 Rotation' }];
+      const defaultScore: Score = {
+        quarter: 1,
+        home: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+        away: { goals: 0, behinds: 0, quarters: [{ g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }, { g: 0, b: 0 }] },
+      };
 
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed.players) && parsed.players.length > 0) {
           setPlayers(normalizePlayers(parsed.players));
         } else {
-          setPlayers(normalizePlayers(DEFAULT_PLAYERS));
+          setPlayers(createFreshSquadForTeam(teamId));
         }
-        if (parsed.lineup) setLineup(parsed.lineup);
-        if (parsed.score) setScore(parsed.score);
+        setLineup(parsed.lineup || {});
+        setScore(parsed.score || defaultScore);
         
         // Preserve target team profile name
         const baseGameInfo = parsed.gameInfo || { round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' };
         setGameInfo({ ...baseGameInfo, team: canonicalName });
 
-        if (Array.isArray(parsed.rotations)) setRotations(parsed.rotations);
-        if (Array.isArray(parsed.plans)) setPlans(parsed.plans);
-        if (Array.isArray(parsed.activePlanIds)) setActivePlanIds(parsed.activePlanIds);
-        if (Array.isArray(parsed.history)) setHistory(parsed.history);
-        if (Array.isArray(parsed.savedLineups)) setSavedLineups(parsed.savedLineups);
+        setRotations(Array.isArray(parsed.rotations) ? parsed.rotations : []);
+        setPlans(Array.isArray(parsed.plans) && parsed.plans.length > 0 ? parsed.plans : defaultPlans);
+        setActivePlanIds(Array.isArray(parsed.activePlanIds) ? parsed.activePlanIds : [defaultPlanId]);
+        setHistory(Array.isArray(parsed.history) ? parsed.history : []);
+        setSavedLineups(Array.isArray(parsed.savedLineups) ? parsed.savedLineups : []);
+        setGrowthRecords(Array.isArray(parsed.growthRecords) ? parsed.growthRecords : []);
       } else {
-        // First time switching to this team: give it default 22 players template and canonical name
-        setPlayers(normalizePlayers(DEFAULT_PLAYERS));
+        // First time switching to this team: isolate squad, clean slate for rotations & plans
+        setPlayers(createFreshSquadForTeam(teamId));
+        setLineup({});
+        setScore(defaultScore);
         setGameInfo({ team: canonicalName, round: 'Round 1', date: new Date().toISOString().slice(0, 10), opponent: '' });
+        setRotations([]);
+        setPlans(defaultPlans);
+        setActivePlanIds([defaultPlanId]);
+        setHistory([]);
+        setSavedLineups([]);
+        setGrowthRecords([]);
       }
     } catch (e) {
       console.warn("Failed to parse cached team data:", e);
-      setPlayers(normalizePlayers(DEFAULT_PLAYERS));
+      setPlayers(createFreshSquadForTeam(teamId));
+      setRotations([]);
+      setPlans([{ id: `plan-${teamId}-q1`, name: 'Q1 Rotation' }]);
+      setActivePlanIds([`plan-${teamId}-q1`]);
     }
 
     // Release sync ref after state update settles
@@ -1417,7 +1436,9 @@ export default function App() {
           ? DEMO_TEAM_SAMPLE_SAVED_LINEUPS
           : ((data.savedLineups && Array.isArray(data.savedLineups)) ? data.savedLineups : (cachedLocalData?.savedLineups || []));
         const activeDrills = (data.drills && Array.isArray(data.drills)) ? parseDrillList(data.drills) : (cachedLocalData?.drills || []);
-        const activeGrowthRecords = (data.growthRecords && Array.isArray(data.growthRecords)) ? data.growthRecords : (cachedLocalData?.growthRecords || []);
+        const activeGrowthRecords = (data.growthRecords && Array.isArray(data.growthRecords) && data.growthRecords.length > 0)
+          ? data.growthRecords
+          : (isDemoUnseeded ? DEMO_TEAM_SAMPLE_GROWTH_RECORDS : (cachedLocalData?.growthRecords || DEFAULT_GROWTH_RECORDS));
         const defaultTrainingState: TrainingState = {
           view: 'library',
           filter: 'All',
@@ -1504,7 +1525,7 @@ export default function App() {
           ? normalizePlayers(DEMO_TEAM_SAMPLE_PLAYERS)
           : ((cachedLocalPlayers.length > 0)
               ? cachedLocalPlayers
-              : (players.length > 0 ? players : normalizePlayers(DEFAULT_PLAYERS)));
+              : createFreshSquadForTeam(activeTeamId));
 
         const freshScore: Score = cachedLocalData?.score || {
           quarter: 1,
@@ -1517,8 +1538,9 @@ export default function App() {
           date: new Date().toISOString().slice(0, 10),
           opponent: '',
         };
-        const freshPlans = cachedLocalData?.plans || [{ id: 'plan1', name: 'Q1 Rotation' }];
-        const freshActivePlanIds = cachedLocalData?.activePlanIds || ['plan1'];
+        const defaultPlanId = `plan-${activeTeamId}-q1`;
+        const freshPlans = cachedLocalData?.plans || [{ id: defaultPlanId, name: 'Q1 Rotation' }];
+        const freshActivePlanIds = cachedLocalData?.activePlanIds || [defaultPlanId];
         const freshTrainingState: TrainingState = cachedLocalData?.trainingState || {
           view: 'library',
           filter: 'All',
@@ -1531,6 +1553,9 @@ export default function App() {
         const freshLineup = isNewDemoTeam ? normalizeLineup(DEMO_TEAM_SAMPLE_LINEUP) : (cachedLocalData?.lineup || {});
         const freshHistory = isNewDemoTeam ? DEMO_TEAM_SAMPLE_HISTORY : (cachedLocalData?.history || []);
         const freshSavedLineups = isNewDemoTeam ? DEMO_TEAM_SAMPLE_SAVED_LINEUPS : (cachedLocalData?.savedLineups || []);
+        const freshGrowthRecords = isNewDemoTeam
+          ? DEMO_TEAM_SAMPLE_GROWTH_RECORDS
+          : (cachedLocalData?.growthRecords || DEFAULT_GROWTH_RECORDS);
 
         const initialDataToSync = {
           id: activeTeamId,
@@ -1545,7 +1570,7 @@ export default function App() {
           history: freshHistory,
           savedLineups: freshSavedLineups,
           drills: sanitizeDrillList(drills),
-          growthRecords: cachedLocalData?.growthRecords || growthRecords,
+          growthRecords: freshGrowthRecords,
           trainingState: freshTrainingState,
         };
 
@@ -2051,22 +2076,6 @@ export default function App() {
         </button>
 
         <div className="flex items-center gap-2">
-          {/* Mobile sync status pill */}
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition ${
-            isSyncingFromServer
-              ? 'bg-blue-50 text-blue-700 border-blue-200'
-              : cloudConnected
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : 'bg-amber-50 text-amber-700 border-amber-200'
-          }`}>
-            {isSyncingFromServer ? (
-              <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
-            ) : (
-              <span className={`w-1.5 h-1.5 rounded-full ${cloudConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-            )}
-            <span>{isSyncingFromServer ? 'Syncing...' : cloudConnected ? 'Synced' : 'Local'}</span>
-          </div>
-
           <button
             onClick={() => handleLogout('Logged out manually via mobile header.')}
             title="Log Out"
@@ -2210,48 +2219,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Sync Status Badge & Manual Trigger */}
-          <div className="flex items-center gap-2 ml-auto">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition shadow-2xs ${
-              isSyncingFromServer
-                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                : cloudConnected
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                : 'bg-amber-50 text-amber-800 border border-amber-200'
-            }`}>
-              {isSyncingFromServer ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
-                  <span>Syncing Cloud...</span>
-                </>
-              ) : cloudConnected ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>Cloud Synced <span className="text-[10px] opacity-80 font-normal">({formatSyncTime(lastSyncedAt)})</span></span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                  <span>Local Cache <span className="text-[10px] opacity-80 font-normal">({formatSyncTime(lastSyncedAt)})</span></span>
-                </>
-              )}
-            </div>
-
-            <button
-              onClick={async () => {
-                setIsManualSyncing(true);
-                await handleForceSync();
-                setTimeout(() => setIsManualSyncing(false), 600);
-              }}
-              disabled={isManualSyncing || isSyncingFromServer}
-              title="Force instant sync with Cloud database"
-              className="px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-blue-50 hover:text-blue-600 text-gray-700 font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer border border-gray-200 shadow-2xs hover:border-blue-200 active:scale-95"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-spin text-blue-600' : ''}`} />
-              <span className="hidden sm:inline">{isManualSyncing ? 'Syncing...' : 'Sync Now'}</span>
-            </button>
-
-            {isDebugEnabled && (
+          {isDebugEnabled && (
+            <div className="flex items-center gap-2 ml-auto">
               <button
                 onClick={() => setIsDebugModalOpen(true)}
                 title="Open Firebase & System Diagnostics Debugger"
@@ -2260,8 +2229,8 @@ export default function App() {
                 <Terminal className="w-3.5 h-3.5 text-blue-600" />
                 <span className="hidden sm:inline">Debug</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Global Debugger Modal */}
@@ -2329,6 +2298,9 @@ export default function App() {
             lineup={lineup}
             onUpdateLineup={setLineup}
             onNavigate={handleSelectTab}
+            teams={teams}
+            activeTeamId={activeTeamId}
+            onSelectTeam={requestSwitchTeam}
           />
         )}
         {activeTab === 'jarvis' && (
