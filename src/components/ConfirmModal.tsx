@@ -34,19 +34,23 @@ export default function ConfirmModal({ open, title, message, confirmLabel = 'OK,
 
         {toggleTargetState !== undefined && (
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-            <span className="text-xs font-bold text-gray-600">After you confirm:</span>
-            <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-600">Tap to confirm:</span>
+            <button
+              onClick={onConfirm}
+              className="flex items-center gap-2 cursor-pointer"
+              title="Tap the switch to apply this change"
+            >
               <span className={`text-[11px] font-black uppercase ${toggleTargetState ? 'text-emerald-600' : 'text-gray-400'}`}>
                 {toggleTargetState ? 'ON' : 'OFF'}
               </span>
               <div
-                className={`w-10 h-6 rounded-full p-1 flex items-center ${
+                className={`w-10 h-6 rounded-full p-1 flex items-center transition ${
                   toggleTargetState ? `${toggleColorClass || 'bg-blue-600'} justify-end` : 'bg-gray-300 justify-start'
                 }`}
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
               </div>
-            </div>
+            </button>
           </div>
         )}
 

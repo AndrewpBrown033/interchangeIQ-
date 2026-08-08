@@ -505,6 +505,16 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: typeof data.createdAt === 'number' && data.createdAt > 0 ? data.createdAt : 0,
             isInactive: !!data.isInactive,
+            isDemo: !!data.isDemo,
+            // These three were missing entirely — meaning every time this listener
+            // fired (which is immediately after ANY write, including a toggle's own),
+            // it rebuilt local state without them, reverting any toggle back to its
+            // default regardless of what was actually written to Firestore. This is
+            // the actual reason toggles never stuck, no matter how many write paths
+            // got fixed to include them.
+            showTraining: data.showTraining !== false,
+            showPlayerGrowth: data.showPlayerGrowth !== false,
+            showJarvis: data.showJarvis !== false,
           });
         }
       });
@@ -685,6 +695,10 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: data.createdAt || Date.now(),
             isInactive: !!data.isInactive,
+            isDemo: !!data.isDemo,
+            showTraining: data.showTraining !== false,
+            showPlayerGrowth: data.showPlayerGrowth !== false,
+            showJarvis: data.showJarvis !== false,
           });
         }
       });
