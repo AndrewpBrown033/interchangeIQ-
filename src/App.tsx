@@ -2329,6 +2329,7 @@ export default function App() {
             onUpdateLineup={setLineup}
             savedLineups={savedLineups}
             history={history}
+            growthRecords={growthRecords}
             teamName={teams.find(t => t.id === activeTeamId)?.name}
             isInactive={teams.find(t => t.id === activeTeamId)?.isInactive}
             onNavigateTab={handleSelectTab}

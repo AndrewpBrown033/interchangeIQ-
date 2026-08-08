@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Target, Award, Zap, BookOpen, CheckCircle2, ChevronRight, X, Sparkles, Activity, Shield, Brain, Layers } from 'lucide-react';
+import { Target, Award, Zap, BookOpen, CheckCircle2, ChevronRight, X, Sparkles, Activity, Shield, Brain, Layers, Users } from 'lucide-react';
 import { COHORT_BENCHMARKS, INTERCHANGE_IQ_SCALE, Gender, AgeGroup } from '../utils/interchangeIQRubric';
+import { AFL_POSITIONAL_RUBRIC, PositionalRubricGroup } from '../utils/aflPositionalRubric';
 
 interface SkillRubricModalProps {
   onClose: () => void;
@@ -624,6 +625,18 @@ export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubric
         {/* Category Tabs Bar */}
         <div className="bg-slate-100 p-2 border-b border-slate-200 overflow-x-auto flex items-center gap-1.5 shrink-0">
           <button
+            onClick={() => setActiveTabId('positionalRubric')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTabId === 'positionalRubric'
+                ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/50'
+                : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300/60'
+            }`}
+          >
+            <span>🏉</span>
+            <span>AFL Positional Rubric (U10 → Seniors)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTabId('interchangeIQ')}
             className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTabId === 'interchangeIQ'
@@ -632,7 +645,7 @@ export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubric
             }`}
           >
             <span>🏆</span>
-            <span>InterchangeIQ Combine Benchmarks</span>
+            <span>Combine Benchmarks</span>
           </button>
 
           {SKILL_RUBRICS.map((cat) => {
@@ -653,6 +666,166 @@ export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubric
             );
           })}
         </div>
+
+        {/* AFL POSITIONAL RUBRIC VIEW */}
+        {activeTabId === 'positionalRubric' ? (
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50">
+            {/* Takeaway Header Banner */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl border border-indigo-900/50 shadow-md space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🏉</span>
+                  <div>
+                    <h3 className="font-black text-base text-white tracking-tight flex items-center gap-2">
+                      <span>AFL Positional Rubric Across All Ages</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase">
+                        Boys & Girls
+                      </span>
+                    </h3>
+                    <p className="text-xs text-indigo-200 font-medium">
+                      Realistic community footy development pathway (U10 → U12 → U14 → U16 → U18/Seniors)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Age & Gender Selector for Rubric View */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex bg-white/10 p-1 rounded-xl border border-white/15">
+                    {(['Male', 'Female'] as Gender[]).map((g) => (
+                      <button
+                        key={g}
+                        onClick={() => setSelectedGender(g)}
+                        className={`px-3 py-1 text-xs font-black rounded-lg transition cursor-pointer ${
+                          selectedGender === g ? 'bg-amber-400 text-slate-950 shadow-xs' : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex bg-white/10 p-1 rounded-xl border border-white/15">
+                    {(['U10', 'U12', 'U14', 'U16', 'U18', 'Seniors'] as AgeGroup[]).map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => setSelectedAge(a)}
+                        className={`px-2.5 py-1 text-xs font-black rounded-lg transition cursor-pointer ${
+                          selectedAge === a ? 'bg-indigo-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Takeaway Note */}
+              <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/15 text-xs text-indigo-100 flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-white font-extrabold uppercase tracking-wider block mb-0.5">Core Takeaway:</strong>
+                  Skill development is non-linear and boys/girls progress differently. This rubric focuses on foundations first (chest marking, short reliable kicks, basic positioning), building toward role-specific skills as confidence matures. Note: Many U14 girls & boys are actively building kicking distance & marking confidence.
+                </div>
+              </div>
+            </div>
+
+            {/* 6 Positional Groups Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.values(AFL_POSITIONAL_RUBRIC).map((group) => {
+                let currentExpectations = '';
+                if (selectedAge === 'U10') currentExpectations = group.progression.u10.join(', ');
+                else if (selectedAge === 'U12') currentExpectations = group.progression.u12.join(', ');
+                else if (selectedAge === 'U14') {
+                  const p = group.progression.u14;
+                  currentExpectations = selectedGender === 'Female' 
+                    ? `Girls: ${p.girls}. Both: ${p.both}` 
+                    : `Boys: ${p.boys}. Both: ${p.both}`;
+                } else if (selectedAge === 'U16') currentExpectations = group.progression.u16.join(', ');
+                else currentExpectations = group.progression.u18Seniors.join(', ');
+
+                return (
+                  <div key={group.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 transition space-y-4 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      {/* Title & Badge */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-2xl p-2 bg-slate-100 rounded-xl">{group.iconEmoji}</span>
+                          <div>
+                            <h4 className="font-black text-sm text-slate-900">{group.title}</h4>
+                            <span className="text-[11px] text-slate-500 font-semibold">
+                              Slots: {group.slots.join(', ')}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 text-[11px] font-black uppercase">
+                          {group.code}
+                        </span>
+                      </div>
+
+                      {/* Core Skills */}
+                      <div>
+                        <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1.5">
+                          Core Skills:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.coreSkills.map((sk, idx) => (
+                            <span key={idx} className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 text-[11px] font-bold border border-slate-200">
+                              ✓ {sk}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Boys vs Girls Notes */}
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 grid grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                          <span className="font-extrabold text-blue-700 block mb-0.5">👦 Boys Dev Note:</span>
+                          <span className="text-slate-700 font-medium">{group.genderNotes.boys}</span>
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-pink-700 block mb-0.5">👧 Girls Dev Note:</span>
+                          <span className="text-slate-700 font-medium">{group.genderNotes.girls}</span>
+                        </div>
+                      </div>
+
+                      {/* Selected Age Expectations */}
+                      <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs">
+                        <div className="flex items-center justify-between font-black text-amber-900 mb-1">
+                          <span className="uppercase text-[10px] tracking-wider">
+                            🎯 {selectedGender} {selectedAge} Milestone:
+                          </span>
+                          <span className="text-[10px] bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded font-bold">
+                            Current Stage
+                          </span>
+                        </div>
+                        <p className="text-amber-950 font-bold leading-relaxed">
+                          {currentExpectations}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Full Pathway Timeline Accordion Summary */}
+                    <div className="bg-slate-100 p-2.5 rounded-xl border border-slate-200/60 text-[10px] space-y-1 text-slate-600 font-semibold">
+                      <span className="font-extrabold text-slate-800 block uppercase">Full Progression Pathway:</span>
+                      <div className="flex flex-wrap gap-x-2 gap-y-1">
+                        <span className={selectedAge === 'U10' ? 'text-indigo-700 font-black underline' : ''}>U10: {group.progression.u10[0]}</span>
+                        <span>•</span>
+                        <span className={selectedAge === 'U12' ? 'text-indigo-700 font-black underline' : ''}>U12: {group.progression.u12[0]}</span>
+                        <span>•</span>
+                        <span className={selectedAge === 'U14' ? 'text-indigo-700 font-black underline' : ''}>U14: {group.progression.u14.both}</span>
+                        <span>•</span>
+                        <span className={selectedAge === 'U16' ? 'text-indigo-700 font-black underline' : ''}>U16: {group.progression.u16[0]}</span>
+                        <span>•</span>
+                        <span className={selectedAge === 'Seniors' || selectedAge === 'U18' ? 'text-indigo-700 font-black underline' : ''}>U18+: {group.progression.u18Seniors[0]}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {/* INTERCHANGE IQ COMBINE BENCHMARKS VIEW */}
         {activeTabId === 'interchangeIQ' ? (

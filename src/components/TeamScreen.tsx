@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Player, LineupTemplate, GameHistory } from '../types';
+import { Player, LineupTemplate, GameHistory, SkillAssessment } from '../types';
 import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS, normalizePosition, getZoneForPosition, POSITION_FULL_NAMES } from '../constants';
+import { evaluatePlayerPositionalRubric } from '../utils/aflPositionalRubric';
+import { calculateInterchangeIQGrade } from '../utils/interchangeIQRubric';
 import { 
   Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, 
   Check, X, Flame, Sparkles, Clock, Activity, RotateCcw, Landmark, 
-  Users, Trophy, Shield, Layers, Play, ArrowRight, FileSpreadsheet, Download, ArrowUp
+  Users, Trophy, Shield, Layers, Play, ArrowRight, FileSpreadsheet, Download, ArrowUp,
+  ArrowLeft, Search, ChevronLeft, ChevronRight, Eye, User, FileText, ChevronDown, ChevronUp,
+  Award, Target, Zap, Dumbbell, Ruler, Sliders
 } from 'lucide-react';
 import CsvImportGuide from './CsvImportGuide';
 
@@ -17,6 +21,7 @@ interface TeamScreenProps {
   onUpdateLineup: (lineup: Record<string, string>) => void;
   savedLineups?: LineupTemplate[];
   history?: GameHistory[];
+  growthRecords?: SkillAssessment[];
   teamName?: string;
   isInactive?: boolean;
   onNavigateTab?: (tab: string) => void;
@@ -31,15 +36,18 @@ export default function TeamScreen({
   onUpdateLineup,
   savedLineups = [],
   history = [],
+  growthRecords = [],
   teamName,
   isInactive,
   onNavigateTab,
 }: TeamScreenProps) {
   const [filterZone, setFilterZone] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'number' | 'name'>('number');
   const [showAddEditModal, setShowAddEditModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [showGameDayHeatmap, setShowGameDayHeatmap] = useState(false);
 
   // Player Form states
   const [formName, setFormName] = useState('');
@@ -49,10 +57,71 @@ export default function TeamScreen({
   const [formPositions, setFormPositions] = useState<string[]>([]);
   const [formStatus, setFormStatus] = useState<'available' | 'away' | 'injured' | 'other_team'>('available');
   const [formNote, setFormNote] = useState('');
+  const [formHeightCm, setFormHeightCm] = useState<string>('180');
+  const [formWeightKg, setFormWeightKg] = useState<string>('75');
+  const [formPreferredFoot, setFormPreferredFoot] = useState<'Right' | 'Left' | 'Dual'>('Right');
+  const [formGender, setFormGender] = useState<'Female' | 'Male'>('Female');
+  const [formAgeGroup, setFormAgeGroup] = useState<'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors'>('U16');
   const [formError, setFormError] = useState('');
 
-  const activeId = selectedPlayerId || players[0]?.id || null;
-  const activePlayer = players.find((p) => p.id === activeId) || null;
+  // Sorting and filtering list
+  const filtered = players
+    .filter((p) => {
+      if (filterZone !== 'All' && p.primaryZone !== filterZone) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const nameMatch = p.name.toLowerCase().includes(q);
+        const nickMatch = (p.nick || '').toLowerCase().includes(q);
+        const numMatch = p.number.includes(q);
+        const posMatch = (p.positions || []).some((pos) => pos.toLowerCase().includes(q));
+        return nameMatch || nickMatch || numMatch || posMatch;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'number') {
+        return (parseInt(a.number, 10) || 999) - (parseInt(b.number, 10) || 999);
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  const activePlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) || null : null;
+  const activeIndex = activePlayer ? filtered.findIndex((p) => p.id === activePlayer.id) : -1;
+  const prevPlayer = activeIndex > 0 ? filtered[activeIndex - 1] : null;
+  const nextPlayer = activeIndex >= 0 && activeIndex < filtered.length - 1 ? filtered[activeIndex + 1] : null;
+
+  // Derive active player growth assessment & physical/skill attributes
+  const playerRecords = activePlayer
+    ? growthRecords.filter((r) => r.playerId === activePlayer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    : [];
+  const activePlayerLatestRecord = playerRecords[0] || null;
+
+  const heightCm = activePlayer?.heightCm || (activePlayerLatestRecord as any)?.heightCm || 180;
+  const weightKg = activePlayer?.weightKg || (activePlayerLatestRecord as any)?.weightKg || 75;
+  const preferredFoot = activePlayer?.preferredFoot || activePlayerLatestRecord?.preferredFoot || 'Right';
+  const gender = activePlayerLatestRecord?.gender || activePlayer?.gender || 'Female';
+  const ageGroup = activePlayerLatestRecord?.ageGroup || activePlayer?.ageGroup || 'U16';
+
+  const kickAcc = activePlayer?.kickAccuracyRating || activePlayerLatestRecord?.kickAccuracyRating || 7;
+  const kickDist = activePlayer?.kickDistanceMeters || activePlayerLatestRecord?.kickDistanceMeters || 45;
+  const oppFoot = activePlayer?.oppositeFootRating || activePlayerLatestRecord?.oppositeFootRating || 6;
+  const handball = activePlayer?.handballRating || activePlayerLatestRecord?.handballRating || 8;
+  const marking = activePlayer?.markingRating || activePlayerLatestRecord?.markingRating || 7;
+  const tackling = activePlayer?.tacklingRating || activePlayerLatestRecord?.tacklingRating || 8;
+  const gameSense = activePlayer?.gameSenseRating || activePlayerLatestRecord?.gameSenseRating || 8;
+  const fitness = activePlayer?.fitnessRating || activePlayerLatestRecord?.fitnessRating || 7;
+
+  const spoiling = activePlayer?.spoilingRating || activePlayerLatestRecord?.spoilingRating || 7;
+  const overheadMarking = activePlayer?.overheadMarkingRating || activePlayerLatestRecord?.overheadMarkingRating || 7;
+  const crumbing = activePlayer?.crumbingRating || activePlayerLatestRecord?.crumbingRating || 7;
+  const pressureActs = activePlayer?.pressureActsRating || activePlayerLatestRecord?.pressureActsRating || 8;
+  const ruckTap = activePlayer?.ruckTapRating || activePlayerLatestRecord?.ruckTapRating || 5;
+  const leadingTiming = activePlayer?.leadingTimingRating || activePlayerLatestRecord?.leadingTimingRating || 7;
+  const snapGoal = activePlayer?.snapGoalRating || activePlayerLatestRecord?.snapGoalRating || 6;
+  const defTransition = activePlayer?.defensiveTransitionRating || activePlayerLatestRecord?.defensiveTransitionRating || 8;
+
+  const evaluations = activePlayer ? evaluatePlayerPositionalRubric(activePlayer, activePlayerLatestRecord) : [];
+  const topChoice = evaluations.length > 0 ? evaluations[0] : null;
 
   const handleExportCSV = () => {
     if (!players || players.length === 0) return;
@@ -77,16 +146,6 @@ export default function TeamScreen({
     document.body.removeChild(link);
   };
 
-  // Sorting and filtering list
-  const filtered = players
-    .filter((p) => filterZone === 'All' || p.primaryZone === filterZone)
-    .sort((a, b) => {
-      if (sortBy === 'number') {
-        return (parseInt(a.number, 10) || 999) - (parseInt(b.number, 10) || 999);
-      }
-      return a.name.localeCompare(b.name);
-    });
-
   const handleOpenAddPlayer = () => {
     setEditingPlayer(null);
     setFormName('');
@@ -96,6 +155,11 @@ export default function TeamScreen({
     setFormPositions([]);
     setFormStatus('available');
     setFormNote('');
+    setFormHeightCm('180');
+    setFormWeightKg('75');
+    setFormPreferredFoot('Right');
+    setFormGender('Female');
+    setFormAgeGroup('U16');
     setFormError('');
     setShowAddEditModal(true);
   };
@@ -103,12 +167,17 @@ export default function TeamScreen({
   const handleOpenEditPlayer = (p: Player) => {
     setEditingPlayer(p);
     setFormName(p.name);
-    setFormNick(p.nick);
+    setFormNick(p.nick || '');
     setFormNumber(p.number);
     setFormPrimaryZone(p.primaryZone);
     setFormPositions((p.positions || []).map(normalizePosition));
     setFormStatus(p.status);
-    setFormNote(p.note);
+    setFormNote(p.note || '');
+    setFormHeightCm(p.heightCm ? String(p.heightCm) : '180');
+    setFormWeightKg(p.weightKg ? String(p.weightKg) : '75');
+    setFormPreferredFoot(p.preferredFoot || 'Right');
+    setFormGender((p.gender as any) || 'Female');
+    setFormAgeGroup(p.ageGroup || 'U16');
     setFormError('');
     setShowAddEditModal(true);
   };
@@ -136,6 +205,11 @@ export default function TeamScreen({
       positions: normPositions,
       status: formStatus,
       note: formNote.trim(),
+      heightCm: parseFloat(formHeightCm) || 180,
+      weightKg: parseFloat(formWeightKg) || 75,
+      preferredFoot: formPreferredFoot,
+      gender: formGender,
+      ageGroup: formAgeGroup,
     };
 
     if (editingPlayer) {
@@ -163,6 +237,11 @@ export default function TeamScreen({
         positions: normPositions,
         status: formStatus,
         note: formNote.trim(),
+        heightCm: parseFloat(formHeightCm) || 180,
+        weightKg: parseFloat(formWeightKg) || 75,
+        preferredFoot: formPreferredFoot,
+        gender: formGender,
+        ageGroup: formAgeGroup,
       };
       onUpdatePlayers([...players, newPlayer]);
     }
@@ -187,7 +266,7 @@ export default function TeamScreen({
     }
   };
 
-  const handleSetStatus = (id: string, stat: 'available' | 'away' | 'injured') => {
+  const handleSetStatus = (id: string, stat: 'available' | 'away' | 'injured' | 'other_team') => {
     onUpdatePlayers(
       players.map((p) => (p.id === id ? { ...p, status: stat } : p))
     );
@@ -335,458 +414,542 @@ export default function TeamScreen({
 
   return (
     <div className="space-y-6">
-      {/* Squad Summary & Metrics Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0">
-              <Landmark className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-black text-white tracking-tight">{teamName || 'Active Team View'}</h2>
-                {isInactive ? (
-                  <span className="px-2 py-0.5 text-[10px] font-black bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-full uppercase tracking-wider">
-                    Inactive • Season Finished
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full uppercase tracking-wider">
-                    Live Dataset View
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-400 font-semibold">Squad Summary & Performance Metrics</p>
-            </div>
-          </div>
-          {onNavigateTab && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onNavigateTab('lineup')}
-                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-              >
-                <Play className="w-3.5 h-3.5 text-white" />
-                <span>Game Day →</span>
-              </button>
-              <button
-                onClick={() => onNavigateTab('admin')}
-                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
-              >
-                Admin Panel
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* 4 Stat Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Squad Count */}
-          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
-              <span>Total Roster</span>
-              <Users className="w-4 h-4 text-blue-400" />
-            </div>
-            <div className="text-2xl font-black text-white">
-              {squadCount} <span className="text-xs text-slate-400 font-semibold">Players</span>
-            </div>
-            <div className="flex flex-wrap gap-1 pt-1 text-[9px] font-extrabold">
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                {availableCount} Avail
-              </span>
-              {injuredCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
-                  {injuredCount} Inj
-                </span>
-              )}
-              {awayCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {awayCount} Away
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Games Record */}
-          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
-              <span>Match Record</span>
-              <Trophy className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="text-2xl font-black text-white">
-              {totalGames} <span className="text-xs text-slate-400 font-semibold">Games</span>
-            </div>
-            <div className="flex flex-wrap gap-1 pt-1 text-[9px] font-extrabold">
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                {winsCount} Wins
-              </span>
-              <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
-                {lossesCount} Loss
-              </span>
-              {drawsCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                  {drawsCount} Draw
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Starter Slots / Field */}
-          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
-              <span>Field / Bench</span>
-              <Shield className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="text-2xl font-black text-white">
-              {activeOnFieldCount} <span className="text-xs text-slate-400 font-semibold">Field</span> / {activeOnBenchCount} <span className="text-xs text-slate-400 font-semibold">Bench</span>
-            </div>
-            <div className="text-[10px] font-bold text-indigo-300 pt-1">
-              {activeOnFieldCount}/18 Starter Slots Set
-            </div>
-          </div>
-
-          {/* Lineups Saved */}
-          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
-              <span>Lineup Presets</span>
-              <Layers className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-black text-white">
-              {lineupsCount} <span className="text-xs text-slate-400 font-semibold">Presets</span>
-            </div>
-            <div className="text-[10px] font-bold text-cyan-300 pt-1">
-              Ready for Game Day
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Top action header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
-        <div>
-          <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Team Squad ({players.length})</h2>
-          <p className="text-xs text-[var(--muted)] font-semibold mt-1">
-            Manage player profiles, positional zones, and status
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setShowCsvModal(!showCsvModal)}
-            className="px-3.5 py-2 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
-            <span>{showCsvModal ? 'Close CSV Guide' : 'Import CSV Roster'}</span>
-          </button>
-          <button
-            onClick={handleOpenAddPlayer}
-            className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Player</span>
-          </button>
-        </div>
-      </div>
-
-      {/* CSV Import Drawer / Guide Modal */}
-      {showCsvModal && (
-        <CsvImportGuide
-          players={players}
-          onUpdatePlayers={onUpdatePlayers}
-          onUpdateLineup={onUpdateLineup}
-          title="Import Roster from CSV / Excel"
-          onSuccess={() => setShowCsvModal(false)}
-        />
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Players List */}
-        <div className="bg-white rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden flex flex-col h-fit">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="font-black text-sm text-[var(--navy)]">Roster list</h3>
-            <button
-              onClick={() => setSortBy(sortBy === 'number' ? 'name' : 'number')}
-              className="px-2 py-1 text-[10px] font-black text-gray-500 bg-gray-50 border border-gray-100 rounded-md hover:bg-gray-100 cursor-pointer"
-            >
-              Sort: {sortBy === 'number' ? 'Jumper #' : 'Name'}
-            </button>
-          </div>
-
-          {/* Positional filters */}
-          <div className="px-4 py-2 border-b border-gray-100 flex flex-wrap gap-1">
-            {['All', 'FWD', 'MID', 'DEF', 'RUCK'].map((zone) => (
-              <button
-                key={zone}
-                onClick={() => setFilterZone(zone)}
-                className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition cursor-pointer ${
-                  filterZone === zone
-                    ? 'bg-[var(--blue)] text-white'
-                    : 'bg-gray-100 text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {zone}
-              </button>
-            ))}
-          </div>
-
-          <div className="max-h-[720px] overflow-y-auto divide-y divide-gray-100">
-            {filtered.map((p) => {
-              const isActive = activeId === p.id;
-              const rawFldPos = Object.keys(lineup).find((k) => lineup[k] === p.id);
-              const fldPos = rawFldPos ? normalizePosition(rawFldPos) : undefined;
-
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => onSelectPlayerId(p.id)}
-                  className={`p-3 flex items-center justify-between gap-4 cursor-pointer transition ${
-                    isActive ? 'bg-[#FFF8E6]' : 'hover:bg-gray-50'
-                  }`}
+      {/* If a player is selected, show FOCUSED PLAYER DETAILS VIEW with Back Button */}
+      {activePlayer ? (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Focused Player Navigation & Action Header */}
+          <div className="bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => onSelectPlayerId(null)}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer shrink-0"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs text-white ${
-                      p.primaryZone === 'FWD' ? 'bg-[#E5484D]' :
-                      p.primaryZone === 'DEF' ? 'bg-[#16a765]' :
-                      p.primaryZone === 'RUCK' ? 'bg-[#8B5CF6]' : 'bg-[#4C6FFF]'
-                    }`}>
-                      {p.number}
-                    </div>
-                    <div>
-                      <b className="text-sm text-[var(--ink)] block">
-                        {p.nick ? `${p.nick} (${p.name})` : p.name}
-                      </b>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                        <span className={`px-1.5 py-0.2 text-[9px] font-black rounded uppercase ${
-                          p.primaryZone === 'FWD' ? 'bg-red-50 text-red-700 border border-red-200' :
-                          p.primaryZone === 'DEF' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
-                          p.primaryZone === 'RUCK' ? 'bg-purple-50 text-purple-800 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'
-                        }`}>
-                          {p.primaryZone}
-                        </span>
-                        {p.positions && p.positions.length > 0 ? (
-                          <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
-                            Pref: {p.positions.map(normalizePosition).join(', ')}
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-gray-400 font-semibold italic">No pref pos</span>
-                        )}
-                        {fldPos && (
-                          <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200">
-                            Field: {fldPos}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <ArrowLeft className="w-4 h-4 text-emerald-400" />
+                  <span>← Back to Squad List</span>
+                </button>
 
-                  <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase ${
-                    p.status === 'available' ? 'bg-green-50 text-[#0E7A48]' :
-                    p.status === 'injured' ? 'bg-red-50 text-red-700' :
-                    p.status === 'other_team' ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-amber-50 text-amber-800'
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-base text-white shadow-xs shrink-0 ${
+                    activePlayer.primaryZone === 'FWD' ? 'bg-[#E5484D]' :
+                    activePlayer.primaryZone === 'DEF' ? 'bg-[#16a765]' :
+                    activePlayer.primaryZone === 'RUCK' ? 'bg-[#8B5CF6]' : 'bg-[#4C6FFF]'
                   }`}>
-                    {p.status === 'other_team' ? 'Playing for Opponent' : p.status}
-                  </span>
-                </div>
-              );
-            })}
-
-            {filtered.length === 0 && (
-              <div className="p-8 text-center space-y-4 bg-slate-50/70">
-                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto">
-                  <Users className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="font-black text-sm text-[var(--navy)]">Roster is Empty</h4>
-                  <p className="text-xs text-gray-500 font-semibold mt-1 max-w-sm mx-auto">
-                    This squad currently has no players. Add players manually, import a CSV roster file, or load sample AFL data.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                  <button
-                    onClick={handleOpenAddPlayer}
-                    className="px-4 py-2 bg-[var(--green)] hover:opacity-95 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add First Player</span>
-                  </button>
-                  <button
-                    onClick={handleRestoreDefaultSquad}
-                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Load Sample Squad</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Selected Player Detailed card */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
-          {activePlayer ? (
-            <>
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[var(--navy)] to-[var(--blue)] text-white rounded-xl flex items-center justify-center font-black text-lg">
                     #{activePlayer.number}
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-gray-900 leading-tight">
-                      {activePlayer.name}
+                    <h2 className="text-lg font-black text-slate-900 leading-tight">
+                      {activePlayer.name} {activePlayer.nick && <span className="text-blue-600 text-xs font-bold">({activePlayer.nick})</span>}
+                    </h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase ${
+                        activePlayer.primaryZone === 'FWD' ? 'bg-red-50 text-red-700 border border-red-200' :
+                        activePlayer.primaryZone === 'DEF' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                        activePlayer.primaryZone === 'RUCK' ? 'bg-purple-50 text-purple-800 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'
+                      }`}>
+                        {activePlayer.primaryZone} Zone
+                      </span>
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase ${
+                        activePlayer.status === 'available' ? 'bg-green-50 text-[#0E7A48] border border-green-200' :
+                        activePlayer.status === 'injured' ? 'bg-red-50 text-red-700 border border-red-200' :
+                        activePlayer.status === 'other_team' ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}>
+                        {activePlayer.status === 'other_team' ? 'Playing for Opponent' : activePlayer.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {prevPlayer && (
+                  <button
+                    onClick={() => onSelectPlayerId(prevPlayer.id)}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                    title={`Previous Player: #${prevPlayer.number} ${prevPlayer.name}`}
+                  >
+                    <ChevronLeft className="w-4 h-4 text-gray-600" />
+                    <span>#{prevPlayer.number} {prevPlayer.nick || prevPlayer.name.split(' ')[0]}</span>
+                  </button>
+                )}
+                {nextPlayer && (
+                  <button
+                    onClick={() => onSelectPlayerId(nextPlayer.id)}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                    title={`Next Player: #${nextPlayer.number} ${nextPlayer.name}`}
+                  >
+                    <span>#{nextPlayer.number} {nextPlayer.nick || nextPlayer.name.split(' ')[0]}</span>
+                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleOpenEditPlayer(activePlayer)}
+                  className="px-3 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Profile</span>
+                </button>
+
+                <button
+                  onClick={() => handleDeletePlayer(activePlayer.id)}
+                  className="px-3 py-2 bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* MAIN PLAYER DETAILS & ATTRIBUTES CONTENT GRID */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            {/* LEFT COLUMN (7 COLS): PHYSICAL DETAILS, PREFERENCES & AI RUBRIC FIT */}
+            <div className="lg:col-span-7 space-y-6">
+
+              {/* Physical Profile & Status Details */}
+              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4.5 h-4.5 text-blue-600" />
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                      Physical Details & Bio
                     </h3>
-                    {activePlayer.nick && (
-                      <p className="text-xs text-[var(--blue)] font-extrabold mt-0.5">
-                        Nickname: {activePlayer.nick}
-                      </p>
+                  </div>
+                  <button
+                    onClick={() => handleOpenEditPlayer(activePlayer)}
+                    className="text-xs font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 cursor-pointer"
+                  >
+                    Edit Physicals
+                  </button>
+                </div>
+
+                {/* 4 Physical Metric Badges */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Height</span>
+                    <span className="text-base font-black text-slate-900 mt-0.5 block">{heightCm} cm</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Weight</span>
+                    <span className="text-base font-black text-slate-900 mt-0.5 block">{weightKg} kg</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Preferred Foot</span>
+                    <span className="text-base font-black text-indigo-900 mt-0.5 block">{preferredFoot}</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Gender & Age</span>
+                    <span className="text-xs font-black text-slate-800 mt-1 block">{gender} {ageGroup}</span>
+                  </div>
+                </div>
+
+                {/* Status Selection */}
+                <div className="bg-gray-50 border border-gray-200/80 p-3.5 rounded-xl space-y-2">
+                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                    Squad Selection Status
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      onClick={() => handleSetStatus(activePlayer.id, 'available')}
+                      className={`py-1.5 px-3 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                        activePlayer.status === 'available'
+                          ? 'bg-green-600 text-white border-green-700 font-black shadow-2xs'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Available
+                    </button>
+                    <button
+                      onClick={() => handleSetStatus(activePlayer.id, 'away')}
+                      className={`py-1.5 px-3 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                        activePlayer.status === 'away'
+                          ? 'bg-amber-500 text-white border-amber-600 font-black shadow-2xs'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Away
+                    </button>
+                    <button
+                      onClick={() => handleSetStatus(activePlayer.id, 'injured')}
+                      className={`py-1.5 px-3 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                        activePlayer.status === 'injured'
+                          ? 'bg-red-600 text-white border-red-700 font-black shadow-2xs'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Injured
+                    </button>
+                    <button
+                      onClick={() => handleSetStatus(activePlayer.id, 'other_team')}
+                      className={`py-1.5 px-3 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                        activePlayer.status === 'other_team'
+                          ? 'bg-purple-600 text-white border-purple-700 font-black shadow-2xs'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Opponent
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preferred Positions */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                      Preferred Positions & Primary Zone
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditPlayer(activePlayer)}
+                      className="text-xs font-extrabold text-blue-600 hover:underline cursor-pointer"
+                    >
+                      Edit Positions
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {activePlayer.positions && activePlayer.positions.length > 0 ? (
+                      activePlayer.positions.map((pos) => {
+                        const normPos = normalizePosition(pos);
+                        const fullName = POSITION_FULL_NAMES[normPos] || normPos;
+                        return (
+                          <span
+                            key={pos}
+                            title={fullName}
+                            className="px-2.5 py-1 bg-white border border-blue-200 text-blue-900 rounded-lg text-xs font-black shadow-2xs flex items-center gap-1.5"
+                          >
+                            <span className="bg-blue-600 text-white px-1.5 py-0.2 rounded text-[10px] font-black">{normPos}</span>
+                            <span>{fullName}</span>
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="text-xs text-gray-400 font-semibold italic">No positions assigned. Click Edit Positions to select.</span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => handleOpenEditPlayer(activePlayer)}
-                    className="p-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition text-gray-500"
-                    title="Edit player profile"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeletePlayer(activePlayer.id)}
-                    className="p-2 bg-red-50 hover:bg-red-100 rounded-xl transition text-red-600"
-                    title="Delete player permanently"
-                  >
-                    <Trash className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-3">
-                <div className="space-y-4">
-                  {/* Status update buttons */}
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block mb-1.5">
-                      Change Status
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleSetStatus(activePlayer.id, 'available')}
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition ${
-                          activePlayer.status === 'available'
-                            ? 'bg-green-50 text-[#0E7A48] border-green-200 font-extrabold'
-                            : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                        }`}
-                      >
-                        Available
-                      </button>
-                      <button
-                        onClick={() => handleSetStatus(activePlayer.id, 'away')}
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition ${
-                          activePlayer.status === 'away'
-                            ? 'bg-amber-50 text-amber-800 border-amber-200 font-extrabold'
-                            : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                        }`}
-                      >
-                        Away
-                      </button>
-                      <button
-                        onClick={() => handleSetStatus(activePlayer.id, 'injured')}
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition ${
-                          activePlayer.status === 'injured'
-                            ? 'bg-red-50 text-red-700 border-red-200 font-extrabold'
-                            : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                        }`}
-                      >
-                        Injured
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block mb-1">
-                      Primary Zone
-                    </span>
-                    <span className="px-3 py-1 font-black text-xs uppercase bg-[#EEF0FF] text-[var(--blue)] rounded-lg">
-                      {activePlayer.primaryZone}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                        Preferred Positions
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditPlayer(activePlayer)}
-                        className="text-[10px] font-extrabold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Edit3 className="w-3 h-3" />
-                        <span>Edit Profile</span>
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {activePlayer.positions && activePlayer.positions.length > 0 ? (
-                        activePlayer.positions.map((pos) => {
-                          const normPos = normalizePosition(pos);
-                          const fullName = POSITION_FULL_NAMES[normPos] || normPos;
-                          return (
-                            <span
-                              key={pos}
-                              title={fullName}
-                              className="px-2.5 py-1 bg-white border border-blue-200 text-blue-900 rounded-lg text-xs font-black shadow-2xs flex items-center gap-1"
-                            >
-                              <span>{normPos}</span>
-                              {fullName !== normPos && (
-                                <span className="text-[9px] font-medium text-blue-500">({fullName})</span>
-                              )}
-                            </span>
-                          );
-                        })
-                      ) : (
-                        <span className="text-xs text-gray-400 font-semibold italic">No preferred positions selected. Click Edit Profile to set positions.</span>
+                {/* Game Day Alignment */}
+                {(() => {
+                  const rawFldPos = Object.keys(lineup).find((k) => lineup[k] === activePlayer.id);
+                  const fldPos = rawFldPos ? normalizePosition(rawFldPos) : null;
+                  return (
+                    <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-blue-800 tracking-wider block">
+                          Game Day Lineup Status
+                        </span>
+                        {fldPos ? (
+                          <p className="text-xs text-slate-800 font-bold mt-0.5">
+                            Assigned Field Starter: <strong className="text-emerald-700 font-extrabold uppercase">{fldPos}</strong>
+                          </p>
+                        ) : activePlayer.status === 'available' ? (
+                          <p className="text-xs text-amber-800 font-bold mt-0.5">Available Bench Reserve</p>
+                        ) : (
+                          <p className="text-xs text-gray-500 font-semibold italic mt-0.5">Unavailable for lineup</p>
+                        )}
+                      </div>
+                      {onNavigateTab && (
+                        <button
+                          onClick={() => onNavigateTab('lineup')}
+                          className="text-xs font-black text-blue-700 hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
+                        >
+                          <span>Game Day →</span>
+                        </button>
                       )}
                     </div>
-                  </div>
+                  );
+                })()}
 
-                  {activePlayer.note && (
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block mb-1">
-                        Coaching Note / Reason
-                      </span>
-                      <p className="text-xs text-gray-600 font-medium bg-[#FAFBFF] p-3 rounded-xl border border-gray-100 italic leading-relaxed">
-                        {activePlayer.note}
-                      </p>
-                    </div>
+                {/* Coaching Notes */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                    Coaching Notes
+                  </span>
+                  {activePlayer.note ? (
+                    <p className="text-xs text-gray-700 font-medium bg-slate-50 p-3 rounded-xl border border-gray-200 italic leading-relaxed">
+                      "{activePlayer.note}"
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 font-medium bg-slate-50 p-3 rounded-xl border border-gray-200 italic">
+                      No notes logged for this player. Click Edit Profile to add comments.
+                    </p>
                   )}
                 </div>
               </div>
 
-              {/* HEATMAP SECTOR */}
-              <div className="border-t border-gray-100 pt-6 mt-6 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <Flame className="w-4 h-4 text-orange-500 animate-pulse" />
-                      Live Match Heatmap
-                    </h4>
-                    <p className="text-xs text-gray-400 font-medium">
-                      Visually displays player's occupancy intensity across slots during the match.
-                    </p>
+              {/* AFL Positional Rubric & AI Recommendation Card */}
+              {topChoice && (
+                <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 text-white p-5 rounded-2xl border border-indigo-800 shadow-md space-y-4">
+                  <div className="flex items-center justify-between border-b border-indigo-800/80 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                      <h3 className="text-sm font-black text-amber-300 uppercase tracking-wider">
+                        AFL Positional Rubric & Recommended Fit
+                      </h3>
+                    </div>
+                    {onNavigateTab && (
+                      <button
+                        onClick={() => onNavigateTab('growth')}
+                        className="text-xs font-extrabold text-amber-300 hover:underline cursor-pointer"
+                      >
+                        Explore Growth Profile →
+                      </button>
+                    )}
                   </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/5 p-3.5 rounded-xl border border-white/10">
+                    <div>
+                      <span className="text-[10px] font-bold text-indigo-300 uppercase block">Primary Recommendation</span>
+                      <h4 className="text-lg font-black text-white flex items-center gap-2 mt-0.5">
+                        <span>{topChoice.group.iconEmoji}</span>
+                        <span>{topChoice.group.title}</span>
+                      </h4>
+                    </div>
+                    <div className="text-right">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase border ${
+                        topChoice.tier === 'Strong Match' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' :
+                        topChoice.tier === 'Good Fit' ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30' :
+                        'bg-amber-500/20 text-amber-300 border-amber-400/30'
+                      }`}>
+                        {topChoice.tier} ({topChoice.suitabilityScore}/100)
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-indigo-100 font-medium leading-relaxed bg-black/20 p-3 rounded-xl border border-indigo-800/50">
+                    <strong>Coaching Rationale:</strong> {topChoice.whyComment}
+                  </p>
+
+                  <div className="text-[11px] text-indigo-200 flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-indigo-800/50">
+                    <span>
+                      <strong>Age Stage Expectation ({gender} {ageGroup}):</strong> {topChoice.ageStageExpectation}
+                    </span>
+                    <span className="text-[10px] bg-amber-400/20 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-300/30">
+                      Focus: {topChoice.growthFocus}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* RIGHT COLUMN (5 COLS): PLAYER ATTRIBUTES & SKILL RATINGS */}
+            <div className="lg:col-span-5 space-y-6">
+
+              {/* Core Skill Attributes Card */}
+              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4.5 h-4.5 text-emerald-600" />
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                      Core Skill Attributes
+                    </h3>
+                  </div>
+                  {onNavigateTab && (
+                    <button
+                      onClick={() => onNavigateTab('growth')}
+                      className="text-xs font-extrabold text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Assessments →
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {/* Kick Accuracy */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>⚡ Kick Accuracy</span>
+                      <span className="text-emerald-700">{kickAcc}/10</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(kickAcc / 10) * 100}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Kick Distance */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>👟 Kick Distance</span>
+                      <span className="text-blue-700">{kickDist} meters</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (kickDist / 60) * 100)}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Opposite Foot */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>🦵 Opposite Foot Competency</span>
+                      <span className="text-indigo-700">{oppFoot}/10</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(oppFoot / 10) * 100}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Handball */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>🤾 Handball Speed & Accuracy</span>
+                      <span className="text-emerald-700">{handball}/10</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(handball / 10) * 100}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Marking */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>🤲 Marking (Chest & Overhead)</span>
+                      <span className="text-purple-700">{marking}/10</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-purple-500 rounded-full" style={{ width: `${(marking / 10) * 100}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Tackling */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>🛡️ Tackling & Defensive Effort</span>
+                      <span className="text-amber-700">{tackling}/10</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(tackling / 10) * 100}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Game Sense */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>🧠 Game Sense & Decision Speed</span>
+                      <span className="text-indigo-700">{gameSense}/10</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${(gameSense / 10) * 100}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Fitness Rating */}
+                  <div>
+                    <div className="flex justify-between text-xs font-extrabold text-slate-800 mb-1">
+                      <span>🏃 Endurance & Work Rate</span>
+                      <span className="text-[#0E7A48]">{fitness}/10</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-green-600 rounded-full" style={{ width: `${(fitness / 10) * 100}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Positional Rubric Skills Card */}
+              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-4.5 h-4.5 text-indigo-600" />
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                      Positional Rubric Skills
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-800">
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Spoiling</span>
+                    <span className="text-sm font-black text-slate-900">{spoiling}/10</span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Overhead Mark</span>
+                    <span className="text-sm font-black text-slate-900">{overheadMarking}/10</span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Crumbing</span>
+                    <span className="text-sm font-black text-slate-900">{crumbing}/10</span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Pressure Acts</span>
+                    <span className="text-sm font-black text-slate-900">{pressureActs}/10</span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Ruck Tap</span>
+                    <span className="text-sm font-black text-slate-900">{ruckTap}/10</span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Leading Timing</span>
+                    <span className="text-sm font-black text-slate-900">{leadingTiming}/10</span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Snap Goal</span>
+                    <span className="text-sm font-black text-slate-900">{snapGoal}/10</span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] text-slate-400 uppercase block font-extrabold">Def Transition</span>
+                    <span className="text-sm font-black text-slate-900">{defTransition}/10</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* MINIMISED GAME DAY STATS & TIME IN POSITIONS (HEATMAP) ACCORDION */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-2xs transition-all">
+            <button
+              type="button"
+              onClick={() => setShowGameDayHeatmap(!showGameDayHeatmap)}
+              className="w-full p-4 flex items-center justify-between bg-slate-100 hover:bg-slate-200/80 transition text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-400/30 flex items-center justify-center text-orange-600 shrink-0">
+                  <Flame className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Game Day Match Stats & Time in Positions (Heatmap)
+                    </h4>
+                    <span className="px-2 py-0.5 text-[9px] font-black bg-amber-100 text-amber-800 rounded border border-amber-200 uppercase">
+                      {showGameDayHeatmap ? 'Expanded' : 'Minimised'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                    On Field: <strong>{activePlayer.active ? `${Math.floor(activePlayer.active / 60)} mins` : '0 mins'}</strong> • On Bench: <strong>{activePlayer.bench ? `${Math.floor(activePlayer.bench / 60)} mins` : '0 mins'}</strong> • Click to {showGameDayHeatmap ? 'collapse' : 'expand live position heat map'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-black text-slate-700 shrink-0">
+                <span>{showGameDayHeatmap ? 'Hide Heatmap' : 'Show Heatmap'}</span>
+                {showGameDayHeatmap ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
+
+            {showGameDayHeatmap && (
+              <div className="p-5 border-t border-slate-200 bg-white space-y-4 animate-fadeIn">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs text-slate-600 font-bold">
+                    Simulated live match duration and position heat intensity on ground:
+                  </span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleSimulatePlaytime(activePlayer.id)}
-                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black rounded-lg transition active:scale-95 cursor-pointer flex items-center gap-1"
+                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black rounded-lg transition active:scale-95 cursor-pointer flex items-center gap-1"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-600" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                       Simulate Match Playtime
                     </button>
                     {activePlayer.slotTimes && Object.keys(activePlayer.slotTimes).length > 0 && (
                       <button
                         type="button"
                         onClick={() => handleClearPlaytime(activePlayer.id)}
-                        className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 text-[10px] font-black rounded-lg transition cursor-pointer"
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 text-xs font-black rounded-lg transition cursor-pointer"
                       >
                         Reset Data
                       </button>
@@ -794,175 +957,444 @@ export default function TeamScreen({
                   </div>
                 </div>
 
-                {/* Heatmap visualization and Stats side-by-side or stacked */}
-                <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
-                  {/* Mini-Field Heatmap Container - Replicating Game Day AFL Oval */}
-                  <div className="xl:col-span-3 bg-gray-50 border border-gray-100 p-4 rounded-2xl flex flex-col items-center justify-center overflow-x-auto">
-                    <div className="w-full max-w-[490px] field relative select-none mx-auto shadow-md shrink-0" style={{ height: '740px' }}>
-                      <div className="centre-square"></div>
-                      <div className="centre-circle-inner"></div>
-                      <div className="fifty-arc-top"></div>
-                      <div className="fifty-arc-bottom"></div>
+                {/* Heatmap Field */}
+                <div className="bg-gray-50 border border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center overflow-x-auto">
+                  <div className="w-full max-w-[460px] field relative select-none mx-auto shadow-md shrink-0" style={{ height: '620px' }}>
+                    <div className="centre-square"></div>
+                    <div className="centre-circle-inner"></div>
+                    <div className="fifty-arc-top"></div>
+                    <div className="fifty-arc-bottom"></div>
 
-                      {/* AFL Goal Posts & Markings - Top End (Forwards) */}
-                      <div className="goal-line-top"></div>
-                      <div className="goal-square-top"></div>
-                      <div className="goal-post behind top-left-behind"></div>
-                      <div className="goal-post main top-left-main"></div>
-                      <div className="goal-post main top-right-main"></div>
-                      <div className="goal-post behind top-right-behind"></div>
+                    {/* AFL Goal Posts & Markings - Top End */}
+                    <div className="goal-line-top"></div>
+                    <div className="goal-square-top"></div>
+                    <div className="goal-post behind top-left-behind"></div>
+                    <div className="goal-post main top-left-main"></div>
+                    <div className="goal-post main top-right-main"></div>
+                    <div className="goal-post behind top-right-behind"></div>
 
-                      {/* AFL Goal Posts & Markings - Bottom End (Defenders) */}
-                      <div className="goal-line-bottom"></div>
-                      <div className="goal-square-bottom"></div>
-                      <div className="goal-post behind bottom-left-behind"></div>
-                      <div className="goal-post main bottom-left-main"></div>
-                      <div className="goal-post main bottom-right-main"></div>
-                      <div className="goal-post behind bottom-right-behind"></div>
+                    {/* AFL Goal Posts & Markings - Bottom End */}
+                    <div className="goal-line-bottom"></div>
+                    <div className="goal-square-bottom"></div>
+                    <div className="goal-post behind bottom-left-behind"></div>
+                    <div className="goal-post main bottom-left-main"></div>
+                    <div className="goal-post main bottom-right-main"></div>
+                    <div className="goal-post behind bottom-right-behind"></div>
 
-                      {/* Left Direction of Play / Attacking Arrow Indicator */}
-                      <div className="absolute left-2.5 top-6 bottom-6 z-20 pointer-events-none flex flex-col items-center justify-center gap-1 select-none">
-                        <div className="flex flex-col items-center bg-black/65 backdrop-blur-xs border border-emerald-400/40 rounded-full px-1.5 py-2.5 text-emerald-300 shadow-lg">
-                          <ArrowUp className="w-4 h-4 stroke-[3] text-emerald-400 animate-pulse" />
-                          <div className="w-0.5 h-10 bg-gradient-to-t from-emerald-500/20 via-emerald-400/80 to-emerald-300 rounded-full my-1"></div>
-                          <span className="text-[7px] font-black uppercase tracking-widest text-emerald-300 [writing-mode:vertical-lr] rotate-180">
-                            ATTACK
-                          </span>
+                    {POSITIONS.map(([slotName, label, x, y]) => {
+                      const playerSlotTimes = activePlayer.slotTimes || {};
+                      const secondsSpent = playerSlotTimes[slotName] || 0;
+                      const activeTimesArray = Object.values(playerSlotTimes);
+                      const maxTime = activeTimesArray.length > 0 ? Math.max(...activeTimesArray) : 0;
+                      const hasHeat = secondsSpent > 0;
+                      const heatRatio = maxTime > 0 ? secondsSpent / maxTime : 0;
+
+                      return (
+                        <div
+                          key={slotName}
+                          style={{ left: `${x}%`, top: `${y}%` }}
+                          className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10"
+                        >
+                          {hasHeat && (
+                            <div
+                              className="absolute rounded-full blur-[8px] opacity-85 animate-pulse transition-all duration-500"
+                              style={{
+                                width: `${24 + heatRatio * 36}px`,
+                                height: `${24 + heatRatio * 36}px`,
+                                backgroundColor: `rgba(${235 + heatRatio * 20}, ${110 - heatRatio * 75}, 25, ${0.45 + heatRatio * 0.45})`,
+                                boxShadow: `0 0 ${12 + heatRatio * 16}px rgba(${245 + heatRatio * 10}, 110, 0, ${0.35 + heatRatio * 0.45})`
+                              }}
+                            />
+                          )}
+
+                          {hasHeat ? (
+                            <div className="relative z-10 flex flex-col items-center bg-black/80 backdrop-blur-xs px-1.5 py-0.5 rounded-md border border-white/30 shadow-xs">
+                              <span className="text-[9px] font-black text-white leading-none tracking-tight">{slotName}</span>
+                              <span className="text-[8px] font-black text-amber-300 leading-none mt-0.5">
+                                {Math.round(secondsSpent / 60)}m
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="relative z-10 flex flex-col items-center bg-black/20 border border-white/20 px-1 py-0.5 rounded-sm backdrop-blur-2xs">
+                              <span className="text-[7px] font-bold text-white/50 leading-none">{slotName}</span>
+                            </div>
+                          )}
                         </div>
-                      </div>
-
-                      {/* Map slots & Heatmap Overlay */}
-                      {POSITIONS.map(([slotName, label, x, y]) => {
-                        const playerSlotTimes = activePlayer.slotTimes || {};
-                        const secondsSpent = playerSlotTimes[slotName] || 0;
-                        const activeTimesArray = Object.values(playerSlotTimes);
-                        const maxTime = activeTimesArray.length > 0 ? Math.max(...activeTimesArray) : 0;
-                        const hasHeat = secondsSpent > 0;
-                        const heatRatio = maxTime > 0 ? secondsSpent / maxTime : 0;
-
-                        return (
-                          <div
-                            key={slotName}
-                            style={{ left: `${x}%`, top: `${y}%` }}
-                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10"
-                          >
-                            {/* Heat Glow Ring */}
-                            {hasHeat && (
-                              <div
-                                className="absolute rounded-full blur-[8px] sm:blur-[12px] opacity-85 animate-pulse transition-all duration-500"
-                                style={{
-                                  width: `${28 + heatRatio * 40}px`,
-                                  height: `${28 + heatRatio * 40}px`,
-                                  backgroundColor: `rgba(${235 + heatRatio * 20}, ${110 - heatRatio * 75}, 25, ${0.45 + heatRatio * 0.45})`,
-                                  boxShadow: `0 0 ${14 + heatRatio * 18}px rgba(${245 + heatRatio * 10}, 110, 0, ${0.35 + heatRatio * 0.45})`
-                                }}
-                              />
-                            )}
-
-                            {/* Label box */}
-                            {hasHeat ? (
-                              <div className="relative z-10 flex flex-col items-center bg-black/75 backdrop-blur-xs px-2 py-0.5 rounded-md border border-white/30 shadow-md">
-                                <span className="text-[8px] sm:text-[10px] font-black text-white leading-none tracking-tight">{slotName}</span>
-                                <span className="text-[7px] sm:text-[9px] font-black text-amber-300 leading-none mt-0.5">
-                                  {Math.round(secondsSpent / 60)}m
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="relative z-10 flex flex-col items-center bg-black/30 border border-white/20 px-1.5 py-0.5 rounded-sm backdrop-blur-2xs">
-                                <span className="text-[7px] sm:text-[8px] font-bold text-white/50 leading-none">{slotName}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Heatmap Stats Cards */}
-                  <div className="xl:col-span-2 space-y-3.5">
-                    <div className="bg-gradient-to-br from-[#FAFBFF] to-[#F4F6FF] border border-blue-50/50 p-4 rounded-2xl space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-[var(--blue)]" />
-                        <span className="text-[11px] font-extrabold uppercase text-[var(--blue)] tracking-wider">
-                          Active Game Duration
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 pt-1">
-                        <div>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase">On Field</p>
-                          <p className="text-lg font-black text-gray-800">
-                            {activePlayer.active ? `${Math.floor(activePlayer.active / 60)} mins` : '0 mins'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase">On Bench</p>
-                          <p className="text-lg font-black text-gray-800">
-                            {activePlayer.bench ? `${Math.floor(activePlayer.bench / 60)} mins` : '0 mins'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50/65 border border-gray-200/50 p-4 rounded-2xl space-y-2">
-                      <span className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider block">
-                        Position Heat Analysis
-                      </span>
-                      {activePlayer.slotTimes && Object.keys(activePlayer.slotTimes).length > 0 ? (
-                        <div className="space-y-2 pt-1">
-                          {Object.entries(activePlayer.slotTimes)
-                            .sort((a, b) => b[1] - a[1])
-                            .map(([slot, secs], index) => {
-                              const pct = Math.round((secs / (activePlayer.active || 1)) * 100);
-                              return (
-                                <div key={slot} className="space-y-1">
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span className="font-extrabold text-gray-700 flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                                      {slot} ({POSITIONS.find(([sn]) => sn === slot)?.[1] || slot})
-                                    </span>
-                                    <span className="font-black text-gray-900">{Math.round(secs / 60)} mins ({pct}%)</span>
-                                  </div>
-                                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${
-                                        index === 0 ? 'bg-gradient-to-r from-orange-500 to-red-500' : 'bg-orange-400'
-                                      }`}
-                                      style={{ width: `${pct}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-400 font-medium italic py-2">
-                          No slot occupancy times captured yet. Simulate match minutes or start the match timer.
-                        </p>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-            </>
+            )}
+          </div>
+
+            {/* Bottom Navigation Bar */}
+            <div className="border-t border-gray-100 pt-4 flex items-center justify-between flex-wrap gap-3">
+              <button
+                onClick={() => onSelectPlayerId(null)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 text-emerald-400" />
+                <span>← Back to Squad List</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                {prevPlayer && (
+                  <button
+                    onClick={() => onSelectPlayerId(prevPlayer.id)}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    ← #{prevPlayer.number} {prevPlayer.name.split(' ')[0]}
+                  </button>
+                )}
+                {nextPlayer && (
+                  <button
+                    onClick={() => onSelectPlayerId(nextPlayer.id)}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    #{nextPlayer.number} {nextPlayer.name.split(' ')[0]} →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+      ) : (
+        <div className="space-y-6">
+          {/* If NO player is selected, show SQUAD LIST VIEW with cards & search */}
+          {/* Squad Summary & Metrics Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-black text-white tracking-tight">{teamName || 'Active Team View'}</h2>
+                    {isInactive ? (
+                      <span className="px-2 py-0.5 text-[10px] font-black bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-full uppercase tracking-wider">
+                        Inactive • Season Finished
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full uppercase tracking-wider">
+                        Live Dataset View
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 font-semibold">Squad Summary & Performance Metrics</p>
+                </div>
+              </div>
+              {onNavigateTab && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onNavigateTab('lineup')}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <Play className="w-3.5 h-3.5 text-white" />
+                    <span>Game Day →</span>
+                  </button>
+                  <button
+                    onClick={() => onNavigateTab('admin')}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    Admin Panel
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 4 Stat Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Squad Count */}
+              <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+                  <span>Total Roster</span>
+                  <Users className="w-4 h-4 text-blue-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {squadCount} <span className="text-xs text-slate-400 font-semibold">Players</span>
+                </div>
+                <div className="flex flex-wrap gap-1 pt-1 text-[9px] font-extrabold">
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {availableCount} Avail
+                  </span>
+                  {injuredCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                      {injuredCount} Inj
+                    </span>
+                  )}
+                  {awayCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {awayCount} Away
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Games Record */}
+              <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+                  <span>Match Record</span>
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {totalGames} <span className="text-xs text-slate-400 font-semibold">Games</span>
+                </div>
+                <div className="flex flex-wrap gap-1 pt-1 text-[9px] font-extrabold">
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {winsCount} Wins
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                    {lossesCount} Loss
+                  </span>
+                  {drawsCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      {drawsCount} Draw
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Starter Slots / Field */}
+              <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+                  <span>Field / Bench</span>
+                  <Shield className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {activeOnFieldCount} <span className="text-xs text-slate-400 font-semibold">Field</span> / {activeOnBenchCount} <span className="text-xs text-slate-400 font-semibold">Bench</span>
+                </div>
+                <div className="text-[10px] font-bold text-indigo-300 pt-1">
+                  {activeOnFieldCount}/18 Starter Slots Set
+                </div>
+              </div>
+
+              {/* Lineups Saved */}
+              <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+                  <span>Lineup Presets</span>
+                  <Layers className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {lineupsCount} <span className="text-xs text-slate-400 font-semibold">Presets</span>
+                </div>
+                <div className="text-[10px] font-bold text-cyan-300 pt-1">
+                  Ready for Game Day
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Top Action Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
+            <div>
+              <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Team Squad ({players.length})</h2>
+              <p className="text-xs text-[var(--muted)] font-semibold mt-1">
+                Click any player card to view their full profile details, positions, and live match heatmaps.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleExportCSV}
+                className="px-3.5 py-2 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl border border-slate-300 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-600" />
+                <span>Export CSV</span>
+              </button>
+              <button
+                onClick={() => setShowCsvModal(!showCsvModal)}
+                className="px-3.5 py-2 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-200 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+                <span>{showCsvModal ? 'Close CSV Guide' : 'Import CSV Roster'}</span>
+              </button>
+              <button
+                onClick={handleOpenAddPlayer}
+                className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Player</span>
+              </button>
+            </div>
+          </div>
+
+          {/* CSV Import Drawer / Guide Modal */}
+          {showCsvModal && (
+            <CsvImportGuide
+              players={players}
+              onUpdatePlayers={onUpdatePlayers}
+              onUpdateLineup={onUpdateLineup}
+              title="Import Roster from CSV / Excel"
+              onSuccess={() => setShowCsvModal(false)}
+            />
+          )}
+
+          {/* Search, Zone Filters & Sort Toolbar */}
+          <div className="bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm space-y-3">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search Box */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search player by name, nickname, jersey #..."
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Zone Pills & Sort Toggle */}
+              <div className="flex flex-wrap items-center justify-between md:justify-end gap-2">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  {['All', 'FWD', 'MID', 'DEF', 'RUCK'].map((zone) => (
+                    <button
+                      key={zone}
+                      onClick={() => setFilterZone(zone)}
+                      className={`px-3 py-1.5 text-xs font-black rounded-lg transition cursor-pointer ${
+                        filterZone === zone
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      {zone}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setSortBy(sortBy === 'number' ? 'name' : 'number')}
+                  className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 cursor-pointer transition"
+                >
+                  Sort: <strong className="text-slate-900">{sortBy === 'number' ? 'Jumper #' : 'Name'}</strong>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Squad Grid View */}
+          {filtered.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filtered.map((p) => {
+                const rawFldPos = Object.keys(lineup).find((k) => lineup[k] === p.id);
+                const fldPos = rawFldPos ? normalizePosition(rawFldPos) : undefined;
+
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => onSelectPlayerId(p.id)}
+                    className="bg-white hover:bg-slate-50/80 rounded-2xl border border-gray-200 hover:border-blue-300 p-4 shadow-2xs hover:shadow-md transition duration-150 cursor-pointer flex flex-col justify-between gap-3 group relative overflow-hidden"
+                  >
+                    {/* Top row: Jumper badge + Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-xs shrink-0 ${
+                          p.primaryZone === 'FWD' ? 'bg-[#E5484D]' :
+                          p.primaryZone === 'DEF' ? 'bg-[#16a765]' :
+                          p.primaryZone === 'RUCK' ? 'bg-[#8B5CF6]' : 'bg-[#4C6FFF]'
+                        }`}>
+                          #{p.number}
+                        </div>
+                        <div>
+                          <h3 className="font-black text-sm text-slate-900 group-hover:text-blue-700 transition leading-tight">
+                            {p.name}
+                          </h3>
+                          {p.nick && (
+                            <p className="text-[11px] text-blue-600 font-bold">"{p.nick}"</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase shrink-0 ${
+                        p.status === 'available' ? 'bg-green-50 text-[#0E7A48] border border-green-200' :
+                        p.status === 'injured' ? 'bg-red-50 text-red-700 border border-red-200' :
+                        p.status === 'other_team' ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}>
+                        {p.status === 'other_team' ? 'Opponent' : p.status}
+                      </span>
+                    </div>
+
+                    {/* Middle row: Zones & Positions */}
+                    <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase ${
+                          p.primaryZone === 'FWD' ? 'bg-red-50 text-red-700 border border-red-200' :
+                          p.primaryZone === 'DEF' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                          p.primaryZone === 'RUCK' ? 'bg-purple-50 text-purple-800 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'
+                        }`}>
+                          {p.primaryZone}
+                        </span>
+
+                        {p.positions && p.positions.length > 0 ? (
+                          <span className="text-[9px] font-extrabold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            {p.positions.map(normalizePosition).join(', ')}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-gray-400 font-medium italic">No preferred pos</span>
+                        )}
+                      </div>
+
+                      {fldPos ? (
+                        <div className="flex items-center gap-1 text-[10px] font-black text-emerald-800 bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
+                          <span>Starter Position: {fldPos}</span>
+                        </div>
+                      ) : p.status === 'available' ? (
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 p-1 rounded-lg">
+                          <span>Bench Reserve</span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Bottom row: Click prompt */}
+                    <div className="flex items-center justify-between text-xs font-black text-blue-600 group-hover:text-blue-800 pt-1 border-t border-slate-100">
+                      <span>View Player Details</span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            <div className="space-y-6">
-              <div className="p-6 text-center bg-slate-50 border border-slate-200 rounded-xl">
-                <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                <h4 className="font-black text-sm text-[var(--navy)]">No Player Selected</h4>
-                <p className="text-xs text-gray-500 font-semibold mt-1">
-                  Select a player from the roster list on the left to view their profile, edit details, or track playtime heatmaps.
+            <div className="p-8 text-center space-y-4 bg-white border border-gray-200 rounded-2xl shadow-xs">
+              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-black text-sm text-[var(--navy)]">No Players Found</h4>
+                <p className="text-xs text-gray-500 font-semibold mt-1 max-w-sm mx-auto">
+                  {searchQuery || filterZone !== 'All'
+                    ? `No squad members matched filter "${filterZone}" / query "${searchQuery}".`
+                    : 'This squad currently has no players. Register players manually, import CSV roster, or load sample data.'}
                 </p>
               </div>
-              <CsvImportGuide
-                players={players}
-                onUpdatePlayers={onUpdatePlayers}
-                onUpdateLineup={onUpdateLineup}
-                title="CSV Roster Bulk Import & File Format Guide"
-              />
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={handleOpenAddPlayer}
+                  className="px-4 py-2 bg-[var(--green)] hover:opacity-95 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add First Player</span>
+                </button>
+                <button
+                  onClick={handleRestoreDefaultSquad}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Load Sample Squad</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* MODAL: Add/Edit Player */}
       {showAddEditModal && (
@@ -1161,16 +1593,82 @@ export default function TeamScreen({
                 </div>
               </div>
 
+              {/* Physical Attributes Section */}
+              <div className="space-y-3 bg-slate-50 border border-slate-200 p-3.5 rounded-2xl">
+                <span className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
+                  Physical Profile & Bio Details
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Height (cm)</label>
+                    <input
+                      type="number"
+                      value={formHeightCm}
+                      onChange={(e) => setFormHeightCm(e.target.value)}
+                      placeholder="180"
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Weight (kg)</label>
+                    <input
+                      type="number"
+                      value={formWeightKg}
+                      onChange={(e) => setFormWeightKg(e.target.value)}
+                      placeholder="75"
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Preferred Foot</label>
+                    <select
+                      value={formPreferredFoot}
+                      onChange={(e) => setFormPreferredFoot(e.target.value as any)}
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    >
+                      <option value="Right">Right</option>
+                      <option value="Left">Left</option>
+                      <option value="Dual">Dual Footed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Gender</label>
+                    <select
+                      value={formGender}
+                      onChange={(e) => setFormGender(e.target.value as any)}
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    >
+                      <option value="Female">Female</option>
+                      <option value="Male">Male</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Age Bracket</label>
+                    <select
+                      value={formAgeGroup}
+                      onChange={(e) => setFormAgeGroup(e.target.value as any)}
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    >
+                      <option value="U10">U10</option>
+                      <option value="U12">U12</option>
+                      <option value="U14">U14</option>
+                      <option value="U16">U16</option>
+                      <option value="U18">U18 / Senior</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Notes */}
               <div>
                 <label className="block mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
-                  Note / Comments
+                  Coaching Notes / Remarks
                 </label>
                 <input
                   type="text"
                   value={formNote}
                   onChange={(e) => setFormNote(e.target.value)}
-                  placeholder="e.g. recovering from a minor quad strain"
+                  placeholder="e.g. strong tackling technique, work on left foot"
                   className="w-full p-2.5 border border-gray-200 bg-white rounded-xl focus:outline-none text-sm font-bold text-[var(--ink)]"
                 />
               </div>

@@ -6,12 +6,34 @@ export interface Player {
   positions: string[];
   primaryZone: string;
   gender?: 'Male' | 'Female';
-  ageGroup?: 'U12' | 'U14' | 'U16' | 'U18';
+  ageGroup?: 'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors';
   status: 'available' | 'away' | 'injured' | 'other_team';
   active: number; // in seconds
   bench: number;  // in seconds
   note: string;
   slotTimes?: Record<string, number>;
+  // Physical & Preferred Attributes
+  heightCm?: number;
+  weightKg?: number;
+  preferredFoot?: 'Right' | 'Left' | 'Dual';
+  // Core Skill Ratings (1-10)
+  kickAccuracyRating?: number;
+  kickDistanceMeters?: number;
+  oppositeFootRating?: number;
+  handballRating?: number;
+  markingRating?: number;
+  tacklingRating?: number;
+  gameSenseRating?: number;
+  fitnessRating?: number;
+  // Positional Rubric Attributes (1-10)
+  spoilingRating?: number; // FB / CHB spoiling
+  overheadMarkingRating?: number; // Overhead vs chest mark
+  crumbingRating?: number; // Ground ball gets at drop of ball
+  pressureActsRating?: number; // Tackles & chasing inside 50
+  ruckTapRating?: number; // Ruck tap placement & follow-up
+  leadingTimingRating?: number; // Key Forward leading patterns
+  snapGoalRating?: number; // Short snaps & set shots
+  defensiveTransitionRating?: number; // Running defender / Wing transition
 }
 
 export interface ScoreDetail {
@@ -208,7 +230,7 @@ export interface SkillAssessment {
   seasonLabel: string; // e.g. "2025 Start of Season", "2026 Pre-Season", "2026 Mid-Season"
   // InterchangeIQ Demographics
   gender?: 'Male' | 'Female';
-  ageGroup?: 'U12' | 'U14' | 'U16' | 'U18';
+  ageGroup?: 'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors';
   // Fitness & Combine Tests
   timeTrial2km?: string; // e.g. "08:45"
   yoyoLevel?: string; // e.g. "15.2"
@@ -226,6 +248,15 @@ export interface SkillAssessment {
   markingRating: number; // 1-10
   tacklingRating: number; // 1-10
   gameSenseRating: number; // 1-10
+  // Position-Specific Rubric Attributes
+  spoilingRating?: number; // 1-10 (FB/CHB/Ruck defensive contest)
+  overheadMarkingRating?: number; // 1-10 (Overhead vs chest marking)
+  crumbingRating?: number; // 1-10 (Small forward / Midfield ground ball cleanliness)
+  pressureActsRating?: number; // 1-10 (Small forward / Midfield chase & tackle inside 50)
+  ruckTapRating?: number; // 1-10 (Ruck tap placement & follow-up)
+  leadingTimingRating?: number; // 1-10 (Key Forward leading patterns & space creation)
+  snapGoalRating?: number; // 1-10 (Short snaps & set shots)
+  defensiveTransitionRating?: number; // 1-10 (Running defender / Wing transition & support play)
   // InterchangeIQ Calculated Ratings
   overallInterchangeIqScore?: number; // 1.0 - 5.0
   overallRatingBadge?: 'Elite' | 'Advanced' | 'Developing' | 'Emerging' | 'Needs Development';

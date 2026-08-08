@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import SkillRubricModal from './SkillRubricModal';
 import { calculateInterchangeIQGrade, Gender, AgeGroup, INTERCHANGE_IQ_SCALE } from '../utils/interchangeIQRubric';
+import { evaluatePlayerPositionalRubric } from '../utils/aflPositionalRubric';
 
 function parseSeconds(val?: string): number | null {
   if (!val) return null;
@@ -141,6 +142,16 @@ export default function PlayerGrowthScreen({
   const [formMarking, setFormMarking] = useState(7);
   const [formTackling, setFormTackling] = useState(7);
   const [formGameSense, setFormGameSense] = useState(7);
+
+  // Position-Specific Rubric Attributes
+  const [formSpoiling, setFormSpoiling] = useState(7);
+  const [formOverheadMarking, setFormOverheadMarking] = useState(7);
+  const [formCrumbing, setFormCrumbing] = useState(7);
+  const [formPressureActs, setFormPressureActs] = useState(7);
+  const [formRuckTap, setFormRuckTap] = useState(7);
+  const [formLeadingTiming, setFormLeadingTiming] = useState(7);
+  const [formSnapGoal, setFormSnapGoal] = useState(7);
+  const [formDefensiveTransition, setFormDefensiveTransition] = useState(7);
 
   // Notes
   const [formGoals, setFormGoals] = useState('');
@@ -370,6 +381,14 @@ export default function PlayerGrowthScreen({
       setFormMarking(last.markingRating || 7);
       setFormTackling(last.tacklingRating || 7);
       setFormGameSense(last.gameSenseRating || 7);
+      setFormSpoiling(last.spoilingRating || 7);
+      setFormOverheadMarking(last.overheadMarkingRating || 7);
+      setFormCrumbing(last.crumbingRating || 7);
+      setFormPressureActs(last.pressureActsRating || 7);
+      setFormRuckTap(last.ruckTapRating || 7);
+      setFormLeadingTiming(last.leadingTimingRating || 7);
+      setFormSnapGoal(last.snapGoalRating || 7);
+      setFormDefensiveTransition(last.defensiveTransitionRating || 7);
       setFormGoals(last.developmentGoals || '');
       setFormNotes('');
     } else {
@@ -387,6 +406,14 @@ export default function PlayerGrowthScreen({
       setFormMarking(7);
       setFormTackling(7);
       setFormGameSense(7);
+      setFormSpoiling(7);
+      setFormOverheadMarking(7);
+      setFormCrumbing(7);
+      setFormPressureActs(7);
+      setFormRuckTap(7);
+      setFormLeadingTiming(7);
+      setFormSnapGoal(7);
+      setFormDefensiveTransition(7);
       setFormGoals('');
       setFormNotes('');
     }
@@ -416,6 +443,14 @@ export default function PlayerGrowthScreen({
     setFormMarking(record.markingRating);
     setFormTackling(record.tacklingRating);
     setFormGameSense(record.gameSenseRating);
+    setFormSpoiling(record.spoilingRating || 7);
+    setFormOverheadMarking(record.overheadMarkingRating || 7);
+    setFormCrumbing(record.crumbingRating || 7);
+    setFormPressureActs(record.pressureActsRating || 7);
+    setFormRuckTap(record.ruckTapRating || 7);
+    setFormLeadingTiming(record.leadingTimingRating || 7);
+    setFormSnapGoal(record.snapGoalRating || 7);
+    setFormDefensiveTransition(record.defensiveTransitionRating || 7);
     setFormGoals(record.developmentGoals || '');
     setFormNotes(record.coachNotes || '');
     setShowAddModal(true);
@@ -462,6 +497,14 @@ export default function PlayerGrowthScreen({
       markingRating: formMarking,
       tacklingRating: formTackling,
       gameSenseRating: formGameSense,
+      spoilingRating: formSpoiling,
+      overheadMarkingRating: formOverheadMarking,
+      crumbingRating: formCrumbing,
+      pressureActsRating: formPressureActs,
+      ruckTapRating: formRuckTap,
+      leadingTimingRating: formLeadingTiming,
+      snapGoalRating: formSnapGoal,
+      defensiveTransitionRating: formDefensiveTransition,
       overallInterchangeIqScore: grading.overallScore,
       overallRatingBadge: grading.overallTier.title as any,
       developmentGoals: formGoals.trim(),
@@ -889,7 +932,157 @@ export default function PlayerGrowthScreen({
                           <span className="text-sm font-black text-purple-600 block">{activePlayerLatestRecord.tacklingRating} / 10</span>
                         </div>
                       </div>
+
+                      {/* Positional Skill Ratings Row */}
+                      <div className="pt-2 border-t border-gray-200/80">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-2">
+                          Positional Rubric Attributes:
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Spoiling</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.spoilingRating || 7}/10</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Overhead Mark</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.overheadMarkingRating || 7}/10</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Crumbing</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.crumbingRating || 7}/10</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Pressure Acts</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.pressureActsRating || 7}/10</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Ruck Tap</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.ruckTapRating || 7}/10</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Leading Timing</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.leadingTimingRating || 7}/10</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Snap Goal</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.snapGoalRating || 7}/10</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-gray-200 text-center">
+                            <span className="text-[9px] font-bold text-gray-500 block">Def Transition</span>
+                            <span className="text-xs font-black text-slate-800">{activePlayerLatestRecord.defensiveTransitionRating || 7}/10</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* AFL POSITIONAL RUBRIC & RECOMMENDATIONS CARD */}
+                    {(() => {
+                      const evaluations = evaluatePlayerPositionalRubric(activePlayer, activePlayerLatestRecord);
+                      const topChoice = evaluations[0];
+                      return (
+                        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-900/60 rounded-2xl p-5 text-white space-y-4 shadow-md">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-2xl">🏉</span>
+                              <div>
+                                <h4 className="text-sm font-black text-white flex items-center gap-2">
+                                  <span>{activePlayer.name}'s Positional Rubric & AI Recommendation</span>
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase">
+                                    {activePlayerLatestRecord.gender || activePlayer.gender || 'Female'} {activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U16'}
+                                  </span>
+                                </h4>
+                                <p className="text-xs text-indigo-200 font-medium">
+                                  Mapped against official AFL Boys & Girls Positional Development Rubric
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => setShowRubricModal(true)}
+                              className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-slate-950" />
+                              <span>View Full Rubric</span>
+                            </button>
+                          </div>
+
+                          {/* Top Recommendations Row */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {evaluations.slice(0, 3).map((ev, idx) => {
+                              const isTop = idx === 0;
+                              return (
+                                <div
+                                  key={ev.group.code}
+                                  className={`p-3.5 rounded-xl border flex flex-col justify-between space-y-2 ${
+                                    isTop
+                                      ? 'bg-amber-500/10 border-amber-400/80 ring-1 ring-amber-400/40'
+                                      : 'bg-white/5 border-white/10'
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-lg">{ev.group.iconEmoji}</span>
+                                        <span className="font-extrabold text-xs text-white">{ev.group.title}</span>
+                                      </div>
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                        ev.tier === 'Strong Match' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' :
+                                        ev.tier === 'Good Fit' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/30' :
+                                        'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                                      }`}>
+                                        {ev.tier}
+                                      </span>
+                                    </div>
+
+                                    {/* Score bar */}
+                                    <div className="mt-2 space-y-1">
+                                      <div className="flex items-center justify-between text-[10px] text-indigo-200 font-bold">
+                                        <span>Suitability Score</span>
+                                        <span>{ev.suitabilityScore} / 100</span>
+                                      </div>
+                                      <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full transition-all duration-500 ${
+                                            ev.suitabilityScore >= 80 ? 'bg-emerald-400' : ev.suitabilityScore >= 65 ? 'bg-indigo-400' : 'bg-amber-400'
+                                          }`}
+                                          style={{ width: `${ev.suitabilityScore}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="pt-2 border-t border-white/10 text-[10px] text-slate-300 font-medium leading-relaxed">
+                                    <strong className="text-white block font-bold mb-0.5">Stage Expectation:</strong>
+                                    {ev.ageStageExpectation}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Top Choice Coaching Commentary */}
+                          {topChoice && (
+                            <div className="bg-indigo-950/80 p-4 rounded-xl border border-indigo-800/80 space-y-2">
+                              <div className="flex items-center gap-2 text-amber-300 text-xs font-black uppercase tracking-wider">
+                                <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                                <span>Why {topChoice.group.title} is Recommended for {activePlayer.name}:</span>
+                              </div>
+                              <p className="text-xs text-indigo-100 font-medium leading-relaxed">
+                                {topChoice.whyComment}
+                              </p>
+                              <div className="bg-white/5 p-2.5 rounded-lg border border-white/10 text-[11px] text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <span>
+                                  <strong>AFL Age Milestone ({activePlayerLatestRecord.gender || activePlayer.gender || 'Female'} {activePlayerLatestRecord.ageGroup || activePlayer.ageGroup || 'U16'}):</strong> {topChoice.ageStageExpectation}
+                                </span>
+                                <span className="text-[10px] bg-amber-400/20 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-300/30 shrink-0">
+                                  Focus: {topChoice.growthFocus}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-300 space-y-3">
@@ -2145,6 +2338,95 @@ export default function PlayerGrowthScreen({
                         onChange={(e) => setFormGameSense(parseInt(e.target.value))}
                         className="w-full h-1 bg-gray-200 rounded-lg accent-blue-600 cursor-pointer"
                       />
+                    </div>
+                  </div>
+
+                  {/* POSITIONAL RUBRIC SPECIFIC ATTRIBUTES */}
+                  <div className="pt-3 border-t border-gray-200/80 space-y-2">
+                    <b className="text-[11px] font-black text-indigo-900 uppercase tracking-wider block">
+                      🏉 Positional Rubric Skills (1-10)
+                    </b>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Spoiling ({formSpoiling}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formSpoiling}
+                          onChange={(e) => setFormSpoiling(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Overhead Marking ({formOverheadMarking}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formOverheadMarking}
+                          onChange={(e) => setFormOverheadMarking(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Crumbing / Ground Gets ({formCrumbing}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formCrumbing}
+                          onChange={(e) => setFormCrumbing(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Pressure Acts ({formPressureActs}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formPressureActs}
+                          onChange={(e) => setFormPressureActs(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Ruck Tap Placement ({formRuckTap}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formRuckTap}
+                          onChange={(e) => setFormRuckTap(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Leading Timing ({formLeadingTiming}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formLeadingTiming}
+                          onChange={(e) => setFormLeadingTiming(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Snap Goal Kicking ({formSnapGoal}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formSnapGoal}
+                          onChange={(e) => setFormSnapGoal(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">
+                          Defensive Transition ({formDefensiveTransition}/10)
+                        </label>
+                        <input
+                          type="range" min="1" max="10" value={formDefensiveTransition}
+                          onChange={(e) => setFormDefensiveTransition(parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg accent-indigo-600 cursor-pointer"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

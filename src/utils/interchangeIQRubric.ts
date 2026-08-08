@@ -1,5 +1,5 @@
 export type Gender = 'Male' | 'Female';
-export type AgeGroup = 'U12' | 'U14' | 'U16' | 'U18';
+export type AgeGroup = 'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors';
 
 export interface RubricLevel {
   rating: 1 | 2 | 3 | 4 | 5;
@@ -74,6 +74,11 @@ export interface CohortBenchmark {
 
 export const COHORT_BENCHMARKS: Record<Gender, Record<AgeGroup, CohortBenchmark>> = {
   Male: {
+    U10: {
+      sprint20m: { r5: 3.70, r4Max: 3.85, r3Max: 4.00, r2Max: 4.15 },
+      agility: { r5: 9.70, r4Max: 10.00, r3Max: 10.30, r2Max: 10.60 },
+      vertical: { r5: 38, r4Min: 34, r3Min: 30, r2Min: 26 }
+    },
     U12: {
       sprint20m: { r5: 3.50, r4Max: 3.64, r3Max: 3.79, r2Max: 3.94 },
       agility: { r5: 9.30, r4Max: 9.59, r3Max: 9.89, r2Max: 10.19 },
@@ -93,9 +98,18 @@ export const COHORT_BENCHMARKS: Record<Gender, Record<AgeGroup, CohortBenchmark>
       sprint20m: { r5: 3.00, r4Max: 3.04, r3Max: 3.14, r2Max: 3.24 },
       agility: { r5: 8.20, r4Max: 8.29, r3Max: 8.39, r2Max: 8.59 },
       vertical: { r5: 70, r4Min: 65, r3Min: 60, r2Min: 55 }
+    },
+    Seniors: {
+      sprint20m: { r5: 2.95, r4Max: 3.02, r3Max: 3.10, r2Max: 3.20 },
+      agility: { r5: 8.10, r4Max: 8.20, r3Max: 8.32, r2Max: 8.50 },
+      vertical: { r5: 72, r4Min: 67, r3Min: 62, r2Min: 57 }
     }
   },
   Female: {
+    U10: {
+      sprint20m: { r5: 3.95, r4Max: 4.10, r3Max: 4.25, r2Max: 4.40 },
+      vertical: { r5: 32, r4Min: 28, r3Min: 24, r2Min: 20 }
+    },
     U12: {
       sprint20m: { r5: 3.75, r4Max: 3.89, r3Max: 4.04, r2Max: 4.19 },
       vertical: { r5: 38, r4Min: 34, r3Min: 30, r2Min: 26 }
@@ -112,6 +126,11 @@ export const COHORT_BENCHMARKS: Record<Gender, Record<AgeGroup, CohortBenchmark>
       sprint20m: { r5: 3.15, r4Max: 3.24, r3Max: 3.39, r2Max: 3.54 },
       agility: { r5: 8.50, r4Max: 8.59, r3Max: 8.79, r2Max: 8.99 },
       vertical: { r5: 55, r4Min: 52, r3Min: 48, r2Min: 44 }
+    },
+    Seniors: {
+      sprint20m: { r5: 3.10, r4Max: 3.20, r3Max: 3.32, r2Max: 3.45 },
+      agility: { r5: 8.40, r4Max: 8.50, r3Max: 8.68, r2Max: 8.88 },
+      vertical: { r5: 58, r4Min: 54, r3Min: 50, r2Min: 45 }
     }
   }
 };
