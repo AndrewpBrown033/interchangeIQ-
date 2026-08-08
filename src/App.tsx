@@ -505,6 +505,17 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: typeof data.createdAt === 'number' && data.createdAt > 0 ? data.createdAt : 0,
             isInactive: !!data.isInactive,
+            // These were previously omitted here, which meant a write from
+            // handleUpdateTeams (e.g. confirming a Training/Player Growth/
+            // JARVIS toggle) got immediately clobbered the moment this same
+            // live listener re-fired with the round-tripped snapshot — the
+            // rebuilt team object was missing the field, and the toggle UI
+            // treats a missing field as "on", so the confirmed change looked
+            // like it silently reverted/did nothing.
+            showTraining: data.showTraining !== false,
+            showPlayerGrowth: data.showPlayerGrowth !== false,
+            showJarvis: data.showJarvis !== false,
+            isDemo: !!data.isDemo,
           });
         }
       });
@@ -696,6 +707,10 @@ export default function App() {
             name: data.name || 'Unnamed Squad',
             createdAt: data.createdAt || Date.now(),
             isInactive: !!data.isInactive,
+            showTraining: data.showTraining !== false,
+            showPlayerGrowth: data.showPlayerGrowth !== false,
+            showJarvis: data.showJarvis !== false,
+            isDemo: !!data.isDemo,
           });
         }
       });
