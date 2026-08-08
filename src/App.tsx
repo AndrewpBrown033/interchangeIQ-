@@ -1541,9 +1541,22 @@ export default function App() {
     }
 
     const currentTeams = Array.isArray(teams) ? teams : [];
+    const activeTeamForSync = currentTeams.find(t => t.id === activeTeamId);
     const dataToSync = {
       id: activeTeamId,
-      name: currentTeams.find(t => t.id === activeTeamId)?.name || 'New Team',
+      name: activeTeamForSync?.name || 'New Team',
+      // IMPORTANT: this effect fires automatically and often — any time players,
+      // lineup, score, or other match data changes. It used to be a plain
+      // (non-merge) setDoc that omitted these fields entirely, which meant it
+      // would silently wipe a feature toggle back to its default moments after
+      // you set it, since this effect runs so much more frequently than a
+      // manual sync. { merge: true } below plus including these fields fixes
+      // it the same way the other two sync paths were fixed.
+      isInactive: !!activeTeamForSync?.isInactive,
+      isDemo: !!activeTeamForSync?.isDemo,
+      showTraining: activeTeamForSync?.showTraining !== false,
+      showPlayerGrowth: activeTeamForSync?.showPlayerGrowth !== false,
+      showJarvis: activeTeamForSync?.showJarvis !== false,
       players: Array.isArray(players) ? players : [],
       lineup,
       score,
@@ -1570,7 +1583,7 @@ export default function App() {
     const timer = setTimeout(() => {
       lastPublishedSerializedRef.current = currentSerialized;
       const cleanPayload = JSON.parse(JSON.stringify({ ...dataToSync, updatedAt: Date.now() }));
-      setDoc(docRef, cleanPayload)
+      setDoc(docRef, cleanPayload, { merge: true })
         .then(() => {
           setLastSyncedAt(Date.now());
           setCloudConnected(true);
