@@ -542,14 +542,29 @@ export default function GameDayScreen({
     const secondsUntil5Min = Math.max(0, 300 - elapsedSeconds);
 
     const onGroundIds = new Set(Object.values(lineup));
-    const plannedOutIds = new Set(plannedRotations.map((r) => r.outId));
-    const plannedInIds = new Set(plannedRotations.map((r) => r.inId));
+    
+    // Collect all players participating in unapplied standard rotation plan entries
+    const unappliedPlanRotations = rotations.filter((r) => {
+      if (r.applied) return false;
+      const matchesPlan = activePlanIds.length === 0 || activePlanIds.includes(r.planId);
+      const matchesQuarter = r.quarter === score.quarter;
+      return matchesPlan || matchesQuarter;
+    });
+
+    const playersInStandardPlan = new Set<string>();
+    unappliedPlanRotations.forEach((r) => {
+      if (r.outId) playersInStandardPlan.add(r.outId);
+      if (r.inId) playersInStandardPlan.add(r.inId);
+      if (r.groupP1Id) playersInStandardPlan.add(r.groupP1Id);
+      if (r.groupP2Id) playersInStandardPlan.add(r.groupP2Id);
+      if (r.groupP3Id) playersInStandardPlan.add(r.groupP3Id);
+    });
 
     const onGroundUnplanned = players.filter(
-      (p) => p.status === 'available' && onGroundIds.has(p.id) && !plannedOutIds.has(p.id)
+      (p) => p.status === 'available' && onGroundIds.has(p.id) && !playersInStandardPlan.has(p.id)
     );
     const onBenchUnplanned = players.filter(
-      (p) => p.status === 'available' && !onGroundIds.has(p.id) && !plannedInIds.has(p.id)
+      (p) => p.status === 'available' && !onGroundIds.has(p.id) && !playersInStandardPlan.has(p.id)
     );
 
     const needRest = onGroundUnplanned
