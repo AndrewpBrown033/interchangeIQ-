@@ -3101,7 +3101,6 @@ export default function AdminScreen({
               </div>
             </div>
           </div>
-          </div>
 
           {/* SMTP configuration — moved in from the server .env file */}
           <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
