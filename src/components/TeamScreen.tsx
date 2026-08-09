@@ -4,6 +4,7 @@ import { POSITION_GROUPS, POSITIONS, DEFAULT_PLAYERS, normalizePosition, getZone
 import { evaluatePlayerPositionalRubric } from '../utils/aflPositionalRubric';
 import { calculateInterchangeIQGrade } from '../utils/interchangeIQRubric';
 import { classifyHeight, resolvePlayerHeightGroup } from '../utils/interchangeIQRubric';
+import PositionalRubricModal from './PositionalRubricModal';
 import { 
   Plus, Edit3, Trash, ShieldCheck, UserMinus, UserCheck, AlertTriangle, 
   Check, X, Flame, Sparkles, Clock, Activity, RotateCcw, Landmark, 
@@ -93,6 +94,7 @@ export default function TeamScreen({
   const [formGender, setFormGender] = useState<'Female' | 'Male'>('Female');
   const [formAgeGroup, setFormAgeGroup] = useState<'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'Seniors'>('U16');
   const [formHeightGroupOverride, setFormHeightGroupOverride] = useState<'' | 'Small' | 'Medium' | 'Tall'>('');
+  const [showPositionalRubricModal, setShowPositionalRubricModal] = useState(false);
 
   // Live-computed height classification preview for the form
   const formHeightCmNum = parseFloat(formHeightCm) || 0;
@@ -131,8 +133,8 @@ export default function TeamScreen({
     : [];
   const activePlayerLatestRecord = playerRecords[0] || null;
 
-  const heightCm = activePlayer?.heightCm ?? 180;
-  const weightKg = activePlayer?.weightKg ?? 75;
+  const heightCm = activePlayer?.heightCm ?? 0;
+  const weightKg = activePlayer?.weightKg ?? 0;
   const preferredFoot = activePlayer?.preferredFoot ?? 'Right';
   const gender = activePlayer?.gender ?? 'Female';
   const ageGroup = activePlayer?.ageGroup ?? 'U16';
@@ -351,7 +353,7 @@ export default function TeamScreen({
     // Preserve a genuine "unknown" (0) height rather than silently defaulting
     // to 180 — that's exactly the case the grouping flag exists for.
     setFormHeightCm(p.heightCm ? String(p.heightCm) : '0');
-    setFormWeightKg(p.weightKg ? String(p.weightKg) : '75');
+    setFormWeightKg(p.weightKg ? String(p.weightKg) : '0');
     setFormPreferredFoot(p.preferredFoot || 'Right');
     setFormGender((p.gender as any) || 'Female');
     setFormAgeGroup(p.ageGroup || 'U16');
@@ -387,7 +389,7 @@ export default function TeamScreen({
       // since that's exactly what would block the grouping flag from ever showing.
       heightCm: parseFloat(formHeightCm) || 0,
       heightGroupOverride: formHeightGroupOverride || undefined,
-      weightKg: parseFloat(formWeightKg) || 75,
+      weightKg: parseFloat(formWeightKg) || 0,
       preferredFoot: formPreferredFoot,
       gender: formGender,
       ageGroup: formAgeGroup,
@@ -420,7 +422,7 @@ export default function TeamScreen({
         note: formNote.trim(),
         heightCm: parseFloat(formHeightCm) || 0,
         heightGroupOverride: formHeightGroupOverride || undefined,
-        weightKg: parseFloat(formWeightKg) || 75,
+        weightKg: parseFloat(formWeightKg) || 0,
         preferredFoot: formPreferredFoot,
         gender: formGender,
         ageGroup: formAgeGroup,
@@ -711,7 +713,7 @@ export default function TeamScreen({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Height</span>
-                    <span className="text-base font-black text-slate-900 mt-0.5 block">{heightCm} cm</span>
+                    <span className="text-base font-black text-slate-900 mt-0.5 block">{heightCm > 0 ? `${heightCm} cm` : '—'}</span>
                     {activePlayerHeightGrade ? (
                       <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-black border ${activePlayerHeightGrade.tier.badgeText}`}>
                         {activePlayerHeightGrade.tier.emoji} {activePlayerHeightGrade.label} ({activePlayerHeightGrade.rating}/5)
@@ -728,7 +730,12 @@ export default function TeamScreen({
                   </div>
                   <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Weight</span>
-                    <span className="text-base font-black text-slate-900 mt-0.5 block">{weightKg} kg</span>
+                    <span className="text-base font-black text-slate-900 mt-0.5 block">{weightKg > 0 ? `${weightKg} kg` : '—'}</span>
+                    {weightKg <= 0 && (
+                      <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-black border bg-slate-100 text-slate-400 border-slate-200">
+                        Not recorded
+                      </span>
+                    )}
                   </div>
                   <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-center">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Preferred Foot</span>
@@ -893,6 +900,14 @@ export default function TeamScreen({
                       </button>
                     )}
                   </div>
+
+                  <button
+                    onClick={() => setShowPositionalRubricModal(true)}
+                    className="text-[11px] font-extrabold text-indigo-200 hover:text-white bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/15 cursor-pointer inline-flex items-center gap-1.5 -mt-1"
+                  >
+                    <Ruler className="w-3 h-3" />
+                    <span>View Full Position Rubric</span>
+                  </button>
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/5 p-3.5 rounded-xl border border-white/10">
                     <div>
@@ -2440,6 +2455,13 @@ export default function TeamScreen({
             </div>
           </div>
         </div>
+      )}
+
+      {showPositionalRubricModal && (
+        <PositionalRubricModal
+          onClose={() => setShowPositionalRubricModal(false)}
+          initialGroupId={topChoice?.group.id}
+        />
       )}
     </div>
   );
