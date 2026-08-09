@@ -2048,13 +2048,13 @@ export default function GameDayScreen({
                 {/* Dynamic SVG Connecting Lines & Arrowhead Markers for Interchange / Swaps */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-15" viewBox="0 0 100 100" preserveAspectRatio="none">
                   <defs>
-                    <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
                       <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
                     </marker>
-                    <marker id="afl-arrow-red" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <marker id="afl-arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
                       <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626" />
                     </marker>
-                    <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
                       <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
                     </marker>
                   </defs>
