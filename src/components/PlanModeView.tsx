@@ -86,6 +86,7 @@ export default function PlanModeView({
   const [selectedQuarter, setSelectedQuarter] = useState<number>(currentQuarter);
   const [selectedMinute, setSelectedMinute] = useState<number>(7);
   const [showThreeWayModal, setShowThreeWayModal] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'bench' | 'pitch' | 'queue'>('pitch');
 
   // Link selection state for rotation linking
   const [selectedSource, setSelectedSource] = useState<{ type: 'bench' | 'field'; id: string; slot?: string } | null>(null);
@@ -201,43 +202,41 @@ export default function PlanModeView({
     <div className="fixed inset-0 bg-[#f3f4f6] z-50 overflow-hidden flex flex-col font-sans select-none text-slate-900">
       
       {/* Sleek Top Bar */}
-      <div className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 shadow-xs">
-        <div className="flex items-center gap-3">
+      <div className="bg-white border-b border-slate-200 px-3 py-2 flex flex-col sm:flex-row items-center justify-between shrink-0 shadow-xs gap-2">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-start">
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition cursor-pointer shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-slate-700" />
-            <span>Back to game</span>
+            <span>Back</span>
           </button>
 
-          <div className="text-slate-600 text-xs font-bold flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-full bg-slate-900 text-amber-400 font-black text-[10px] border border-slate-700">
+          <div className="text-slate-600 text-xs font-bold flex items-center gap-1.5 overflow-x-auto">
+            <span className="px-2 py-0.5 rounded-full bg-slate-900 text-amber-400 font-black text-[10px] border border-slate-700 shrink-0">
               {teamName}
             </span>
             <span className="text-slate-300">•</span>
-            <span>Quarter {selectedQuarter}</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-slate-900 font-black">Plan Mode</span>
+            <span className="shrink-0 font-black text-slate-900">Q{selectedQuarter} Plan</span>
           </div>
         </div>
 
         {/* Quarter Selector & 3-Way Generator */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
           <button
             onClick={() => setShowThreeWayModal(true)}
-            className="px-2.5 py-1 text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-md transition cursor-pointer flex items-center gap-1 shadow-2xs"
+            className="px-2.5 py-1 text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-md transition cursor-pointer flex items-center gap-1 shadow-2xs shrink-0"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>3-Way Generator</span>
           </button>
 
-          <div className="flex bg-slate-100 p-0.5 rounded-md gap-1">
+          <div className="flex bg-slate-100 p-0.5 rounded-md gap-1 shrink-0">
             {[1, 2, 3, 4].map((q) => (
               <button
                 key={q}
                 onClick={() => setSelectedQuarter(q)}
-                className={`px-2.5 py-0.5 text-xs font-extrabold rounded transition cursor-pointer ${
+                className={`px-2 py-0.5 text-xs font-extrabold rounded transition cursor-pointer ${
                   selectedQuarter === q
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:text-slate-900'
@@ -250,11 +249,45 @@ export default function PlanModeView({
         </div>
       </div>
 
-      {/* Main 3-Column Workspace Layout */}
+      {/* Mobile Subheader Tab Switcher (Visible only on mobile screens < md) */}
+      <div className="flex md:hidden bg-slate-900 text-white border-b border-slate-800 p-1.5 gap-1 shrink-0">
+        <button
+          onClick={() => setMobileTab('bench')}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            mobileTab === 'bench' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'text-slate-300 hover:bg-white/10'
+          }`}
+        >
+          <span>Bench</span>
+          <span className="px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">{benchPlayers.length}</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('pitch')}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            mobileTab === 'pitch' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'text-slate-300 hover:bg-white/10'
+          }`}
+        >
+          <span>Field Pitch</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('queue')}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            mobileTab === 'queue' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'text-slate-300 hover:bg-white/10'
+          }`}
+        >
+          <span>Queue</span>
+          <span className="px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">{qRotations.length}</span>
+        </button>
+      </div>
+
+      {/* Main Workspace Layout (Grid on md+, tab-switched on mobile) */}
       <div className="flex-1 grid grid-cols-12 overflow-hidden bg-[#f3f4f6]">
 
         {/* LEFT COLUMN: BENCH PLAYERS PANEL */}
-        <div className="col-span-3 sm:col-span-2 lg:col-span-3 border-r border-slate-200 bg-[#f8fafc] flex flex-col overflow-hidden">
+        <div className={`col-span-12 md:col-span-3 lg:col-span-3 border-r border-slate-200 bg-[#f8fafc] flex flex-col overflow-hidden ${
+          mobileTab === 'bench' ? 'flex' : 'hidden md:flex'
+        }`}>
           {/* Header */}
           <div className="p-3 border-b border-slate-200 flex items-center gap-2 bg-white shrink-0">
             <span className="font-extrabold text-xs uppercase tracking-wider text-slate-700">BENCH</span>
@@ -318,7 +351,9 @@ export default function PlanModeView({
         </div>
 
         {/* CENTER COLUMN: AFL PITCH CANVAS */}
-        <div className="col-span-6 sm:col-span-7 lg:col-span-6 relative flex flex-col items-center justify-center p-2 sm:p-3 overflow-hidden bg-[#f3f4f6]">
+        <div className={`col-span-12 md:col-span-6 relative flex flex-col items-center justify-center p-2 sm:p-3 overflow-hidden bg-[#f3f4f6] ${
+          mobileTab === 'pitch' ? 'flex' : 'hidden md:flex'
+        }`}>
           
           {/* EXACT GAMEDAY PITCH CONTAINER WITH RADIAL TURF & 3D GOAL POSTS */}
           <div className="field relative select-none w-full max-w-[490px] my-auto">
@@ -502,7 +537,9 @@ export default function PlanModeView({
         </div>
 
         {/* RIGHT COLUMN: QUEUE & NEW PLAN PANEL */}
-        <div className="col-span-3 sm:col-span-3 lg:col-span-3 border-l border-slate-200 bg-white text-slate-900 flex flex-col overflow-hidden">
+        <div className={`col-span-12 md:col-span-3 lg:col-span-3 border-l border-slate-200 bg-white text-slate-900 flex flex-col overflow-hidden ${
+          mobileTab === 'queue' ? 'flex' : 'hidden md:flex'
+        }`}>
           
           {/* Header Bar matching GameDay style */}
           <div className="p-3 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
