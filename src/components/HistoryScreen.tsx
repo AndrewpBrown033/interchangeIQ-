@@ -33,7 +33,7 @@ export default function HistoryScreen({ history, onUpdateHistory }: HistoryScree
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 p-4 rounded-2xl border border-indigo-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-[var(--navy)] via-[#102A43] to-indigo-900 p-4 rounded-2xl border border-indigo-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-white tracking-tight">Game History</h2>
           <p className="text-xs text-indigo-300 font-semibold mt-1">

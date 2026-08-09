@@ -34,12 +34,12 @@ export default function PositionalRubricModal({ onClose, initialGroupId }: Props
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[2100] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-3xl border border-gray-200 shadow-2xl max-h-[92vh] overflow-hidden flex flex-col">
         {/* Blue heading */}
-        <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900">
+        <div className="bg-gradient-to-br from-[var(--navy)] via-[#102A43] to-indigo-900">
           <div className="flex items-center justify-between p-5">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+              <Sparkles className="w-5 h-5 text-[var(--amber)] animate-pulse" />
               <div>
-                <h3 className="text-sm font-black text-amber-300 uppercase tracking-wider">AFL Positional Rubric</h3>
+                <h3 className="text-sm font-black text-[var(--amber)] uppercase tracking-wider">AFL Positional Rubric</h3>
                 <p className="text-[11px] text-indigo-300 font-semibold">
                   Core skills, height convention & Boys/Girls progression for every position group
                 </p>

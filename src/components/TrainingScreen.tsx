@@ -545,7 +545,7 @@ export default function TrainingScreen({
   return (
     <div id="training" className="space-y-4">
       {/* Header Panel */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 p-4 rounded-2xl border border-indigo-800 shadow-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[var(--navy)] via-[#102A43] to-indigo-900 p-4 rounded-2xl border border-indigo-800 shadow-md">
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight">
             {trainingState.view === 'plans' ? 'Training Plans' : trainingState.view === 'viewer' ? activeDrill?.title : 'Training Library'}
@@ -569,7 +569,7 @@ export default function TrainingScreen({
               }
               className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-white/10 text-white border border-white/15 rounded-xl hover:bg-white/15 transition cursor-pointer"
             >
-              {trainingState.motionPaused ? <Play className="w-3.5 h-3.5 text-emerald-400" /> : <Pause className="w-3.5 h-3.5 text-amber-300" />}
+              {trainingState.motionPaused ? <Play className="w-3.5 h-3.5 text-[var(--green)]" /> : <Pause className="w-3.5 h-3.5 text-[var(--amber)]" />}
               <span>{trainingState.motionPaused ? 'Play routes' : 'Pause routes'}</span>
             </button>
           )}
@@ -577,7 +577,7 @@ export default function TrainingScreen({
           {onNavigateToJarvis && (
             <button
               onClick={onNavigateToJarvis}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl transition shadow-xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-black bg-[var(--amber)] hover:opacity-90 text-slate-950 rounded-xl transition shadow-xs cursor-pointer"
             >
               <Bot className="w-4 h-4 text-slate-950" />
               <span>Ask Jarvis AI</span>
@@ -589,7 +589,7 @@ export default function TrainingScreen({
               onClick={() => onUpdateTrainingState({ ...trainingState, view: 'library' })}
               className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-white/10 text-white border border-white/15 rounded-xl hover:bg-white/15 transition cursor-pointer"
             >
-              <Library className="w-3.5 h-3.5 text-blue-300" />
+              <Library className="w-3.5 h-3.5 text-[var(--blue)]" />
               <span>Library</span>
             </button>
           )}
@@ -599,7 +599,7 @@ export default function TrainingScreen({
               onClick={() => onUpdateTrainingState({ ...trainingState, view: 'plans' })}
               className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-white/10 text-white border border-white/15 rounded-xl hover:bg-white/15 transition cursor-pointer"
             >
-              <FolderHeart className="w-3.5 h-3.5 text-blue-300" />
+              <FolderHeart className="w-3.5 h-3.5 text-[var(--blue)]" />
               <span>Plans</span>
             </button>
           )}

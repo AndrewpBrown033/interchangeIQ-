@@ -1142,7 +1142,7 @@ export default function AdminScreen({
   return (
     <div className="space-y-6">
       {/* Top Header & Sub-navigation Header Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 p-5 rounded-2xl border border-indigo-800 shadow-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[var(--navy)] via-[#102A43] to-indigo-900 p-5 rounded-2xl border border-indigo-800 shadow-md">
         <div>
           <h2 className="text-xl font-black text-white tracking-tight">Admin Dashboard</h2>
           <p className="text-xs text-indigo-300 font-semibold mt-1">
@@ -2512,11 +2512,11 @@ export default function AdminScreen({
           {/* SUB-SECTION: API Keys */}
           {jarvisSubTab === 'keys' && (
             <div className="space-y-5">
-              <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-6 rounded-3xl border border-indigo-800/40 shadow-xl relative overflow-hidden">
+              <div className="bg-gradient-to-r from-[var(--navy)] via-[#102A43] to-indigo-900 text-white p-6 rounded-3xl border border-indigo-800/40 shadow-xl relative overflow-hidden">
                 <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
                 <div className="flex items-start gap-4 relative z-10">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 p-0.5 shadow-lg shrink-0">
-                    <div className="w-full h-full bg-indigo-950 rounded-[14px] flex items-center justify-center text-amber-300">
+                    <div className="w-full h-full bg-indigo-950 rounded-[14px] flex items-center justify-center text-[var(--amber)]">
                       <Key className="w-6 h-6" />
                     </div>
                   </div>
@@ -2719,7 +2719,7 @@ export default function AdminScreen({
               {/* Jarvis Diagnostic Output Box */}
               {jarvisTestResult && (
                 <div className={`p-4 rounded-2xl border ${
-                  jarvisTestResult.success ? 'bg-slate-950 border-emerald-500/40 text-emerald-400' : 'bg-slate-950 border-red-500/40 text-red-400'
+                  jarvisTestResult.success ? 'bg-slate-950 border-emerald-500/40 text-[var(--green)]' : 'bg-slate-950 border-red-500/40 text-red-400'
                 } space-y-2.5 font-mono text-xs shadow-lg animate-fadeIn`}>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-slate-300 font-sans">
                     <div className="flex items-center gap-2 font-black text-xs">
@@ -2753,7 +2753,7 @@ export default function AdminScreen({
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Server & API Debug Traces:</span>
                       <div className="p-3 bg-black/80 rounded-xl border border-slate-800 space-y-1 text-[11px] leading-relaxed overflow-x-auto max-h-56">
                         {jarvisTestResult.debugLogs.map((log, lIdx) => (
-                          <div key={lIdx} className="whitespace-pre-wrap break-all text-emerald-400">
+                          <div key={lIdx} className="whitespace-pre-wrap break-all text-[var(--green)]">
                             {log}
                           </div>
                         ))}
@@ -2796,7 +2796,7 @@ export default function AdminScreen({
           {jarvisSubTab === 'prompts' && (
         <>
           {/* Top Prompts Header Banner */}
-          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-6 rounded-3xl border border-indigo-800/40 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-gradient-to-r from-[var(--navy)] via-[#102A43] to-indigo-900 text-white p-6 rounded-3xl border border-indigo-800/40 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="flex items-start gap-4 relative z-10">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-400 p-0.5 shadow-lg shrink-0">
@@ -3002,9 +3002,9 @@ export default function AdminScreen({
       {adminSection === 'notifications' && (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
-            <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
+            <div className="px-5 py-3.5 bg-gradient-to-r from-[var(--navy)] via-[#102A43] to-indigo-900">
               <h3 className="font-black text-sm text-white flex items-center gap-2">
-                <Bell className="w-4 h-4 text-amber-300" />
+                <Bell className="w-4 h-4 text-[var(--amber)]" />
                 <span>Notification Channels</span>
               </h3>
               <p className="text-xs text-indigo-300 font-semibold mt-1">
@@ -3101,11 +3101,13 @@ export default function AdminScreen({
               </div>
             </div>
           </div>
+          </div>
+
           {/* SMTP configuration — moved in from the server .env file */}
           <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
-            <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
+            <div className="px-5 py-3.5 bg-gradient-to-r from-[var(--navy)] via-[#102A43] to-indigo-900">
               <h3 className="font-black text-sm text-white flex items-center gap-2">
-                <Key className="w-4 h-4 text-amber-300" />
+                <Key className="w-4 h-4 text-[var(--amber)]" />
                 <span>Email (SMTP) Server Setup</span>
               </h3>
               <p className="text-xs text-indigo-300 font-semibold mt-1">
@@ -3296,7 +3298,7 @@ export default function AdminScreen({
             )}
 
             {smtpDebugLogs && smtpDebugLogs.length > 0 && (
-              <div className="p-3 bg-gray-900 text-emerald-400 font-mono text-[11px] rounded-xl border border-gray-800 shadow-inner space-y-1 overflow-x-auto max-h-48">
+              <div className="p-3 bg-gray-900 text-[var(--green)] font-mono text-[11px] rounded-xl border border-gray-800 shadow-inner space-y-1 overflow-x-auto max-h-48">
                 <div className="flex items-center justify-between text-gray-400 border-b border-gray-800 pb-1 text-[10px] font-bold uppercase tracking-wider">
                   <span>SMTP Connection Debug Log</span>
                   <button
