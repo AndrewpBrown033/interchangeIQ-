@@ -33,17 +33,17 @@ export default function HistoryScreen({ history, onUpdateHistory }: HistoryScree
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 p-4 rounded-2xl border border-indigo-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Game History</h2>
-          <p className="text-xs text-[var(--muted)] font-semibold mt-1">
+          <h2 className="text-xl font-black text-white tracking-tight">Game History</h2>
+          <p className="text-xs text-indigo-300 font-semibold mt-1">
             Review detailed player usage, applied rotations and scoreboards from past games
           </p>
         </div>
         {selectedGameId && (
           <button
             onClick={() => setSelectedPlayerId(null)}
-            className="px-3.5 py-2 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-xl hover:bg-gray-200 transition flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-bold bg-white/10 text-white rounded-xl hover:bg-white/15 transition flex items-center gap-1.5 border border-white/15 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Logs</span>

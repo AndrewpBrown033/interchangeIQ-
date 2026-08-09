@@ -1142,22 +1142,22 @@ export default function AdminScreen({
   return (
     <div className="space-y-6">
       {/* Top Header & Sub-navigation Header Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 p-5 rounded-2xl border border-indigo-800 shadow-md">
         <div>
-          <h2 className="text-xl font-black text-[var(--navy)] tracking-tight">Admin Dashboard</h2>
-          <p className="text-xs text-[var(--muted)] font-semibold mt-1">
+          <h2 className="text-xl font-black text-white tracking-tight">Admin Dashboard</h2>
+          <p className="text-xs text-indigo-300 font-semibold mt-1">
             Configure squads, coach credentials, Jarvis AI provider keys, and tactical prompts
           </p>
         </div>
         
         {/* Navigation Switcher */}
-        <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-200/80">
+        <div className="flex bg-white/10 p-1 rounded-2xl border border-white/15">
           <button
             onClick={() => setAdminSection('access')}
             className={`py-2 px-4 rounded-xl font-black text-xs transition flex items-center gap-2 cursor-pointer ${
               adminSection === 'access'
-                ? 'bg-white text-[var(--navy)] shadow-xs'
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-indigo-200 hover:text-white'
             }`}
           >
             <Shield className="w-4 h-4 text-blue-500" />
@@ -1168,13 +1168,13 @@ export default function AdminScreen({
             className={`py-2 px-4 rounded-xl font-black text-xs transition flex items-center gap-2 cursor-pointer ${
               adminSection === 'prompts'
                 ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-gray-500 hover:text-gray-800'
+                : 'text-indigo-200 hover:text-white'
             }`}
           >
             <Bot className="w-4 h-4 text-indigo-300" />
             <span>Jarvis Settings</span>
             <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-              adminSection === 'prompts' ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-700'
+              adminSection === 'prompts' ? 'bg-indigo-500 text-white' : 'bg-white/15 text-indigo-100'
             }`}>
               {prompts.length}
             </span>
@@ -1184,7 +1184,7 @@ export default function AdminScreen({
             className={`py-2 px-4 rounded-xl font-black text-xs transition flex items-center gap-2 cursor-pointer ${
               adminSection === 'notifications'
                 ? 'bg-amber-500 text-white shadow-xs'
-                : 'text-gray-500 hover:text-gray-800'
+                : 'text-indigo-200 hover:text-white'
             }`}
           >
             <Bell className="w-4 h-4 text-amber-400" />
@@ -3001,16 +3001,18 @@ export default function AdminScreen({
       {/* SECTION 3: Notification Settings */}
       {adminSection === 'notifications' && (
         <div className="space-y-6">
-          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs">
-            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
-              <Bell className="w-4 h-4 text-amber-500" />
-              <span>Notification Channels</span>
-            </h3>
-            <p className="text-xs text-gray-500 font-semibold mt-1 mb-4">
-              Turn each notification channel on or off for the whole club.
-            </p>
+          <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
+            <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
+              <h3 className="font-black text-sm text-white flex items-center gap-2">
+                <Bell className="w-4 h-4 text-amber-300" />
+                <span>Notification Channels</span>
+              </h3>
+              <p className="text-xs text-indigo-300 font-semibold mt-1">
+                Turn each notification channel on or off for the whole club.
+              </p>
+            </div>
 
-            <div className="space-y-3">
+            <div className="p-5 space-y-3">
               {/* Email channel */}
               <div className="flex items-start justify-between gap-4 p-3.5 border border-gray-100 rounded-xl">
                 <div className="flex items-start gap-3">
@@ -3099,18 +3101,21 @@ export default function AdminScreen({
               </div>
             </div>
           </div>
+          </div>
 
           {/* SMTP configuration — moved in from the server .env file */}
-          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
-            <div>
-              <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-2">
-                <Key className="w-4 h-4 text-blue-500" />
+          <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
+            <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
+              <h3 className="font-black text-sm text-white flex items-center gap-2">
+                <Key className="w-4 h-4 text-amber-300" />
                 <span>Email (SMTP) Server Setup</span>
               </h3>
-              <p className="text-xs text-gray-500 font-semibold mt-1">
+              <p className="text-xs text-indigo-300 font-semibold mt-1">
                 Configure your mail server (MailerSend, Gmail, SendGrid, Mailgun, Postmark, etc.) so password resets and coach invitations are sent directly to user inboxes.
               </p>
             </div>
+
+            <div className="p-5 space-y-4">
 
             {/* Provider Quick Presets */}
             <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
@@ -3358,6 +3363,7 @@ export default function AdminScreen({
             <p className="text-[10px] text-gray-400 font-semibold border-t border-gray-100 pt-3">
               These settings are shared with every coach who has Admin access on this club and are sent to the server only when an invite email is triggered — the password is stored, not displayed, once saved. If left blank, the server falls back to its own SMTP_* / RESEND_API_KEY environment configuration (if any).
             </p>
+          </div>
           </div>
 
           {/* Firebase Trigger Email Extension Card */}

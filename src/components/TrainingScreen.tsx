@@ -545,12 +545,12 @@ export default function TrainingScreen({
   return (
     <div id="training" className="space-y-4">
       {/* Header Panel */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 p-4 rounded-2xl border border-indigo-800 shadow-md">
         <div>
-          <h2 className="text-2xl font-black text-[var(--navy)] tracking-tight">
+          <h2 className="text-2xl font-black text-white tracking-tight">
             {trainingState.view === 'plans' ? 'Training Plans' : trainingState.view === 'viewer' ? activeDrill?.title : 'Training Library'}
           </h2>
-          <p className="text-xs text-[var(--muted)] font-semibold mt-1">
+          <p className="text-xs text-indigo-300 font-semibold mt-1">
             {trainingState.view === 'plans'
               ? 'Organise and schedule your training sessions'
               : trainingState.view === 'viewer'
@@ -567,9 +567,9 @@ export default function TrainingScreen({
                   motionPaused: !trainingState.motionPaused,
                 })
               }
-              className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-[#F0F1F5] text-[var(--ink)] border border-[var(--line)] rounded-xl hover:bg-gray-100 transition"
+              className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-white/10 text-white border border-white/15 rounded-xl hover:bg-white/15 transition cursor-pointer"
             >
-              {trainingState.motionPaused ? <Play className="w-3.5 h-3.5 text-[var(--green)]" /> : <Pause className="w-3.5 h-3.5 text-[var(--amber)]" />}
+              {trainingState.motionPaused ? <Play className="w-3.5 h-3.5 text-emerald-400" /> : <Pause className="w-3.5 h-3.5 text-amber-300" />}
               <span>{trainingState.motionPaused ? 'Play routes' : 'Pause routes'}</span>
             </button>
           )}
@@ -577,9 +577,9 @@ export default function TrainingScreen({
           {onNavigateToJarvis && (
             <button
               onClick={onNavigateToJarvis}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl transition shadow-xs cursor-pointer"
             >
-              <Bot className="w-4 h-4 text-indigo-200" />
+              <Bot className="w-4 h-4 text-slate-950" />
               <span>Ask Jarvis AI</span>
             </button>
           )}
@@ -587,9 +587,9 @@ export default function TrainingScreen({
           {trainingState.view !== 'library' && (
             <button
               onClick={() => onUpdateTrainingState({ ...trainingState, view: 'library' })}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-[#F0F1F5] text-[var(--ink)] border border-[var(--line)] rounded-xl hover:bg-gray-100 transition"
+              className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-white/10 text-white border border-white/15 rounded-xl hover:bg-white/15 transition cursor-pointer"
             >
-              <Library className="w-3.5 h-3.5 text-[var(--blue)]" />
+              <Library className="w-3.5 h-3.5 text-blue-300" />
               <span>Library</span>
             </button>
           )}
@@ -597,16 +597,16 @@ export default function TrainingScreen({
           {trainingState.view !== 'plans' && (
             <button
               onClick={() => onUpdateTrainingState({ ...trainingState, view: 'plans' })}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-[#F0F1F5] text-[var(--ink)] border border-[var(--line)] rounded-xl hover:bg-gray-100 transition"
+              className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-white/10 text-white border border-white/15 rounded-xl hover:bg-white/15 transition cursor-pointer"
             >
-              <FolderHeart className="w-3.5 h-3.5 text-[var(--blue)]" />
+              <FolderHeart className="w-3.5 h-3.5 text-blue-300" />
               <span>Plans</span>
             </button>
           )}
 
           <button
             onClick={handleOpenAddDrill}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition shadow-sm"
+            className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-white/10 text-indigo-100 border border-white/15 rounded-xl hover:bg-white/15 transition cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Import with AI</span>
@@ -614,7 +614,7 @@ export default function TrainingScreen({
 
           <button
             onClick={handleOpenAddDrill}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-90 transition shadow-sm"
+            className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-emerald-500 text-white rounded-xl hover:bg-emerald-400 transition shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Drill</span>
