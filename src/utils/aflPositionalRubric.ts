@@ -2,15 +2,11 @@ import { Player, SkillAssessment } from '../types';
 import { Gender, AgeGroup, HeightGroup, resolvePlayerHeightGroup } from './interchangeIQRubric';
 
 export interface PositionProgression {
-  u10: string[];
-  u12: string[];
-  u14: {
-    girls: string;
-    boys: string;
-    both: string;
-  };
-  u16: string[];
-  u18Seniors: string[];
+  u10: { boys: string; girls: string; both: string };
+  u12: { boys: string; girls: string; both: string };
+  u14: { boys: string; girls: string; both: string };
+  u16: { boys: string; girls: string; both: string };
+  u18Seniors: { boys: string; girls: string; both: string };
 }
 
 export interface PositionalRubricGroup {
@@ -51,15 +47,15 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
       girls: 'Earlier positioning awareness'
     },
     progression: {
-      u10: ['Basic spoils', 'Stay goal-side', 'Chest marks only'],
-      u12: ['Short kicks to space', 'Simple intercepts'],
+      u10: { both: 'Basic spoils, staying goal-side, chest marks only', boys: 'Enjoys early contested marking attempts', girls: 'Focuses on getting body position right before the contest' },
+      u12: { both: 'Short kicks to space & simple intercepts', boys: 'Starting to test overhead marking in a genuine contest', girls: "Building confidence reading the ball off opponents' boot" },
       u14: {
         girls: 'Still developing kicking distance',
         boys: 'Beginning overhead marking',
         both: 'Learning body positioning & goal-side discipline'
       },
-      u16: ['More confident contests', 'Basic rebound'],
-      u18Seniors: ['Intercepting', 'Structured defensive leadership']
+      u16: { both: 'More confident contests & basic rebound', boys: 'Increasingly competitive in one-on-one marking', girls: 'Developing physical strength to match aerial intent' },
+      u18Seniors: { both: 'Intercepting & structured defensive leadership', boys: 'Well-established aerial dominance', girls: 'Strong all-round intercept marking and organisational leadership' }
     }
   },
   RDEF: {
@@ -80,15 +76,15 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
       girls: 'Stronger decision-making and support play'
     },
     progression: {
-      u10: ['Run forward', 'Simple handball chains'],
-      u12: ['Short kicks to teammates', 'Basic switches'],
+      u10: { both: 'Run forward, simple handball chains', boys: 'Enjoys running end-to-end with the ball', girls: 'Looks for the safe short option before running' },
+      u12: { both: 'Short kicks to teammates, basic switches', boys: 'Starting to use speed to beat the first line of pressure', girls: 'Building awareness of when to switch play' },
       u14: {
         girls: 'Still developing kicking strength',
         boys: 'Beginning to break lines',
         both: 'Learning defensive transition & positioning'
       },
-      u16: ['Reliable short kicks', 'Better pressure reads'],
-      u18Seniors: ['Structured rebound', 'Tempo control']
+      u16: { both: 'Reliable short kicks & better pressure reads', boys: 'Using speed to consistently break defensive lines', girls: 'Reading pressure and picking the right rebound option' },
+      u18Seniors: { both: 'Structured rebound & tempo control', boys: 'Explosive line-breaking running off half back', girls: 'Composed, low-risk ball use under sustained pressure' }
     }
   },
   KFWD: {
@@ -109,15 +105,15 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
       girls: 'Better timing and space creation'
     },
     progression: {
-      u10: ['Straight leads', 'Chest marks'],
-      u12: ['Short set shots', 'Simple body work'],
+      u10: { both: 'Straight leads, chest marks', boys: 'Enjoys physical one-on-one contests early', girls: 'Times leads well to find space' },
+      u12: { both: 'Short set shots, simple body work', boys: 'Building strength to hold position at the contest', girls: 'Refining lead timing against a defender' },
       u14: {
         girls: 'Still developing kicking power',
         boys: 'Beginning contested marking',
         both: 'Learning repeat leads & space creation'
       },
-      u16: ['More reliable marking', 'Scoreboard impact'],
-      u18Seniors: ['Tactical leading', 'Pack presence']
+      u16: { both: 'More reliable marking & scoreboard impact', boys: 'Increasingly dominant in contested one-on-ones', girls: 'Consistently creating separation through smart leading' },
+      u18Seniors: { both: 'Tactical leading & pack presence', boys: 'Genuine contested marking target', girls: 'Elite lead timing and structured forward craft' }
     }
   },
   SFWD: {
@@ -138,15 +134,15 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
       girls: 'Stronger positioning and repeat efforts'
     },
     progression: {
-      u10: ['Chase', 'Tackle', 'Front-and-centre basics'],
-      u12: ['Simple snaps', 'Pressure acts'],
+      u10: { both: 'Chase, tackle, front-and-centre basics', boys: 'Loves the chase and simple tackling', girls: 'Works hard to stay front-and-centre of the ball' },
+      u12: { both: 'Simple snaps, pressure acts', boys: 'Applying quicker chase pressure', girls: 'Building consistency with repeat pressure efforts' },
       u14: {
         girls: 'Still developing kicking consistency',
         boys: 'Speed-based pressure',
         both: 'Learning scoring involvement & tackling inside 50'
       },
-      u16: ['Repeat efforts', 'Scoreboard impact'],
-      u18Seniors: ['Tactical pressure', 'Scoring craft']
+      u16: { both: 'Repeat efforts & scoreboard impact', boys: 'Using speed to apply relentless forward pressure', girls: 'Reliable repeat pressure and smart crumbing positioning' },
+      u18Seniors: { both: 'Tactical pressure & scoring craft', boys: 'Explosive small-forward craft under pressure', girls: 'Composed set-shot craft and elite repeat pressure' }
     }
   },
   MID: {
@@ -168,15 +164,15 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
       girls: 'Stronger game sense and positioning'
     },
     progression: {
-      u10: ['Handball chains', 'Basic positioning'],
-      u12: ['Spread + support running'],
+      u10: { both: 'Handball chains, basic positioning', boys: 'Enjoys quick bursts out of a contest', girls: 'Reads where support is needed' },
+      u12: { both: 'Spread + support running', boys: 'Beginning to use speed to break away from stoppages', girls: 'Building awareness of team structure and spread' },
       u14: {
         girls: 'Still developing kicking distance',
         boys: 'Beginning clearance strength',
         both: 'Learning stoppage roles & spread'
       },
-      u16: ['Reliable short kicks', 'Better defensive running'],
-      u18Seniors: ['Tactical midfield control', 'Pace & endurance execution']
+      u16: { both: 'Reliable short kicks & better defensive running', boys: 'Winning more clearances through strength and burst', girls: 'Strong tactical reads and consistent defensive effort' },
+      u18Seniors: { both: 'Tactical midfield control & pace/endurance execution', boys: 'High-impact clearance and outside speed', girls: 'Elite decision-making and stoppage craft' }
     }
   },
   RUCK: {
@@ -197,15 +193,15 @@ export const AFL_POSITIONAL_RUBRIC: Record<string, PositionalRubricGroup> = {
       girls: 'Stronger positioning + repeat efforts'
     },
     progression: {
-      u10: ['Simple taps', 'Basic positioning'],
-      u12: ['Direct taps', 'Follow-up ground work'],
+      u10: { both: 'Simple taps, basic positioning', boys: 'Often the tallest and enjoys the aerial contest', girls: 'Focuses on good body position at the bounce' },
+      u12: { both: 'Direct taps, follow-up ground work', boys: 'Beginning to use height advantage more deliberately', girls: 'Building reliable tap placement to teammates' },
       u14: {
         girls: 'Still developing marking confidence',
         boys: 'Beginning aerial impact',
         both: 'Learning stoppage structure & second efforts'
       },
-      u16: ['Stronger tap placement', 'Contest work'],
-      u18Seniors: ['Tactical ruck leadership', 'Hitout-to-advantage accuracy']
+      u16: { both: 'Stronger tap placement & contest work', boys: 'Growing physical dominance in ruck contests', girls: 'Consistent tap accuracy and strong follow-up efforts' },
+      u18Seniors: { both: 'Tactical ruck leadership & hitout-to-advantage accuracy', boys: 'Genuine aerial dominance at stoppages', girls: 'Elite tap craft and stoppage leadership' }
     }
   }
 };
