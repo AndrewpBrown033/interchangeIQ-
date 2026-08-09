@@ -3101,8 +3101,6 @@ export default function AdminScreen({
               </div>
             </div>
           </div>
-          </div>
-
           {/* SMTP configuration — moved in from the server .env file */}
           <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
             <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">

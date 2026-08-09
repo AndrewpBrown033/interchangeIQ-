@@ -733,16 +733,14 @@ export default function SkillRubricModal({ onClose, onSelectScore }: SkillRubric
             {/* 6 Positional Groups Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Object.values(AFL_POSITIONAL_RUBRIC).map((group) => {
-                let currentExpectations = '';
-                if (selectedAge === 'U10') currentExpectations = group.progression.u10.join(', ');
-                else if (selectedAge === 'U12') currentExpectations = group.progression.u12.join(', ');
-                else if (selectedAge === 'U14') {
-                  const p = group.progression.u14;
-                  currentExpectations = selectedGender === 'Female' 
-                    ? `Girls: ${p.girls}. Both: ${p.both}` 
-                    : `Boys: ${p.boys}. Both: ${p.both}`;
-                } else if (selectedAge === 'U16') currentExpectations = group.progression.u16.join(', ');
-                else currentExpectations = group.progression.u18Seniors.join(', ');
+                const progBand = selectedAge === 'U10' ? group.progression.u10
+                  : selectedAge === 'U12' ? group.progression.u12
+                  : selectedAge === 'U14' ? group.progression.u14
+                  : selectedAge === 'U16' ? group.progression.u16
+                  : group.progression.u18Seniors;
+
+                const genderSpecific = selectedGender === 'Female' ? progBand.girls : progBand.boys;
+                const currentExpectations = `${progBand.both}. ${selectedGender === 'Female' ? 'Girls' : 'Boys'}: ${genderSpecific}`;
 
                 return (
                   <div key={group.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 transition space-y-4 flex flex-col justify-between">
