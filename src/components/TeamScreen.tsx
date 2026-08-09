@@ -1816,6 +1816,102 @@ export default function TeamScreen({
                 </div>
               </div>
 
+              {/* Physical Attributes Section */}
+              <div className="space-y-3 bg-slate-50 border border-slate-200 p-3.5 rounded-2xl">
+                <span className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
+                  Physical Profile & Bio Details
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Height (cm)</label>
+                    <input
+                      type="number"
+                      value={formHeightCm}
+                      onChange={(e) => setFormHeightCm(e.target.value)}
+                      placeholder="0 = not recorded"
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Weight (kg)</label>
+                    <input
+                      type="number"
+                      value={formWeightKg}
+                      onChange={(e) => setFormWeightKg(e.target.value)}
+                      placeholder="75"
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Preferred Foot</label>
+                    <select
+                      value={formPreferredFoot}
+                      onChange={(e) => setFormPreferredFoot(e.target.value as any)}
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    >
+                      <option value="Right">Right</option>
+                      <option value="Left">Left</option>
+                      <option value="Dual">Dual Footed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Gender</label>
+                    <select
+                      value={formGender}
+                      onChange={(e) => setFormGender(e.target.value as any)}
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    >
+                      <option value="Female">Female</option>
+                      <option value="Male">Male</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Age Bracket</label>
+                    <select
+                      value={formAgeGroup}
+                      onChange={(e) => setFormAgeGroup(e.target.value as any)}
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    >
+                      <option value="U10">U10</option>
+                      <option value="U12">U12</option>
+                      <option value="U14">U14</option>
+                      <option value="U16">U16</option>
+                      <option value="U18">U18 / Senior</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* InterchangeIQ Height Classification */}
+                {formHeightCmNum > 0 ? (
+                  formHeightResult ? (
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-lg border text-xs font-black ${formHeightResult.tier.badgeText}`}>
+                        {formHeightResult.tier.emoji} {formHeightResult.group} — {formHeightResult.label} (Rating {formHeightResult.rating}/5)
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 font-semibold">Height classification unavailable for this gender/age bracket combination.</p>
+                  )
+                ) : (
+                  <div>
+                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">
+                      Grouping Flag (height unknown — set manually)
+                    </label>
+                    <select
+                      value={formHeightGroupOverride}
+                      onChange={(e) => setFormHeightGroupOverride(e.target.value as any)}
+                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
+                    >
+                      <option value="">Not set</option>
+                      <option value="Small">Small</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Tall">Tall</option>
+                    </select>
+                    <p className="text-[9px] text-slate-500 font-semibold mt-1">Enter a height above to auto-calculate this instead — it always takes priority over the manual flag.</p>
+                  </div>
+                )}
+              </div>
+
               {/* Preferred Positions Builder */}
               <div className="space-y-2 bg-slate-50 border border-slate-200 p-3.5 rounded-2xl">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1921,102 +2017,6 @@ export default function TeamScreen({
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Physical Attributes Section */}
-              <div className="space-y-3 bg-slate-50 border border-slate-200 p-3.5 rounded-2xl">
-                <span className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
-                  Physical Profile & Bio Details
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  <div>
-                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Height (cm)</label>
-                    <input
-                      type="number"
-                      value={formHeightCm}
-                      onChange={(e) => setFormHeightCm(e.target.value)}
-                      placeholder="0 = not recorded"
-                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Weight (kg)</label>
-                    <input
-                      type="number"
-                      value={formWeightKg}
-                      onChange={(e) => setFormWeightKg(e.target.value)}
-                      placeholder="75"
-                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Preferred Foot</label>
-                    <select
-                      value={formPreferredFoot}
-                      onChange={(e) => setFormPreferredFoot(e.target.value as any)}
-                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
-                    >
-                      <option value="Right">Right</option>
-                      <option value="Left">Left</option>
-                      <option value="Dual">Dual Footed</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Gender</label>
-                    <select
-                      value={formGender}
-                      onChange={(e) => setFormGender(e.target.value as any)}
-                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
-                    >
-                      <option value="Female">Female</option>
-                      <option value="Male">Male</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">Age Bracket</label>
-                    <select
-                      value={formAgeGroup}
-                      onChange={(e) => setFormAgeGroup(e.target.value as any)}
-                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
-                    >
-                      <option value="U10">U10</option>
-                      <option value="U12">U12</option>
-                      <option value="U14">U14</option>
-                      <option value="U16">U16</option>
-                      <option value="U18">U18 / Senior</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* InterchangeIQ Height Classification */}
-                {formHeightCmNum > 0 ? (
-                  formHeightResult ? (
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded-lg border text-xs font-black ${formHeightResult.tier.badgeText}`}>
-                        {formHeightResult.tier.emoji} {formHeightResult.group} — {formHeightResult.label} (Rating {formHeightResult.rating}/5)
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-slate-500 font-semibold">Height classification unavailable for this gender/age bracket combination.</p>
-                  )
-                ) : (
-                  <div>
-                    <label className="block mb-1 text-[9px] font-black uppercase text-slate-500">
-                      Grouping Flag (height unknown — set manually)
-                    </label>
-                    <select
-                      value={formHeightGroupOverride}
-                      onChange={(e) => setFormHeightGroupOverride(e.target.value as any)}
-                      className="w-full p-2 border border-gray-200 bg-white rounded-xl text-xs font-bold text-slate-800"
-                    >
-                      <option value="">Not set</option>
-                      <option value="Small">Small</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Tall">Tall</option>
-                    </select>
-                    <p className="text-[9px] text-slate-500 font-semibold mt-1">Enter a height above to auto-calculate this instead — it always takes priority over the manual flag.</p>
-                  </div>
-                )}
               </div>
 
               {/* Notes */}
