@@ -602,12 +602,12 @@ export default function TeamScreen({
       {activePlayer ? (
         <div className="space-y-6 animate-fadeIn">
           {/* Focused Player Navigation & Action Header */}
-          <div className="bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 p-4 rounded-2xl border border-indigo-800 shadow-md space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => onSelectPlayerId(null)}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer shrink-0"
+                  className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer shrink-0 border border-white/15"
                 >
                   <ArrowLeft className="w-4 h-4 text-emerald-400" />
                   <span>← Back to Squad List</span>
@@ -622,21 +622,21 @@ export default function TeamScreen({
                     #{activePlayer.number}
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-slate-900 leading-tight">
-                      {activePlayer.name} {activePlayer.nick && <span className="text-blue-600 text-xs font-bold">({activePlayer.nick})</span>}
+                    <h2 className="text-lg font-black text-white leading-tight">
+                      {activePlayer.name} {activePlayer.nick && <span className="text-amber-300 text-xs font-bold">({activePlayer.nick})</span>}
                     </h2>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase ${
-                        activePlayer.primaryZone === 'FWD' ? 'bg-red-50 text-red-700 border border-red-200' :
-                        activePlayer.primaryZone === 'DEF' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
-                        activePlayer.primaryZone === 'RUCK' ? 'bg-purple-50 text-purple-800 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase border ${
+                        activePlayer.primaryZone === 'FWD' ? 'bg-red-500/20 text-red-200 border-red-400/30' :
+                        activePlayer.primaryZone === 'DEF' ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30' :
+                        activePlayer.primaryZone === 'RUCK' ? 'bg-purple-500/20 text-purple-200 border-purple-400/30' : 'bg-blue-500/20 text-blue-200 border-blue-400/30'
                       }`}>
                         {activePlayer.primaryZone} Zone
                       </span>
-                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase ${
-                        activePlayer.status === 'available' ? 'bg-green-50 text-[#0E7A48] border border-green-200' :
-                        activePlayer.status === 'injured' ? 'bg-red-50 text-red-700 border border-red-200' :
-                        activePlayer.status === 'other_team' ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase border ${
+                        activePlayer.status === 'available' ? 'bg-green-500/20 text-emerald-200 border-emerald-400/30' :
+                        activePlayer.status === 'injured' ? 'bg-red-500/20 text-red-200 border-red-400/30' :
+                        activePlayer.status === 'other_team' ? 'bg-purple-500/20 text-purple-200 border-purple-400/30' : 'bg-amber-500/20 text-amber-200 border-amber-400/30'
                       }`}>
                         {activePlayer.status === 'other_team' ? 'Playing for Opponent' : activePlayer.status}
                       </span>
@@ -649,27 +649,27 @@ export default function TeamScreen({
                 {prevPlayer && (
                   <button
                     onClick={() => onSelectPlayerId(prevPlayer.id)}
-                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                    className="px-3 py-2 bg-white/10 hover:bg-white/15 text-indigo-100 font-extrabold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer border border-white/15"
                     title={`Previous Player: #${prevPlayer.number} ${prevPlayer.name}`}
                   >
-                    <ChevronLeft className="w-4 h-4 text-gray-600" />
+                    <ChevronLeft className="w-4 h-4 text-indigo-300" />
                     <span>#{prevPlayer.number} {prevPlayer.nick || prevPlayer.name.split(' ')[0]}</span>
                   </button>
                 )}
                 {nextPlayer && (
                   <button
                     onClick={() => onSelectPlayerId(nextPlayer.id)}
-                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                    className="px-3 py-2 bg-white/10 hover:bg-white/15 text-indigo-100 font-extrabold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer border border-white/15"
                     title={`Next Player: #${nextPlayer.number} ${nextPlayer.name}`}
                   >
                     <span>#{nextPlayer.number} {nextPlayer.nick || nextPlayer.name.split(' ')[0]}</span>
-                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                    <ChevronRight className="w-4 h-4 text-indigo-300" />
                   </button>
                 )}
 
                 <button
                   onClick={() => handleOpenEditPlayer(activePlayer)}
-                  className="px-3 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-2 bg-amber-400 hover:bg-amber-300 border border-amber-300 text-slate-950 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>Edit Profile</span>
@@ -677,7 +677,7 @@ export default function TeamScreen({
 
                 <button
                   onClick={() => handleDeletePlayer(activePlayer.id)}
-                  className="px-3 py-2 bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-2 bg-red-500/20 border border-red-400/30 hover:bg-red-500/30 text-red-200 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Trash className="w-3.5 h-3.5" />
                   <span>Delete</span>
@@ -693,21 +693,23 @@ export default function TeamScreen({
             <div className="lg:col-span-7 space-y-6">
 
               {/* Physical Profile & Status Details */}
-              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
                   <div className="flex items-center gap-2">
-                    <User className="w-4.5 h-4.5 text-blue-600" />
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    <User className="w-4.5 h-4.5 text-amber-300" />
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">
                       Physical Details & Bio
                     </h3>
                   </div>
                   <button
                     onClick={() => handleOpenEditPlayer(activePlayer)}
-                    className="text-xs font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 cursor-pointer"
+                    className="text-xs font-extrabold text-amber-300 hover:text-amber-200 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/15 cursor-pointer"
                   >
                     Edit Physicals
                   </button>
                 </div>
+
+                <div className="p-5 space-y-4">
 
                 {/* 4 Physical Metric Badges */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -880,6 +882,7 @@ export default function TeamScreen({
                   )}
                 </div>
               </div>
+              </div>
 
               {/* AFL Positional Rubric & AI Recommendation Card */}
               {topChoice && (
@@ -968,18 +971,18 @@ export default function TeamScreen({
             <div className="lg:col-span-5 space-y-6">
 
               {/* Core Skill Attributes Card */}
-              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
                   <div className="flex items-center gap-2">
-                    <Award className="w-4.5 h-4.5 text-emerald-600" />
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    <Award className="w-4.5 h-4.5 text-amber-300" />
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">
                       Core Skill Attributes
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleOpenAdjustAttributes}
-                      className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-black transition cursor-pointer border border-emerald-200"
+                      className="flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/15 text-emerald-300 rounded-lg text-xs font-black transition cursor-pointer border border-white/15"
                     >
                       <Sliders className="w-3.5 h-3.5" />
                       Adjust Attributes
@@ -987,13 +990,15 @@ export default function TeamScreen({
                     {onNavigateTab && (
                       <button
                         onClick={() => onNavigateTab('growth')}
-                        className="text-xs font-extrabold text-indigo-600 hover:underline cursor-pointer"
+                        className="text-xs font-extrabold text-amber-300 hover:underline cursor-pointer"
                       >
                         Assessments →
                       </button>
                     )}
                   </div>
                 </div>
+
+                <div className="p-5 space-y-4">
 
                 <div className="space-y-3">
                   {/* Kick Accuracy */}
@@ -1085,17 +1090,20 @@ export default function TeamScreen({
                   </div>
                 </div>
               </div>
+              </div>
 
               {/* Positional Rubric Skills Card */}
-              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
                   <div className="flex items-center gap-2">
-                    <Target className="w-4.5 h-4.5 text-indigo-600" />
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    <Target className="w-4.5 h-4.5 text-amber-300" />
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">
                       Positional Rubric Skills
                     </h3>
                   </div>
                 </div>
+
+                <div className="p-5 space-y-4">
 
                 <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-800">
                   <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
@@ -1132,20 +1140,23 @@ export default function TeamScreen({
                   </div>
                 </div>
               </div>
+              </div>
 
               {/* Combine Test Snapshot Results Card */}
-              <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="bg-white rounded-2xl border border-[var(--line)] shadow-xs overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900">
                   <div className="flex items-center gap-2">
-                    <Zap className="w-4.5 h-4.5 text-amber-500" />
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    <Zap className="w-4.5 h-4.5 text-amber-300" />
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">
                       Combine Test Snapshot Results
                     </h3>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400/20 text-amber-200 border border-amber-400/30">
                     ⚡ Point-in-Time Test
                   </span>
                 </div>
+
+                <div className="p-5 space-y-4">
 
                 {latestCombineRecord ? (
                   <div className="space-y-3">
@@ -1213,6 +1224,7 @@ export default function TeamScreen({
                 <div className="p-2.5 bg-blue-50/80 rounded-xl border border-blue-200/80 text-[11px] text-blue-900 font-medium leading-tight">
                   📌 <strong>Snapshot Note:</strong> Combine test results are athletic snapshots recorded at a point in time. They do <strong>NOT</strong> alter or overwrite the player's static core attributes or skill ratings.
                 </div>
+              </div>
               </div>
 
             </div>
