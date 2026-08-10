@@ -3,6 +3,7 @@ import { TeamProfile, UserProfile, TacticalPrompt, Player, LineupTemplate, GameH
 import { DEFAULT_PLAYERS, DEMO_TEAM_ID } from '../constants';
 import { sendPasswordReset } from '../lib/firebase';
 import ConfirmModal from './ConfirmModal';
+import TeamEditModal from './TeamEditModal';
 import {
   Plus,
   Trash,
@@ -216,6 +217,7 @@ export default function AdminScreen({
   const [jarvisSubTab, setJarvisSubTab] = useState<'keys' | 'prompts'>('keys');
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [teamSyncMsg, setTeamSyncMsg] = useState<string | null>(null);
+  const [editingTeamProfile, setEditingTeamProfile] = useState<TeamProfile | null | 'NEW'>(null);
 
   // Jarvis Settings > API Keys panel state
   const [anthropicInput, setAnthropicInput] = useState('');
@@ -1823,24 +1825,33 @@ export default function AdminScreen({
                   <Landmark className="w-4 h-4 text-[var(--blue)]" />
                   <span>Teams & Clubs ({teams.length})</span>
                 </h3>
-                {onForceSyncTeams && (
+                <div className="flex items-center gap-2">
                   <button
-                    disabled={isSyncingTeams}
-                    onClick={async () => {
-                      setIsSyncingTeams(true);
-                      setTeamSyncMsg(null);
-                      const res = await onForceSyncTeams();
-                      setIsSyncingTeams(false);
-                      setTeamSyncMsg(res.message);
-                      setTimeout(() => setTeamSyncMsg(null), 8000);
-                    }}
-                    className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-                    title="Push all local team profiles to Cloud Firestore and sync remote team roster data"
+                    onClick={() => setEditingTeamProfile('NEW')}
+                    className="px-3 py-1.5 text-xs font-black bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition flex items-center gap-1 shadow-2xs cursor-pointer"
                   >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isSyncingTeams ? 'animate-spin' : ''}`} />
-                    <span>{isSyncingTeams ? 'Syncing...' : 'Sync Teams to Cloud'}</span>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Team</span>
                   </button>
-                )}
+                  {onForceSyncTeams && (
+                    <button
+                      disabled={isSyncingTeams}
+                      onClick={async () => {
+                        setIsSyncingTeams(true);
+                        setTeamSyncMsg(null);
+                        const res = await onForceSyncTeams();
+                        setIsSyncingTeams(false);
+                        setTeamSyncMsg(res.message);
+                        setTimeout(() => setTeamSyncMsg(null), 8000);
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                      title="Push all local team profiles to Cloud Firestore and sync remote team roster data"
+                    >
+                      <RotateCcw className={`w-3.5 h-3.5 ${isSyncingTeams ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingTeams ? 'Syncing...' : 'Sync Teams to Cloud'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
                 Manage your registered sports clubs. Active coaches can be assigned directly to individual team datasets.
@@ -1899,22 +1910,42 @@ export default function AdminScreen({
                           : 'border-gray-100 bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <b className={`text-sm font-extrabold block ${isInactive ? 'text-gray-600 line-through decoration-amber-500/60' : 'text-[var(--ink)]'}`}>{t.name}</b>
-                          {isInactive && (
-                            <span className="px-2 py-0.5 text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200 rounded-md">
-                              Inactive • Season Finished
-                            </span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden p-0.5 shadow-2xs">
+                          {t.logoUrl || t.iconUrl ? (
+                            <img src={t.logoUrl || t.iconUrl} alt={t.name} className="w-full h-full object-contain" />
+                          ) : (
+                            <Landmark className="w-5 h-5 text-slate-500" />
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
-                          <span>ID: {t.id}</span>
-                          {isActive && <span className="text-emerald-600 font-extrabold">• Active Selection</span>}
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <b className={`text-sm font-extrabold block ${isInactive ? 'text-gray-600 line-through decoration-amber-500/60' : 'text-[var(--ink)]'}`}>{t.name}</b>
+                            {t.jumperUrl && (
+                              <img src={t.jumperUrl} alt="Jumper" className="w-5 h-5 object-contain rounded border border-slate-200 shrink-0" title="Team Jumper" />
+                            )}
+                            {isInactive && (
+                              <span className="px-2 py-0.5 text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200 rounded-md">
+                                Inactive • Season Finished
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                            <span>ID: {t.id}</span>
+                            {isActive && <span className="text-emerald-600 font-extrabold">• Active Selection</span>}
+                          </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <button
+                          onClick={() => setEditingTeamProfile(t)}
+                          className="px-2.5 py-1.5 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg cursor-pointer transition flex items-center gap-1"
+                          title={`Edit logo, jumper and details for ${t.name}`}
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Branding</span>
+                        </button>
                         <button
                           onClick={() => {
                             onSelectTeam(t.id);
@@ -3819,6 +3850,36 @@ export default function AdminScreen({
           setPendingConfirm(null);
         }}
       />
+
+      {editingTeamProfile !== null && (
+        <TeamEditModal
+          team={editingTeamProfile === 'NEW' ? null : editingTeamProfile}
+          onClose={() => setEditingTeamProfile(null)}
+          onSave={(updatedTeam) => {
+            const exists = teams.some((t) => t.id === updatedTeam.id);
+            const nextTeams = exists
+              ? teams.map((t) => (t.id === updatedTeam.id ? updatedTeam : t))
+              : [...teams, updatedTeam];
+            onUpdateTeams(nextTeams);
+
+            if (!exists && Array.isArray(users) && users.length > 0) {
+              const updatedUsers = users.map((u) => {
+                const currentTeamIds = Array.isArray(u.teamIds) ? u.teamIds : [];
+                const nextTeamIds = currentTeamIds.includes(updatedTeam.id)
+                  ? currentTeamIds
+                  : [...currentTeamIds, updatedTeam.id];
+                return {
+                  ...u,
+                  teamIds: withDemoTeamRule(nextTeamIds),
+                };
+              });
+              onUpdateUsers(updatedUsers);
+            }
+
+            setEditingTeamProfile(null);
+          }}
+        />
+      )}
     </div>
   );
 }

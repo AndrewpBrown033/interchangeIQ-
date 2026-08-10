@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Player, AuditLogEntry, TeamProfile } from '../types';
-import { Palette, Download, Upload, ClipboardList, RefreshCw, User, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark, CheckCircle2, Cloud, Play, Loader2 } from 'lucide-react';
+import { Palette, Download, Upload, ClipboardList, RefreshCw, User, Volume2, VolumeX, Smartphone, Bell, FileSpreadsheet, Landmark, CheckCircle2, Cloud, Play, Loader2, Edit3 } from 'lucide-react';
 import CsvImportGuide from './CsvImportGuide';
 import ConfirmModal from './ConfirmModal';
+import TeamEditModal from './TeamEditModal';
 
 interface SettingsScreenProps {
   currentTheme: string;
@@ -71,32 +72,12 @@ export default function SettingsScreen({
   onUpdateTeams,
   onPerformLoginSync,
 }: SettingsScreenProps) {
-  // Login Sync Rule testing state
-  const [isTestingLoginSync, setIsTestingLoginSync] = useState(false);
-  const [loginSyncNotice, setLoginSyncNotice] = useState<string | null>(null);
+  const [editingTeamProfile, setEditingTeamProfile] = useState<TeamProfile | null>(null);
 
   // Confirmation gate for every toggle on this screen (sound, haptics, theme)
   const [pendingConfirm, setPendingConfirm] = useState<{ title: string; message: string; action: () => void; toggleTargetState?: boolean; toggleColorClass?: string } | null>(null);
   const confirmToggle = (title: string, message: string, action: () => void, toggleTargetState?: boolean, toggleColorClass?: string) => {
     setPendingConfirm({ title, message, action, toggleTargetState, toggleColorClass });
-  };
-
-  const handleRunLoginSyncTest = async () => {
-    if (!onPerformLoginSync) return;
-    setIsTestingLoginSync(true);
-    setLoginSyncNotice(null);
-    try {
-      const result = await onPerformLoginSync('Manual Settings Test');
-      if (result.success) {
-        setLoginSyncNotice(`✅ Sync Rule Executed: ${result.teamCount} team(s) synchronized with Firestore.`);
-      } else {
-        setLoginSyncNotice(`⚠️ Sync Notice: ${result.message}`);
-      }
-    } catch (e: any) {
-      setLoginSyncNotice(`⚠️ Sync Test Error: ${e.message}`);
-    } finally {
-      setIsTestingLoginSync(false);
-    }
   };
   // Filter teams to only show those this coach actually belongs to. No role-based
   // bypass and no "fall back to everything if the filter comes up empty" — a coach
@@ -461,7 +442,7 @@ export default function SettingsScreen({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Profile Card & Look */}
+        {/* Column 1: Squad, Profile & Data Management */}
         <div className="space-y-6">
           {/* Profile Name setting */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
@@ -520,25 +501,37 @@ export default function SettingsScreen({
                         : 'border-gray-100 bg-white hover:bg-gray-50'
                     }`}
                   >
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <b className={`text-xs font-extrabold truncate ${isInactive ? 'text-gray-500 line-through' : 'text-[var(--ink)]'}`}>
-                          {t.name}
-                        </b>
-                        {isActive && (
-                          <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200">
-                            Active Selection
-                          </span>
-                        )}
-                        {isInactive && (
-                          <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-amber-100 text-amber-800 rounded-md border border-amber-200">
-                            Inactive
-                          </span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden p-0.5 shadow-2xs">
+                        {t.logoUrl || t.iconUrl ? (
+                          <img src={t.logoUrl || t.iconUrl} alt={t.name} className="w-full h-full object-contain" />
+                        ) : (
+                          <Landmark className="w-5 h-5 text-slate-500" />
                         )}
                       </div>
-                      <span className="text-[10px] text-gray-400 font-bold block truncate">
-                        Squad ID: {t.id}
-                      </span>
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <b className={`text-xs font-extrabold truncate ${isInactive ? 'text-gray-500 line-through' : 'text-[var(--ink)]'}`}>
+                            {t.name}
+                          </b>
+                          {t.jumperUrl && (
+                            <img src={t.jumperUrl} alt="Jumper" className="w-5 h-5 object-contain rounded border border-slate-200 shrink-0" title="Team Jumper" />
+                          )}
+                          {isActive && (
+                            <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200">
+                              Active Selection
+                            </span>
+                          )}
+                          {isInactive && (
+                            <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-amber-100 text-amber-800 rounded-md border border-amber-200">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-bold block truncate">
+                          Squad ID: {t.id}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
@@ -559,21 +552,14 @@ export default function SettingsScreen({
                         </button>
                       )}
                       {onUpdateTeams && (
-                        t.id === 'demo-team' || t.isDemo ? (
-                          <span
-                            className="px-2.5 py-1.5 text-xs font-bold bg-gray-100 text-gray-400 rounded-lg border border-gray-200 cursor-not-allowed"
-                            title="Demo Team name is hardcoded as Demo Team and cannot be changed"
-                          >
-                            Locked Name
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleRenameTeamInSettings(t.id)}
-                            className="px-2.5 py-1.5 text-xs font-bold bg-[#F0F1F5] text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200"
-                          >
-                            Rename
-                          </button>
-                        )
+                        <button
+                          onClick={() => setEditingTeamProfile(t)}
+                          className="px-2.5 py-1.5 text-xs font-bold bg-[#F0F1F5] hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 rounded-lg cursor-pointer transition flex items-center gap-1"
+                          title={`Edit branding and info for ${t.name}`}
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Branding</span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -590,97 +576,14 @@ export default function SettingsScreen({
             </div>
           </div>
 
-          {/* Theme card selection */}
-          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
-            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
-              <Palette className="w-4 h-4 text-[var(--blue)]" />
-              <span>App Color Styling</span>
-            </h3>
-            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-              Choose your dashboard colour style. Changes will apply immediately across all screens.
-            </p>
+          {/* Bulk Load Roster from Excel / CSV */}
+          <CsvImportGuide
+            players={players || []}
+            onUpdatePlayers={onUpdatePlayers}
+            onUpdateLineup={onUpdateLineup}
+          />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {THEMES.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => {
-                    if (t.id === currentTheme) return;
-                    confirmToggle(
-                      'Change App Theme?',
-                      `Switch your dashboard colour style to "${t.name}"? This applies immediately across all screens.`,
-                      () => onChangeTheme(t.id)
-                    );
-                  }}
-                  className={`p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition flex items-center justify-between gap-3 ${
-                    currentTheme === t.id ? 'border-[var(--blue)] bg-blue-50/20 shadow-xs' : 'border-gray-100'
-                  }`}
-                >
-                  <b className="text-xs font-bold text-[var(--ink)]">{t.name}</b>
-                  <div className="flex h-5 w-12 rounded overflow-hidden border border-gray-100">
-                    {t.colors.map((c, idx) => (
-                      <span key={idx} className="flex-1" style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Default Sync on Login Rule Card */}
-          <div className="bg-gradient-to-br from-indigo-50/70 to-blue-50/70 p-5 rounded-2xl border border-indigo-200/80 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-indigo-600/10 text-indigo-600 rounded-lg">
-                  <Cloud className="w-5 h-5 text-indigo-600" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-xs text-indigo-950 flex items-center gap-1.5">
-                    <span>Default Sync on Login Rule</span>
-                    <span className="px-2 py-0.5 bg-indigo-600 text-white font-mono text-[9px] rounded-full uppercase tracking-wider">
-                      Active
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-indigo-800 font-medium">
-                    Automatic cloud synchronization triggered upon every successful coach login
-                  </p>
-                </div>
-              </div>
-              {onPerformLoginSync && (
-                <button
-                  type="button"
-                  onClick={handleRunLoginSyncTest}
-                  disabled={isTestingLoginSync}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  {isTestingLoginSync ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Syncing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Test Sync Rule</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-
-            <p className="text-xs text-indigo-900/90 leading-relaxed font-sans">
-              <strong>Rule Policy:</strong> Whenever a coach logs in or restores an authenticated passkey session, the app automatically executes a background sync rule. This synchronizes all team rosters, active match lineups, rotation logs, and drill templates directly with Cloud Firestore.
-            </p>
-
-            {loginSyncNotice && (
-              <div className="p-2.5 bg-white/90 rounded-xl border border-indigo-200 text-xs font-mono font-semibold text-indigo-900">
-                {loginSyncNotice}
-              </div>
-            )}
-          </div>
-
-          {/* Data Export & Backup Restore — moved here to balance the two columns
-              now that the Session Security card has been removed. */}
+          {/* Data Export & Backup Restore */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
             <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
               <Download className="w-4 h-4 text-[var(--blue)]" />
@@ -693,7 +596,7 @@ export default function SettingsScreen({
             <div className="flex flex-wrap gap-2.5">
               <button
                 onClick={onExportData}
-                className="px-4 py-2 text-xs font-bold bg-[#FAFBFF] border border-blue-100 hover:bg-blue-50 text-[var(--blue)] rounded-xl transition flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-bold bg-[#FAFBFF] border border-blue-100 hover:bg-blue-50 text-[var(--blue)] rounded-xl transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export JSON Backup</span>
@@ -711,10 +614,9 @@ export default function SettingsScreen({
               </label>
             </div>
           </div>
-
         </div>
 
-        {/* Backups & Activity Audit logs */}
+        {/* Column 2: System Preferences, Audio & Audit Logs */}
         <div className="space-y-6">
           {/* Sound & Vibration Preferences */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
@@ -887,13 +789,42 @@ export default function SettingsScreen({
             </div>
           </div>
 
-          {/* Bulk Load Roster from Excel / CSV */}
-          <CsvImportGuide
-            players={players || []}
-            onUpdatePlayers={onUpdatePlayers}
-            onUpdateLineup={onUpdateLineup}
-          />
+          {/* Theme card selection */}
+          <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
+            <h3 className="font-black text-sm text-[var(--navy)] flex items-center gap-1.5">
+              <Palette className="w-4 h-4 text-[var(--blue)]" />
+              <span>App Color Styling</span>
+            </h3>
+            <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
+              Choose your dashboard colour style. Changes will apply immediately across all screens.
+            </p>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {THEMES.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => {
+                    if (t.id === currentTheme) return;
+                    confirmToggle(
+                      'Change App Theme?',
+                      `Switch your dashboard colour style to "${t.name}"? This applies immediately across all screens.`,
+                      () => onChangeTheme(t.id)
+                    );
+                  }}
+                  className={`p-3 border rounded-xl cursor-pointer hover:bg-gray-50 transition flex items-center justify-between gap-3 ${
+                    currentTheme === t.id ? 'border-[var(--blue)] bg-blue-50/20 shadow-xs' : 'border-gray-100'
+                  }`}
+                >
+                  <b className="text-xs font-bold text-[var(--ink)]">{t.name}</b>
+                  <div className="flex h-5 w-12 rounded overflow-hidden border border-gray-100">
+                    {t.colors.map((c, idx) => (
+                      <span key={idx} className="flex-1" style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Activity Logs */}
           <div className="bg-white p-5 rounded-2xl border border-[var(--line)] shadow-sm space-y-4">
@@ -904,7 +835,7 @@ export default function SettingsScreen({
               </h3>
               <button
                 onClick={onClearLogs}
-                className="px-2 py-0.5 rounded text-[10px] font-black text-red-600 bg-red-50 hover:bg-red-100"
+                className="px-2 py-0.5 rounded text-[10px] font-black text-red-600 bg-red-50 hover:bg-red-100 cursor-pointer"
               >
                 Clear Log
               </button>
@@ -943,6 +874,21 @@ export default function SettingsScreen({
           setPendingConfirm(null);
         }}
       />
+
+      {editingTeamProfile !== null && (
+        <TeamEditModal
+          team={editingTeamProfile}
+          onClose={() => setEditingTeamProfile(null)}
+          onSave={(updatedTeam) => {
+            if (!teams) return;
+            const nextTeams = teams.map((t) => (t.id === updatedTeam.id ? updatedTeam : t));
+            if (onUpdateTeams) {
+              onUpdateTeams(nextTeams);
+            }
+            setEditingTeamProfile(null);
+          }}
+        />
+      )}
     </div>
   );
 }

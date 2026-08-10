@@ -502,44 +502,58 @@ export default function RotationsScreen({
   return (
     <div className="space-y-6">
       {/* Active Team Alignment Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-indigo-500/20">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shrink-0 shadow-xs">
-            ⚡
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">
-                Active Squad Context
-              </span>
-              <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold uppercase border border-emerald-500/30">
-                Rotations Aligned
-              </span>
+      {(() => {
+        const activeTeamObj = teams?.find(t => t.id === activeTeamId);
+        const activeLogo = activeTeamObj?.logoUrl || activeTeamObj?.iconUrl;
+        const activeJumper = activeTeamObj?.jumperUrl;
+        return (
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-indigo-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shrink-0 shadow-xs overflow-hidden p-0.5">
+                {activeLogo ? (
+                  <img src={activeLogo} alt={activeTeamName} className="w-full h-full object-contain" />
+                ) : (
+                  <span>⚡</span>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">
+                    Active Squad Context
+                  </span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold uppercase border border-emerald-500/30">
+                    Rotations Aligned
+                  </span>
+                </div>
+                <h3 className="font-black text-base text-white flex items-center gap-2">
+                  <span>{activeTeamName}</span>
+                  {activeJumper && (
+                    <img src={activeJumper} alt="Jumper" className="w-5 h-5 object-contain rounded border border-slate-700 shrink-0" title="Team Jumper" />
+                  )}
+                  <span className="text-xs font-semibold text-slate-300">({players.length} squad members)</span>
+                </h3>
+              </div>
             </div>
-            <h3 className="font-black text-base text-white flex items-center gap-2">
-              <span>{activeTeamName}</span>
-              <span className="text-xs font-semibold text-slate-300">({players.length} squad members)</span>
-            </h3>
-          </div>
-        </div>
 
-        {teams && teams.length > 1 && onSelectTeam && (
-          <div className="flex items-center gap-2 bg-white/10 p-1.5 px-3 rounded-xl border border-white/15">
-            <span className="text-xs font-extrabold text-slate-200 shrink-0">Selected Team:</span>
-            <select
-              value={activeTeamId || ''}
-              onChange={(e) => onSelectTeam(e.target.value)}
-              className="px-3 py-1 rounded-lg bg-slate-900 text-white font-extrabold text-xs border border-slate-700 focus:outline-none cursor-pointer"
-            >
-              {teams.map((t) => (
-                <option key={t.id} value={t.id} className="text-slate-900 font-bold">
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            {teams && teams.length > 1 && onSelectTeam && (
+              <div className="flex items-center gap-2 bg-white/10 p-1.5 px-3 rounded-xl border border-white/15">
+                <span className="text-xs font-extrabold text-slate-200 shrink-0">Selected Team:</span>
+                <select
+                  value={activeTeamId || ''}
+                  onChange={(e) => onSelectTeam(e.target.value)}
+                  className="px-3 py-1 rounded-lg bg-slate-900 text-white font-extrabold text-xs border border-slate-700 focus:outline-none cursor-pointer"
+                >
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id} className="text-slate-900 font-bold">
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Top action header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[var(--line)] shadow-sm">
@@ -1364,6 +1378,10 @@ export default function RotationsScreen({
       {showPlanMode && (
         <PlanModeView
           onClose={() => setShowPlanMode(false)}
+          onNavigateToGameDay={() => {
+            setShowPlanMode(false);
+            if (onNavigate) onNavigate('gameday');
+          }}
           players={players}
           onUpdatePlayers={() => {}}
           lineup={lineup}

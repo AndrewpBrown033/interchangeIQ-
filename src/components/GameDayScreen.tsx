@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, Score, Rotation, Plan, GameInfo, ApiKeySettings } from '../types';
+import { Player, Score, Rotation, Plan, GameInfo, ApiKeySettings, TeamProfile } from '../types';
 import { POSITIONS, POSITION_GROUPS, normalizePosition, getZoneForPosition, matchPositions, stripSideFromPosition, detectRotationGaps, RotationGap, POSITION_FULL_NAMES } from '../constants';
 import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp, Sparkles, Camera, Bot } from 'lucide-react';
 import PlanModeView from './PlanModeView';
@@ -70,6 +70,9 @@ interface GameDayScreenProps {
   soundTone: string;
   hapticEnabled: boolean;
   hapticPattern: string;
+  activeTeamProfile?: TeamProfile;
+  teams?: TeamProfile[];
+  activeTeamId?: string | null;
 }
 
 export interface RotationSuggestionItem {
@@ -114,6 +117,9 @@ export default function GameDayScreen({
   soundTone,
   hapticEnabled,
   hapticPattern,
+  activeTeamProfile,
+  teams,
+  activeTeamId,
 }: GameDayScreenProps) {
   // Clock state
   const [clockRemaining, setClockRemaining] = useState(15 * 60);
@@ -1328,8 +1334,16 @@ export default function GameDayScreen({
                   <div className="grid grid-cols-2 gap-4 py-3">
                     {/* Home Side */}
                     <div className="flex flex-col items-center border-r border-white/10 pr-2">
-                      <div className="text-[11px] font-black text-gray-300 tracking-wider uppercase mb-1 text-center">
-                        {gameInfo.team || 'OUR TEAM'}
+                      <div className="flex items-center gap-1.5 mb-1 justify-center text-center">
+                        {(activeTeamProfile?.logoUrl || activeTeamProfile?.iconUrl) && (
+                          <img src={activeTeamProfile.logoUrl || activeTeamProfile.iconUrl} alt="Logo" className="w-4.5 h-4.5 object-contain rounded" />
+                        )}
+                        <span className="text-[11px] font-black text-gray-300 tracking-wider uppercase">
+                          {gameInfo.team || activeTeamProfile?.name || 'OUR TEAM'}
+                        </span>
+                        {activeTeamProfile?.jumperUrl && (
+                          <img src={activeTeamProfile.jumperUrl} alt="Jumper" className="w-4.5 h-4.5 object-contain rounded border border-slate-700" title="Team Jumper" />
+                        )}
                       </div>
                       <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-black text-[var(--cyan)]">{totalPoints(score.home)}</span>
@@ -2789,6 +2803,10 @@ export default function GameDayScreen({
       {showPlanMode && (
         <PlanModeView
           onClose={() => setShowPlanMode(false)}
+          onNavigateToGameDay={() => {
+            setShowPlanMode(false);
+            if (onNavigate) onNavigate('gameday');
+          }}
           players={players}
           onUpdatePlayers={onUpdatePlayers}
           lineup={lineup}

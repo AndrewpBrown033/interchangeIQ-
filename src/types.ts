@@ -225,6 +225,9 @@ export interface TeamProfile {
   showJarvis?: boolean;
   isInactive?: boolean;
   isDemo?: boolean;
+  logoUrl?: string;
+  jumperUrl?: string;
+  iconUrl?: string;
 }
 
 export interface SkillAssessment {

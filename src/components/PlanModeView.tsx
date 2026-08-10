@@ -21,6 +21,7 @@ import {
 
 interface PlanModeViewProps {
   onClose: () => void;
+  onNavigateToGameDay?: () => void;
   players: Player[];
   onUpdatePlayers: (players: Player[]) => void;
   lineup: Record<string, string>;
@@ -63,6 +64,7 @@ const POSITION_DESCRIPTIONS: Record<string, string> = {
 
 export default function PlanModeView({
   onClose,
+  onNavigateToGameDay,
   players,
   onUpdatePlayers,
   lineup,
@@ -205,11 +207,16 @@ export default function PlanModeView({
       <div className="bg-white border-b border-slate-200 px-3 py-2 flex flex-col sm:flex-row items-center justify-between shrink-0 shadow-xs gap-2">
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-start">
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (onNavigateToGameDay) {
+                onNavigateToGameDay();
+              }
+              onClose();
+            }}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition cursor-pointer shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-slate-700" />
-            <span>Back</span>
+            <span>Back to Game Day</span>
           </button>
 
           <div className="text-slate-600 text-xs font-bold flex items-center gap-1.5 overflow-x-auto">

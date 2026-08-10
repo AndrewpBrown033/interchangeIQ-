@@ -538,6 +538,9 @@ export default function App() {
             showPlayerGrowth: data.showPlayerGrowth !== false,
             showJarvis: data.showJarvis !== false,
             isDemo: !!data.isDemo,
+            logoUrl: data.logoUrl || '',
+            jumperUrl: data.jumperUrl || '',
+            iconUrl: data.iconUrl || '',
           });
         }
       });
@@ -670,6 +673,9 @@ export default function App() {
           showTraining: t.showTraining !== false,
           showPlayerGrowth: t.showPlayerGrowth !== false,
           showJarvis: t.showJarvis !== false,
+          logoUrl: t.logoUrl || '',
+          jumperUrl: t.jumperUrl || '',
+          iconUrl: t.iconUrl || '',
           updatedAt: Date.now()
         }, { merge: true }).catch(err => console.warn("Error saving team doc to Firestore:", err));
       })
@@ -2074,8 +2080,12 @@ export default function App() {
           onClick={() => setActiveTab('summary')}
           className="flex items-center gap-2 cursor-pointer focus:outline-none text-left min-w-0"
         >
-          <div className="w-8 h-8 rounded-lg bg-white border border-gray-150 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
-            <TrendingUp className="w-5 h-5" strokeWidth={2.5} />
+          <div className="w-8 h-8 rounded-lg bg-white border border-gray-150 flex items-center justify-center text-blue-600 shadow-sm shrink-0 overflow-hidden p-0.5">
+            {activeTeamProfile?.logoUrl || activeTeamProfile?.iconUrl ? (
+              <img src={activeTeamProfile.logoUrl || activeTeamProfile.iconUrl} alt={activeTeamProfile.name} className="w-full h-full object-contain" />
+            ) : (
+              <TrendingUp className="w-5 h-5" strokeWidth={2.5} />
+            )}
           </div>
           <span className="font-black text-sm tracking-tight text-[var(--navy)] truncate max-w-[110px]">
             {activeTeamProfile?.name || 'InterchangeIQ'}
@@ -2213,16 +2223,25 @@ export default function App() {
         <div className="bg-white border border-[var(--line)] rounded-2xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
           {/* Squad Switcher */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8.5 h-8.5 rounded-xl bg-blue-50 border border-blue-100 text-[var(--blue)] flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
-              <ShieldCheck className="w-4.5 h-4.5" />
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 text-[var(--blue)] flex items-center justify-center font-black text-xs shrink-0 shadow-2xs overflow-hidden p-0.5">
+              {activeTeamProfile?.logoUrl || activeTeamProfile?.iconUrl ? (
+                <img src={activeTeamProfile.logoUrl || activeTeamProfile.iconUrl} alt={activeTeamProfile.name || 'Team Logo'} className="w-full h-full object-contain" />
+              ) : (
+                <ShieldCheck className="w-4.5 h-4.5" />
+              )}
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-extrabold text-[var(--muted)] uppercase tracking-wider block leading-tight">
                 Active Squad
               </span>
-              <span className="font-black text-sm text-[var(--navy)] truncate block py-0.5">
-                {teams.find((t) => t.id === activeTeamId)?.name || 'Unnamed Squad'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-sm text-[var(--navy)] truncate block py-0.5">
+                  {activeTeamProfile?.name || 'Unnamed Squad'}
+                </span>
+                {activeTeamProfile?.jumperUrl && (
+                  <img src={activeTeamProfile.jumperUrl} alt="Jumper" className="w-5 h-5 object-contain rounded border border-slate-200 shrink-0" title="Team Jumper" />
+                )}
+              </div>
             </div>
           </div>
 
