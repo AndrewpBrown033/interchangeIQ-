@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Player, Rotation, Plan } from '../types';
 import { POSITIONS, POSITION_GROUPS } from '../constants';
 import ThreeWayRotationModal from './ThreeWayRotationModal';
@@ -16,7 +16,14 @@ import {
   XCircle,
   Zap,
   RefreshCw,
-  ArrowUp
+  ArrowUp,
+  Clock,
+  Play,
+  Pause,
+  Save,
+  UserPlus,
+  Calendar,
+  Circle
 } from 'lucide-react';
 
 interface PlanModeViewProps {
@@ -93,12 +100,65 @@ export default function PlanModeView({
   // Link selection state for rotation linking
   const [selectedSource, setSelectedSource] = useState<{ type: 'bench' | 'field'; id: string; slot?: string } | null>(null);
 
+  // "Create a Substitute" staging: moves built here are held locally until
+  // the coach clicks Save Changes, so nothing is written to the shared
+  // rotations list mid-build. Staged purely in component state + a
+  // localStorage mirror (see below) — no network call of any kind, so this
+  // works fully offline; Save Changes just calls the same onUpdateRotations
+  // prop everything else in the app already uses for local-first sync.
+  const [substituteMode, setSubstituteMode] = useState(true);
+  const [pendingMoves, setPendingMoves] = useState<Rotation[]>([]);
+
+  // Which move (pending or already-saved) is currently selected — drives
+  // both the on-field arrow-in-context and the per-move Apply to Game button.
+  const [selectedMoveId, setSelectedMoveId] = useState<string | null>(null);
+
   const currentPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || null;
 
   // Filter rotations for selected quarter
   const qRotations = rotations.filter(
     (r) => (currentPlan ? r.planId === currentPlan.id : true) && r.quarter === selectedQuarter
   );
+
+  // Split into moves built visually in Plan Mode vs pre-built ones from the
+  // classic Rotations screen form.
+  const plannedMoves = qRotations.filter((r) => r.origin === 'planMode');
+  const scheduledRotations = qRotations.filter((r) => r.origin !== 'planMode');
+
+  // Offline-safe local staging key for this plan+quarter's unsaved queue.
+  const pendingStorageKey = `iiq_planmode_pending_${currentPlan?.id || 'default'}_q${selectedQuarter}`;
+  const hasLoadedPendingRef = useRef<string | null>(null);
+
+  // Restore any unsaved pending moves for this plan+quarter (e.g. the coach
+  // was offline/closed the app mid-build) and persist on every change —
+  // both operations are pure localStorage, no network required.
+  useEffect(() => {
+    if (hasLoadedPendingRef.current === pendingStorageKey) return;
+    hasLoadedPendingRef.current = pendingStorageKey;
+    try {
+      const raw = localStorage.getItem(pendingStorageKey);
+      setPendingMoves(raw ? JSON.parse(raw) : []);
+    } catch {
+      setPendingMoves([]);
+    }
+    setSelectedSource(null);
+    setSelectedMoveId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (pendingMoves.length > 0) {
+        localStorage.setItem(pendingStorageKey, JSON.stringify(pendingMoves));
+      } else {
+        localStorage.removeItem(pendingStorageKey);
+      }
+    } catch {
+      // Local storage unavailable (private browsing etc.) — pending moves
+      // still work for this session, just won't survive a reload.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMoves, pendingStorageKey]);
 
   // Active field vs bench
   const activeFieldPids = new Set(Object.values(lineup));
@@ -122,18 +182,20 @@ export default function PlanModeView({
     return 100;
   };
 
-  // Connect two selected entities (field or bench)
+  // Connect two selected entities (field or bench) — stages a substitute
+  // rather than saving immediately, so multiple moves can be built up before
+  // one Save Changes commit.
   const handleEntityClick = (entity: { type: 'bench' | 'field'; id: string; slot?: string }) => {
     if (!selectedSource) {
       setSelectedSource(entity);
     } else if (selectedSource.id === entity.id) {
       setSelectedSource(null);
     } else {
-      createRotation(selectedSource, entity);
+      stageSubstitute(selectedSource, entity);
     }
   };
 
-  const createRotation = (
+  const stageSubstitute = (
     from: { type: 'bench' | 'field'; id: string; slot?: string },
     to: { type: 'bench' | 'field'; id: string; slot?: string }
   ) => {
@@ -161,44 +223,113 @@ export default function PlanModeView({
       note: isBenchSwap ? 'Bench Interchange' : 'On-Field Position Swap',
       applied: false,
       status: 'scheduled',
+      origin: 'planMode',
     };
 
-    onUpdateRotations([...rotations, newRot]);
+    setPendingMoves((prev) => [...prev, newRot]);
     setSelectedSource(null);
+    setSelectedMoveId(newRot.id);
   };
 
-  const handleRemoveRotation = (rotId: string) => {
+  const handleRemovePendingMove = (rotId: string) => {
+    setPendingMoves((prev) => prev.filter((r) => r.id !== rotId));
+    if (selectedMoveId === rotId) setSelectedMoveId(null);
+  };
+
+  const handleRemoveSavedRotation = (rotId: string) => {
     onUpdateRotations(rotations.filter((r) => r.id !== rotId));
+    if (selectedMoveId === rotId) setSelectedMoveId(null);
+  };
+
+  const handleDiscardPending = () => {
+    setPendingMoves([]);
+    setSelectedMoveId(null);
+  };
+
+  // Commits every staged substitute for this quarter into the shared
+  // rotations list in one write, tagged with a stable sequence number for
+  // the on-field numbered markers.
+  const handleSaveChanges = () => {
+    if (pendingMoves.length === 0) return;
+    const existingMaxSeq = plannedMoves.reduce((max, r) => Math.max(max, r.planSeq || 0), 0);
+    const toSave = pendingMoves.map((r, i) => ({ ...r, planSeq: existingMaxSeq + i + 1 }));
+    onUpdateRotations([...rotations, ...toSave]);
+    setPendingMoves([]);
+    setSelectedMoveId(toSave[toSave.length - 1]?.id || null);
   };
 
   const handleClearQueue = () => {
     onUpdateRotations(rotations.filter((r) => r.quarter !== selectedQuarter));
+    setPendingMoves([]);
+    setSelectedMoveId(null);
   };
 
-  const handleApplyPlanToGame = () => {
-    if (qRotations.length === 0) return;
+  // Applies only the currently SELECTED move to the live game lineup — not
+  // every queued move — per-move, so the coach can apply one substitute at a
+  // time as it actually happens on the field.
+  const handleApplySelectedToGame = () => {
+    const rot = [...plannedMoves, ...scheduledRotations].find((r) => r.id === selectedMoveId);
+    if (!rot) return;
+
     const nextLineup = { ...lineup };
+    const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
+    const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
-    qRotations.forEach((rot) => {
-      const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
-      const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
-
-      if (outSlot && inSlot) {
-        nextLineup[outSlot] = rot.inId;
-        nextLineup[inSlot] = rot.outId;
-      } else if (outSlot) {
-        nextLineup[outSlot] = rot.inId;
-      }
-    });
+    if (outSlot && inSlot) {
+      nextLineup[outSlot] = rot.inId;
+      nextLineup[inSlot] = rot.outId;
+    } else if (outSlot) {
+      nextLineup[outSlot] = rot.inId;
+    }
 
     onUpdateLineup(nextLineup);
-    const appliedIds = new Set(qRotations.map((r) => r.id));
     onUpdateRotations(
-      rotations.map((r) => (appliedIds.has(r.id) ? { ...r, applied: true, status: 'applied' } : r))
+      rotations.map((r) => (r.id === rot.id ? { ...r, applied: true, status: 'applied' } : r))
     );
-
-    alert(`Successfully applied Quarter ${selectedQuarter} plan to active game lineup!`);
+    setSelectedMoveId(null);
   };
+
+  // ---------------------------------------------------------------------
+  // Quarter Clock — a self-contained timer for reference while planning.
+  // Runs entirely locally (setInterval), so it needs no connectivity.
+  // Note: this is independent from the live Game Day clock (that timer's
+  // state lives on the Game Day screen itself) — it's here so a coach can
+  // track quarter time without leaving Plan Mode.
+  // ---------------------------------------------------------------------
+  const QUARTER_LENGTH_SECONDS = 15 * 60;
+  const [clockRunning, setClockRunning] = useState(false);
+  const [clockRemaining, setClockRemaining] = useState(QUARTER_LENGTH_SECONDS);
+
+  useEffect(() => {
+    if (!clockRunning) return;
+    const interval = setInterval(() => {
+      setClockRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [clockRunning]);
+
+  useEffect(() => {
+    if (clockRemaining === 0) setClockRunning(false);
+  }, [clockRemaining]);
+
+  const resetClock = () => {
+    setClockRunning(false);
+    setClockRemaining(QUARTER_LENGTH_SECONDS);
+  };
+
+  // Stable display numbers for the on-field substitute badges: saved moves
+  // first (in save order), then any still-pending ones — so every
+  // substitute built in Plan Mode has a unique, consistent ①②③ marker.
+  const orderedPlanMoves = [...plannedMoves].sort((a, b) => (a.planSeq || 0) - (b.planSeq || 0));
+  const allDisplayedPlanMoves = [...orderedPlanMoves, ...pendingMoves];
+  const planMoveNumberByPlayer: Record<string, number> = {};
+  const planMoveNumberByRotId: Record<string, number> = {};
+  allDisplayedPlanMoves.forEach((r, idx) => {
+    const n = idx + 1;
+    planMoveNumberByPlayer[r.outId] = n;
+    planMoveNumberByPlayer[r.inId] = n;
+    planMoveNumberByRotId[r.id] = n;
+  });
 
   return (
     <div className="fixed inset-0 bg-[#f3f4f6] z-50 overflow-hidden flex flex-col font-sans select-none text-slate-900">
@@ -226,6 +357,33 @@ export default function PlanModeView({
             <span className="text-slate-300">•</span>
             <span className="shrink-0 font-black text-slate-900">Q{selectedQuarter} Plan</span>
           </div>
+        </div>
+
+        {/* Quarter Clock */}
+        <div
+          className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded-md shrink-0 border border-slate-700"
+          title="Local reference clock for planning — independent from the live Game Day match clock"
+        >
+          <Clock className={`w-3.5 h-3.5 ${clockRunning ? 'text-emerald-400 animate-pulse' : 'text-[var(--cyan)]'}`} />
+          <span className="font-mono font-black text-sm text-white tabular-nums">
+            {formatTime(clockRemaining)}
+          </span>
+          <button
+            onClick={() => setClockRunning(!clockRunning)}
+            className={`p-1 rounded transition cursor-pointer ${
+              clockRunning ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-emerald-600 text-white hover:bg-emerald-500'
+            }`}
+            title={clockRunning ? 'Pause quarter clock' : 'Start quarter clock'}
+          >
+            {clockRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={resetClock}
+            className="p-1 rounded bg-white/10 hover:bg-white/20 text-slate-300 transition cursor-pointer"
+            title="Reset quarter clock"
+          >
+            <RotateCcw className="w-3 h-3" />
+          </button>
         </div>
 
         {/* Quarter Selector & 3-Way Generator */}
@@ -295,6 +453,56 @@ export default function PlanModeView({
         <div className={`col-span-12 md:col-span-3 lg:col-span-3 border-r border-slate-200 bg-[#f8fafc] flex flex-col overflow-hidden ${
           mobileTab === 'bench' ? 'flex' : 'hidden md:flex'
         }`}>
+          {/* Create a Substitute panel */}
+          <div className="p-3 border-b border-slate-200 bg-white shrink-0 space-y-2">
+            <button
+              onClick={() => setSubstituteMode(!substituteMode)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-black text-xs transition cursor-pointer border ${
+                substituteMode
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <UserPlus className="w-3.5 h-3.5 text-amber-400" />
+                <span>Create a Substitute</span>
+              </span>
+              {substituteMode && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+            </button>
+
+            {substituteMode && (
+              <p className="text-[10.5px] text-slate-500 font-semibold leading-snug">
+                {!selectedSource
+                  ? 'Tap a player on the field to start a substitute.'
+                  : 'Now tap the 2nd player — pick a bench player to swap them off, or another field player for an infield change.'}
+                {' '}Build as many as you like, then hit <b>Save Changes</b> below.
+              </p>
+            )}
+
+            {pendingMoves.length > 0 && (
+              <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                <span className="text-[10px] font-black text-amber-800">
+                  {pendingMoves.length} pending — not saved yet
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleSaveChanges}
+                    className="px-2 py-1 text-[10px] font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Save className="w-3 h-3" />
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={handleDiscardPending}
+                    className="px-2 py-1 text-[10px] font-black bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-md transition cursor-pointer"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Header */}
           <div className="p-3 border-b border-slate-200 flex items-center gap-2 bg-white shrink-0">
             <span className="font-extrabold text-xs uppercase tracking-wider text-slate-700">BENCH</span>
@@ -396,16 +604,25 @@ export default function PlanModeView({
               </div>
             </div>
 
-            {/* BOLD HIGH-CONTRAST DASHED CONNECTING ARROWS */}
+            {/* CONNECTING ARROW — only drawn for the currently selected move,
+                so the field stays readable instead of every queued move's
+                line overlapping at once. Tap a move in the side panel (or
+                its numbered badge on the field) to see its path here. */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
               <defs>
-                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
+                </marker>
+                <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
                 </marker>
               </defs>
 
-              {/* Render dashed lines between queued rotations */}
-              {qRotations.map((rot) => {
+              {(() => {
+                const rot = [...plannedMoves, ...scheduledRotations, ...pendingMoves].find((r) => r.id === selectedMoveId);
+                if (!rot) return null;
+                const isPending = pendingMoves.some((r) => r.id === rot.id);
+
                 const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
                 const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
@@ -418,22 +635,22 @@ export default function PlanModeView({
                 const y2 = inPosConfig ? inPosConfig[3] : 50;
 
                 return (
-                  <g key={rot.id}>
-                    <line
-                      x1={`${x1}%`}
-                      y1={`${y1}%`}
-                      x2={`${x2}%`}
-                      y2={`${y2}%`}
-                      stroke="#0f172a"
-                      strokeWidth="2.2"
-                      strokeDasharray="4,4"
-                      markerEnd="url(#afl-arrow-dark)"
-                      opacity="0.9"
-                    />
-                  </g>
+                  <line
+                    x1={`${x1}%`}
+                    y1={`${y1}%`}
+                    x2={`${x2}%`}
+                    y2={`${y2}%`}
+                    stroke={isPending ? '#d97706' : '#0f172a'}
+                    strokeWidth="1.6"
+                    strokeDasharray="4,4"
+                    markerEnd={isPending ? 'url(#afl-arrow-amber)' : 'url(#afl-arrow-dark)'}
+                    opacity="0.95"
+                  />
                 );
-              })}
+              })()}
             </svg>
+
+
 
             {/* FIELD POSITIONS EXACTLY MATCHING GAMEDAY */}
             {POSITIONS.map(([slotName, label, x, y]) => {
@@ -441,7 +658,9 @@ export default function PlanModeView({
               const p = pid ? players.find((x) => x.id === pid) : null;
               const energyPct = p ? getEnergyPct(p) : 100;
               const isSelected = selectedSource?.id === pid;
-              const isQueued = qRotations.some((r) => r.outId === pid || r.inId === pid);
+              const moveNum = pid ? planMoveNumberByPlayer[pid] : undefined;
+              const isPendingMove = pid ? pendingMoves.some((r) => r.outId === pid || r.inId === pid) : false;
+              const isScheduledOnly = pid ? (scheduledRotations.some((r) => r.outId === pid || r.inId === pid) && !moveNum) : false;
 
               return (
                 <div
@@ -472,21 +691,39 @@ export default function PlanModeView({
                   } ${
                     isSelected
                       ? 'ring-4 ring-slate-900 shadow-[0_0_24px_rgba(15,23,42,0.9)] scale-105 z-40'
-                      : isQueued
-                        ? 'ring-2 ring-orange-500 scale-105 z-30'
-                        : selectedSource
-                          ? 'hover:ring-2 hover:ring-emerald-400 cursor-pointer'
-                          : ''
+                      : isPendingMove
+                        ? 'ring-2 ring-amber-500 scale-105 z-30'
+                        : moveNum
+                          ? 'ring-2 ring-orange-500 scale-105 z-30'
+                          : isScheduledOnly
+                            ? 'ring-2 ring-slate-400 scale-105 z-30'
+                            : selectedSource
+                              ? 'hover:ring-2 hover:ring-emerald-400 cursor-pointer'
+                              : ''
                   }`}
                   style={{ left: `${x}%`, top: `${y}%` }}
                 >
+                  {moveNum && (
+                    <div
+                      className={`absolute -top-1.5 -left-1.5 z-50 w-4.5 h-4.5 rounded-full flex items-center justify-center text-[9px] font-black text-white border-2 border-white shadow-md ${
+                        isPendingMove ? 'bg-amber-500' : 'bg-orange-500'
+                      }`}
+                      title={isPendingMove ? `Pending substitute #${moveNum} — not yet saved` : `Planned move #${moveNum}`}
+                    >
+                      {moveNum}
+                    </div>
+                  )}
                   {p ? (
                     <div className={`relative overflow-hidden w-full h-full rounded-xl bg-white p-1 shadow-md border flex items-center gap-1.5 transition-all select-none ${
                       isSelected
                         ? 'border-2 border-slate-900 ring-2 ring-slate-900/30'
-                        : isQueued
-                          ? 'border-2 border-orange-500 ring-1 ring-orange-300'
-                          : 'border-slate-300 hover:border-slate-400'
+                        : isPendingMove
+                          ? 'border-2 border-amber-500 ring-1 ring-amber-300'
+                          : moveNum
+                            ? 'border-2 border-orange-500 ring-1 ring-orange-300'
+                            : isScheduledOnly
+                              ? 'border-2 border-slate-400 ring-1 ring-slate-300'
+                              : 'border-slate-300 hover:border-slate-400'
                     }`}>
                       {/* Jumper Number Box */}
                       <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md font-black text-white text-[9px] sm:text-[11px] flex items-center justify-center shrink-0 shadow-xs ${
@@ -543,17 +780,17 @@ export default function PlanModeView({
           </div>
         </div>
 
-        {/* RIGHT COLUMN: QUEUE & NEW PLAN PANEL */}
+        {/* RIGHT COLUMN: PENDING / PLANNED MOVES / SCHEDULED ROTATIONS */}
         <div className={`col-span-12 md:col-span-3 lg:col-span-3 border-l border-slate-200 bg-white text-slate-900 flex flex-col overflow-hidden ${
           mobileTab === 'queue' ? 'flex' : 'hidden md:flex'
         }`}>
-          
+
           {/* Header Bar matching GameDay style */}
           <div className="p-3 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-xs tracking-wider text-orange-600">Queue</span>
+              <span className="font-extrabold text-xs tracking-wider text-orange-600">Moves</span>
               <span className="w-4 h-4 rounded-full bg-red-500 text-white font-black text-[10px] flex items-center justify-center">
-                {qRotations.length}
+                {qRotations.length + pendingMoves.length}
               </span>
             </div>
 
@@ -562,98 +799,88 @@ export default function PlanModeView({
             </span>
           </div>
 
-          {/* Dynamic Queue List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
-            {qRotations.length === 0 ? (
+          {/* Move list */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-white">
+            {qRotations.length === 0 && pendingMoves.length === 0 && (
               <div className="text-center py-8 px-2 space-y-2">
                 <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
                   <RefreshCw className="w-5 h-5" />
                 </div>
                 <div className="font-extrabold text-xs text-slate-700">No Rotations Queued</div>
                 <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                  Select a player on the field or bench, then tap another player or slot to queue a rotation move for Quarter {selectedQuarter}.
+                  Use <b>Create a Substitute</b> on the left, or tap a player on the field, to start queuing a move for Quarter {selectedQuarter}.
                 </p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Substitution Group Header */}
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full border-2 border-orange-500/80 text-slate-900 font-extrabold text-xs flex items-center justify-center">
-                      {qRotations.length}
-                    </div>
-                    <div className="font-extrabold text-xs text-slate-900">
-                      Planned Moves
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleClearQueue}
-                    className="text-[10px] font-bold text-red-600 hover:text-red-700 transition cursor-pointer"
-                  >
-                    Clear All
-                  </button>
-                </div>
+            )}
 
-                {/* Substitution Move List */}
-                <div className="space-y-2.5">
-                  {qRotations.map((rot) => {
-                    const pOut = players.find((p) => p.id === rot.outId);
-                    const pIn = players.find((p) => p.id === rot.inId);
-                    const isBench = rot.type === 'bench' ||
-                                    rot.out.toUpperCase().startsWith('OFF') ||
-                                    rot.inn.toUpperCase().startsWith('ON') ||
-                                    rot.out.toLowerCase().includes('bench') ||
-                                    rot.inn.toLowerCase().includes('bench');
+            {/* PENDING — NOT SAVED */}
+            {pendingMoves.length > 0 && (
+              <MoveSection
+                title="Pending — Not Saved"
+                count={pendingMoves.length}
+                accent="amber"
+                onClearAll={handleDiscardPending}
+                clearLabel="Discard All"
+              >
+                {pendingMoves.map((rot) => (
+                  <MoveCard
+                    key={rot.id}
+                    rot={rot}
+                    players={players}
+                    seq={planMoveNumberByRotId[rot.id]}
+                    accent="amber"
+                    isSelected={selectedMoveId === rot.id}
+                    onSelect={() => setSelectedMoveId(selectedMoveId === rot.id ? null : rot.id)}
+                    onRemove={() => handleRemovePendingMove(rot.id)}
+                  />
+                ))}
+              </MoveSection>
+            )}
 
-                    const getCleanPosLabel = (str: string) => {
-                      return str.replace(/^(OFF|ON|FROM|TO|Pos A|Pos B)\s*/i, '').replace(/^\(([^\)]+)\)/, '$1').trim().split(' ')[0] || 'Field';
-                    };
+            {/* PLANNED MOVES — built & saved in Plan Mode */}
+            {plannedMoves.length > 0 && (
+              <MoveSection
+                title="Planned Moves"
+                count={plannedMoves.length}
+                accent="orange"
+              >
+                {orderedPlanMoves.map((rot) => (
+                  <MoveCard
+                    key={rot.id}
+                    rot={rot}
+                    players={players}
+                    seq={planMoveNumberByRotId[rot.id]}
+                    accent="orange"
+                    isSelected={selectedMoveId === rot.id}
+                    isApplied={rot.applied}
+                    onSelect={() => setSelectedMoveId(selectedMoveId === rot.id ? null : rot.id)}
+                    onRemove={() => handleRemoveSavedRotation(rot.id)}
+                  />
+                ))}
+              </MoveSection>
+            )}
 
-                    return (
-                      <div
-                        key={rot.id}
-                        className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-50 transition flex items-center justify-between gap-2 text-xs"
-                      >
-                        <div className="space-y-1.5 min-w-0 flex-1">
-                          {pOut && (
-                            <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
-                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                                isBench ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-100 text-blue-700 border border-blue-200'
-                              }`}>
-                                {isBench ? 'OFF' : 'FROM'}
-                              </span>
-                              <span className={`text-[11px] font-black ${isBench ? 'text-red-600' : 'text-blue-600'}`}>#{pOut.number}</span>
-                              <span className="truncate">{pOut.name}</span>
-                              <span className="text-[9px] text-slate-500 font-semibold uppercase">({getCleanPosLabel(rot.out)})</span>
-                            </div>
-                          )}
-
-                          {pIn && (
-                            <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
-                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                                isBench ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-purple-100 text-purple-700 border border-purple-200'
-                              }`}>
-                                {isBench ? 'ON' : 'TO'}
-                              </span>
-                              <span className={`text-[11px] font-black ${isBench ? 'text-emerald-600' : 'text-purple-600'}`}>#{pIn.number}</span>
-                              <span className="truncate">{pIn.name}</span>
-                              <span className="text-[9px] text-slate-500 font-semibold uppercase">({getCleanPosLabel(rot.inn)})</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={() => handleRemoveRotation(rot.id)}
-                          className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition shrink-0 cursor-pointer"
-                          title="Remove rotation"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* SCHEDULED ROTATIONS — pre-built in the Rotations screen form */}
+            {scheduledRotations.length > 0 && (
+              <MoveSection
+                title="Scheduled Rotations"
+                count={scheduledRotations.length}
+                accent="slate"
+                icon={<Calendar className="w-3.5 h-3.5 text-slate-500" />}
+              >
+                {scheduledRotations.map((rot) => (
+                  <MoveCard
+                    key={rot.id}
+                    rot={rot}
+                    players={players}
+                    accent="slate"
+                    isSelected={selectedMoveId === rot.id}
+                    isApplied={rot.applied}
+                    onSelect={() => setSelectedMoveId(selectedMoveId === rot.id ? null : rot.id)}
+                    onRemove={() => handleRemoveSavedRotation(rot.id)}
+                  />
+                ))}
+              </MoveSection>
             )}
           </div>
 
@@ -663,13 +890,20 @@ export default function PlanModeView({
               onClick={handleClearQueue}
               className="py-2 px-3 font-extrabold text-[11px] rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition cursor-pointer uppercase tracking-wider text-center"
             >
-              CLEAR
+              CLEAR ALL
             </button>
             <button
-              onClick={handleApplyPlanToGame}
-              disabled={qRotations.length === 0}
+              onClick={handleApplySelectedToGame}
+              disabled={!selectedMoveId || pendingMoves.some((r) => r.id === selectedMoveId)}
+              title={
+                !selectedMoveId
+                  ? 'Select a planned or scheduled move first'
+                  : pendingMoves.some((r) => r.id === selectedMoveId)
+                    ? 'Save this move before applying it to the game'
+                    : 'Apply this move to the live lineup'
+              }
               className={`py-2 px-3 font-extrabold text-[11px] rounded-lg border transition uppercase tracking-wider text-center ${
-                qRotations.length > 0
+                selectedMoveId && !pendingMoves.some((r) => r.id === selectedMoveId)
                   ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900 cursor-pointer shadow-xs'
                   : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               }`}
@@ -696,3 +930,158 @@ export default function PlanModeView({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Small presentational helpers for the right-hand column's 3 move sections
+// (Pending, Planned Moves, Scheduled Rotations).
+// ---------------------------------------------------------------------------
+
+function MoveSection({
+  title,
+  count,
+  accent,
+  icon,
+  children,
+  onClearAll,
+  clearLabel,
+}: {
+  title: string;
+  count: number;
+  accent: 'amber' | 'orange' | 'slate';
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  onClearAll?: () => void;
+  clearLabel?: string;
+}) {
+  const badgeClasses = {
+    amber: 'border-amber-500/80 text-amber-700',
+    orange: 'border-orange-500/80 text-slate-900',
+    slate: 'border-slate-400/80 text-slate-600',
+  }[accent];
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className={`w-6 h-6 rounded-full border-2 font-extrabold text-xs flex items-center justify-center ${badgeClasses}`}>
+            {count}
+          </div>
+          <div className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+            {icon}
+            <span>{title}</span>
+          </div>
+        </div>
+        {onClearAll && (
+          <button
+            onClick={onClearAll}
+            className="text-[10px] font-bold text-red-600 hover:text-red-700 transition cursor-pointer"
+          >
+            {clearLabel || 'Clear All'}
+          </button>
+        )}
+      </div>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  );
+}
+
+function MoveCard({
+  rot,
+  players,
+  seq,
+  accent,
+  isSelected,
+  isApplied,
+  onSelect,
+  onRemove,
+}: {
+  rot: Rotation;
+  players: Player[];
+  seq?: number;
+  accent: 'amber' | 'orange' | 'slate';
+  isSelected: boolean;
+  isApplied?: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+}) {
+  const pOut = players.find((p) => p.id === rot.outId);
+  const pIn = players.find((p) => p.id === rot.inId);
+  const isBench = rot.type === 'bench' ||
+                  rot.out.toUpperCase().startsWith('OFF') ||
+                  rot.inn.toUpperCase().startsWith('ON') ||
+                  rot.out.toLowerCase().includes('bench') ||
+                  rot.inn.toLowerCase().includes('bench');
+
+  const getCleanPosLabel = (str: string) => {
+    return str.replace(/^(OFF|ON|FROM|TO|Pos A|Pos B)\s*/i, '').replace(/^\(([^\)]+)\)/, '$1').trim().split(' ')[0] || 'Field';
+  };
+
+  const ringClass = isSelected
+    ? accent === 'amber'
+      ? 'border-amber-600 ring-2 ring-amber-300 bg-amber-50/60'
+      : accent === 'orange'
+        ? 'border-orange-600 ring-2 ring-orange-300 bg-orange-50/60'
+        : 'border-slate-600 ring-2 ring-slate-300 bg-slate-100'
+    : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50';
+
+  const badgeBg = accent === 'amber' ? 'bg-amber-500' : accent === 'orange' ? 'bg-orange-500' : 'bg-slate-400';
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`p-2.5 rounded-xl border transition flex items-center gap-2 text-xs cursor-pointer ${ringClass}`}
+      title={isSelected ? 'Selected — showing this move\'s arrow on the field' : 'Tap to see this move\'s path on the field'}
+    >
+      {seq !== undefined && (
+        <div className={`shrink-0 w-5 h-5 rounded-full text-white font-black text-[10px] flex items-center justify-center ${badgeBg}`}>
+          {seq}
+        </div>
+      )}
+      <div className="space-y-1.5 min-w-0 flex-1">
+        {pOut && (
+          <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
+            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
+              isBench ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-100 text-blue-700 border border-blue-200'
+            }`}>
+              {isBench ? 'OFF' : 'FROM'}
+            </span>
+            <span className={`text-[11px] font-black ${isBench ? 'text-red-600' : 'text-blue-600'}`}>#{pOut.number}</span>
+            <span className="truncate">{pOut.name}</span>
+            <span className="text-[9px] text-slate-500 font-semibold uppercase">({getCleanPosLabel(rot.out)})</span>
+          </div>
+        )}
+
+        {pIn && (
+          <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
+            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
+              isBench ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-purple-100 text-purple-700 border border-purple-200'
+            }`}>
+              {isBench ? 'ON' : 'TO'}
+            </span>
+            <span className={`text-[11px] font-black ${isBench ? 'text-emerald-600' : 'text-purple-600'}`}>#{pIn.number}</span>
+            <span className="truncate">{pIn.name}</span>
+            <span className="text-[9px] text-slate-500 font-semibold uppercase">({getCleanPosLabel(rot.inn)})</span>
+          </div>
+        )}
+
+        {isApplied && (
+          <span className="inline-block text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+            ✓ Applied to game
+          </span>
+        )}
+      </div>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition shrink-0 cursor-pointer"
+        title="Remove"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+

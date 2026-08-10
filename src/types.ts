@@ -71,6 +71,16 @@ export interface Rotation {
   groupP2Id?: string;
   groupP3Id?: string;
   groupInterval?: number;
+  // Where this rotation was created — 'planMode' = built visually on the
+  // field in Plan Mode's "Create a Substitute" flow; 'builder' (or
+  // undefined, for backward compatibility with existing rotations) = the
+  // classic pre-built form on the Rotations screen. Used to split Plan
+  // Mode's queue into "Planned Moves" vs "Scheduled Rotations".
+  origin?: 'planMode' | 'builder';
+  // Sequence number assigned within Plan Mode so each move can carry a
+  // small, stable on-field marker (①②③...) tying the queue entry to its
+  // arrow/position on the pitch.
+  planSeq?: number;
 }
 
 export interface Plan {
@@ -225,9 +235,6 @@ export interface TeamProfile {
   showJarvis?: boolean;
   isInactive?: boolean;
   isDemo?: boolean;
-  logoUrl?: string;
-  jumperUrl?: string;
-  iconUrl?: string;
 }
 
 export interface SkillAssessment {

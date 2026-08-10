@@ -120,7 +120,7 @@ export default function RotationsScreen({
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [showThreeWayModal, setShowThreeWayModal] = useState(false);
   const [editingThreeWayData, setEditingThreeWayData] = useState<ThreeWayGroupEditData | null>(null);
-  const [showPlanMode, setShowPlanMode] = useState(false);
+  const [showPlanMode, setShowPlanMode] = useState(true);
   const [editingRotation, setEditingRotation] = useState<Rotation | null>(null);
 
   // Rotation Form states

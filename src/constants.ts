@@ -1,6 +1,6 @@
 import { Player, Rotation, Drill, SkillAssessment, TeamProfile, GameHistory, LineupTemplate } from './types';
 
-export const APP_VERSION = 'v1.6';
+export const APP_VERSION = 'v1.7';
 
 // New users (self sign-up or admin invite) start on a Provisional license with
 // access to this sandbox team so they have something to explore immediately.
@@ -1733,26 +1733,26 @@ export const DEMO_TEAM_SAMPLE_GROWTH_RECORDS: SkillAssessment[] = [
 // ---------------------------------------------------------------------------
 
 export const DEMO_TEAM_SAMPLE_PLAYERS: Player[] = [
-  { id: 'dp1', name: 'Zoe Campbell', nick: '', number: '7', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1860, bench: 660, note: 'Captain', slotTimes: { 'C': 1200, 'ROV': 660 } },
-  { id: 'dp2', name: 'Maddie Foster', nick: '', number: '12', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1560, bench: 900, note: '', slotTimes: { 'FF': 1560 } },
-  { id: 'dp3', name: 'Priya Anand', nick: '', number: '18', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 2100, bench: 480, note: 'Vice-Captain', slotTimes: { 'CHB': 1500, 'BP-L': 600 } },
-  { id: 'dp4', name: 'Aisha Osei', nick: '', number: '22', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1740, bench: 780, note: '', slotTimes: { 'W-L': 1080, 'W-R': 660 } },
-  { id: 'dp5', name: 'Charlotte Reyes', nick: 'Charlie', number: '31', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1440, bench: 1140, note: '', slotTimes: { 'CHF': 900, 'HF-L': 540 } },
-  { id: 'dp6', name: 'Grace Thompson', nick: '', number: '44', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1980, bench: 540, note: '', slotTimes: { 'FB': 1500, 'BP-R': 480 } },
-  { id: 'dp7', name: 'Willow Baxter', nick: '', number: '55', positions: ['RUCK'], primaryZone: 'RUCK', status: 'available', active: 2160, bench: 420, note: '', slotTimes: { 'R': 2160 } },
-  { id: 'dp8', name: 'Talia Nguyen', nick: '', number: '5', positions: ['MID'], primaryZone: 'MID', status: 'injured', active: 600, bench: 300, note: 'Hamstring strain — reassess in 2 weeks', slotTimes: { 'C': 600 } },
-  { id: 'dp9', name: 'Sienna Walsh', nick: '', number: '9', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1320, bench: 960, note: '', slotTimes: { 'FP-R': 1320 } },
-  { id: 'dp10', name: 'Ruby Fitzgerald', nick: '', number: '14', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1620, bench: 720, note: '', slotTimes: { 'HB-L': 1020, 'BP-L': 600 } },
-  { id: 'dp11', name: 'Isla McKenzie', nick: '', number: '23', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1500, bench: 900, note: '', slotTimes: { 'ROV': 900, 'RR': 600 } },
-  { id: 'dp12', name: 'Ebony Carter', nick: '', number: '33', positions: ['FWD'], primaryZone: 'FWD', status: 'away', active: 0, bench: 0, note: 'Rep squad duty this round' },
-  { id: 'dp13', name: 'Freya Douglas', nick: '', number: '41', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1380, bench: 1020, note: '', slotTimes: { 'HB-R': 1380 } },
-  { id: 'dp14', name: 'Amelia Novak', nick: '', number: '2', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1260, bench: 1140, note: '', slotTimes: { 'W-R': 1260 } },
-  { id: 'dp15', name: 'Layla Simmons', nick: '', number: '16', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1140, bench: 1260, note: '', slotTimes: { 'FP-L': 1140 } },
-  { id: 'dp16', name: 'Poppy Hendricks', nick: '', number: '27', positions: ['DEF'], primaryZone: 'DEF', status: 'injured', active: 420, bench: 300, note: 'Rolled ankle — team physio managing', slotTimes: { 'BP-R': 420 } },
-  { id: 'dp17', name: 'Harriet Cole', nick: '', number: '36', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'dp18', name: 'Violet Marsh', nick: '', number: '49', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'dp19', name: 'Matilda Grant', nick: '', number: '60', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 0, bench: 0, note: '' },
-  { id: 'dp20', name: 'Scarlett Boyd', nick: '', number: '71', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '' },
+  { id: 'dp1', name: 'Zoe Campbell', nick: '', number: '7', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1860, bench: 660, note: 'Captain', slotTimes: { 'C': 1200, 'ROV': 660 }, heightCm: 163, weightKg: 58, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp2', name: 'Maddie Foster', nick: '', number: '12', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1560, bench: 900, note: '', slotTimes: { 'FF': 1560 }, heightCm: 156, weightKg: 50, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp3', name: 'Priya Anand', nick: '', number: '18', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 2100, bench: 480, note: 'Vice-Captain', slotTimes: { 'CHB': 1500, 'BP-L': 600 }, heightCm: 174, weightKg: 66, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp4', name: 'Aisha Osei', nick: '', number: '22', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1740, bench: 780, note: '', slotTimes: { 'W-L': 1080, 'W-R': 660 }, heightCm: 165, weightKg: 59, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp5', name: 'Charlotte Reyes', nick: 'Charlie', number: '31', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1440, bench: 1140, note: '', slotTimes: { 'CHF': 900, 'HF-L': 540 }, heightCm: 168, weightKg: 60, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp6', name: 'Grace Thompson', nick: '', number: '44', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1980, bench: 540, note: '', slotTimes: { 'FB': 1500, 'BP-R': 480 }, heightCm: 176, weightKg: 68, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp7', name: 'Willow Baxter', nick: '', number: '55', positions: ['RUCK'], primaryZone: 'RUCK', status: 'available', active: 2160, bench: 420, note: '', slotTimes: { 'R': 2160 }, heightCm: 181, weightKg: 72, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp8', name: 'Talia Nguyen', nick: '', number: '5', positions: ['MID'], primaryZone: 'MID', status: 'injured', active: 600, bench: 300, note: 'Hamstring strain — reassess in 2 weeks', slotTimes: { 'C': 600 }, heightCm: 160, weightKg: 54, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp9', name: 'Sienna Walsh', nick: '', number: '9', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1320, bench: 960, note: '', slotTimes: { 'FP-R': 1320 }, heightCm: 154, weightKg: 48, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp10', name: 'Ruby Fitzgerald', nick: '', number: '14', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1620, bench: 720, note: '', slotTimes: { 'HB-L': 1020, 'BP-L': 600 }, heightCm: 162, weightKg: 56, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp11', name: 'Isla McKenzie', nick: '', number: '23', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1500, bench: 900, note: '', slotTimes: { 'ROV': 900, 'RR': 600 }, heightCm: 158, weightKg: 52, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp12', name: 'Ebony Carter', nick: '', number: '33', positions: ['FWD'], primaryZone: 'FWD', status: 'away', active: 0, bench: 0, note: 'Rep squad duty this round', heightCm: 159, weightKg: 53, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp13', name: 'Freya Douglas', nick: '', number: '41', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 1380, bench: 1020, note: '', slotTimes: { 'HB-R': 1380 }, heightCm: 166, weightKg: 58, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp14', name: 'Amelia Novak', nick: '', number: '2', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 1260, bench: 1140, note: '', slotTimes: { 'W-R': 1260 }, heightCm: 164, weightKg: 57, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp15', name: 'Layla Simmons', nick: '', number: '16', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 1140, bench: 1260, note: '', slotTimes: { 'FP-L': 1140 }, heightCm: 152, weightKg: 47, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp16', name: 'Poppy Hendricks', nick: '', number: '27', positions: ['DEF'], primaryZone: 'DEF', status: 'injured', active: 420, bench: 300, note: 'Rolled ankle — team physio managing', slotTimes: { 'BP-R': 420 }, heightCm: 161, weightKg: 55, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp17', name: 'Harriet Cole', nick: '', number: '36', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '', heightCm: 167, weightKg: 59, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp18', name: 'Violet Marsh', nick: '', number: '49', positions: ['DEF'], primaryZone: 'DEF', status: 'available', active: 0, bench: 0, note: '', heightCm: 163, weightKg: 56, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp19', name: 'Matilda Grant', nick: '', number: '60', positions: ['FWD'], primaryZone: 'FWD', status: 'available', active: 0, bench: 0, note: '', heightCm: 155, weightKg: 49, gender: 'Female', ageGroup: 'U16' },
+  { id: 'dp20', name: 'Scarlett Boyd', nick: '', number: '71', positions: ['MID'], primaryZone: 'MID', status: 'available', active: 0, bench: 0, note: '', heightCm: 172, weightKg: 61, gender: 'Female', ageGroup: 'U16' },
 ];
 
 // Best-18 match-day lineup used both as the "live" current lineup and as the
