@@ -236,6 +236,8 @@ export default function PlanModeView({
       type: isBenchSwap ? 'bench' : 'onfield',
       outId: pOut.id,
       inId: pIn.id,
+      outSlot: from.type === 'field' ? from.slot : undefined,
+      inSlot: to.type === 'field' ? to.slot : undefined,
       out: isBenchSwap
         ? `OFF (${from.slot || 'Bench'}) #${pOut.number} ${pOut.name}`
         : `FROM (${from.slot || 'Field'}) #${pOut.number} ${pOut.name}`,
@@ -294,8 +296,8 @@ export default function PlanModeView({
     if (!rot) return;
 
     const nextLineup = { ...lineup };
-    const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
-    const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
+    const outSlot = rot.outSlot || Object.keys(lineup).find((k) => lineup[k] === rot.outId);
+    const inSlot = rot.inSlot || Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
     if (outSlot && inSlot) {
       nextLineup[outSlot] = rot.inId;
@@ -345,11 +347,17 @@ export default function PlanModeView({
   const orderedPlanMoves = [...plannedMoves].sort((a, b) => (a.planSeq || 0) - (b.planSeq || 0));
   const allDisplayedPlanMoves = [...orderedPlanMoves, ...pendingMoves];
   const planMoveNumberByPlayer: Record<string, number> = {};
+  // Keyed by the move's own recorded slot (outSlot/inSlot) — the reliable
+  // way to mark "this exact position", since a player id can legitimately
+  // occupy more than one slot at once.
+  const planMoveNumberBySlot: Record<string, number> = {};
   const planMoveNumberByRotId: Record<string, number> = {};
   allDisplayedPlanMoves.forEach((r, idx) => {
     const n = idx + 1;
     planMoveNumberByPlayer[r.outId] = n;
     planMoveNumberByPlayer[r.inId] = n;
+    if (r.outSlot) planMoveNumberBySlot[r.outSlot] = n;
+    if (r.inSlot) planMoveNumberBySlot[r.inSlot] = n;
     planMoveNumberByRotId[r.id] = n;
   });
 
@@ -636,10 +644,10 @@ export default function PlanModeView({
               preserveAspectRatio="xMidYMid meet"
             >
               <defs>
-                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" markerUnits="strokeWidth" orient="auto-start-reverse">
+                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="4" markerHeight="4" markerUnits="strokeWidth" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
                 </marker>
-                <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" markerUnits="strokeWidth" orient="auto-start-reverse">
+                <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="4" markerHeight="4" markerUnits="strokeWidth" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
                 </marker>
               </defs>
@@ -649,8 +657,8 @@ export default function PlanModeView({
                 if (!rot) return null;
                 const isPending = pendingMoves.some((r) => r.id === rot.id);
 
-                const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
-                const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
+                const outSlot = rot.outSlot || Object.keys(lineup).find((k) => lineup[k] === rot.outId);
+                const inSlot = rot.inSlot || Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
                 const outPosConfig = outSlot ? POSITIONS.find(([sn]) => sn === outSlot) : null;
                 const inPosConfig = inSlot ? POSITIONS.find(([sn]) => sn === inSlot) : null;
@@ -675,9 +683,9 @@ export default function PlanModeView({
                     x2={x2}
                     y2={y2}
                     stroke={isPending ? '#d97706' : '#0f172a'}
-                    strokeWidth={3}
+                    strokeWidth={1.75}
                     strokeLinecap="round"
-                    strokeDasharray="8,6"
+                    strokeDasharray="6,5"
                     markerEnd={isPending ? 'url(#afl-arrow-amber)' : 'url(#afl-arrow-dark)'}
                     opacity="0.95"
                   />
@@ -698,9 +706,25 @@ export default function PlanModeView({
               // matching by id alone would highlight every slot that
               // player occupies instead of just the one that was clicked.
               const isSelected = selectedSource?.type === 'field' && selectedSource.slot === slotName;
-              const moveNum = pid ? planMoveNumberByPlayer[pid] : undefined;
-              const isPendingMove = pid ? pendingMoves.some((r) => r.outId === pid || r.inId === pid) : false;
-              const isScheduledOnly = pid ? (scheduledRotations.some((r) => r.outId === pid || r.inId === pid) && !moveNum) : false;
+              // Prefer the move's own recorded slot; only fall back to
+              // matching by player id for older/"classic builder" rotations
+              // that never recorded outSlot/inSlot (those are created from a
+              // plain player-vs-player form with no slot context available).
+              const moveNum =
+                planMoveNumberBySlot[slotName] !== undefined
+                  ? planMoveNumberBySlot[slotName]
+                  : pid
+                    ? planMoveNumberByPlayer[pid]
+                    : undefined;
+              const isPendingMove = pendingMoves.some((r) => r.outSlot === slotName || r.inSlot === slotName);
+              const isScheduledOnly =
+                !moveNum &&
+                scheduledRotations.some(
+                  (r) =>
+                    r.outSlot === slotName ||
+                    r.inSlot === slotName ||
+                    (!r.outSlot && !r.inSlot && !!pid && (r.outId === pid || r.inId === pid))
+                );
 
               return (
                 <div

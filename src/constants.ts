@@ -16,36 +16,36 @@ export const DEMO_TEAM: TeamProfile = {
 
 export const POSITIONS: [string, string, number, number][] = [
   // Full Forward Line (Top End - Attacking Goal)
-  ['LFP', 'LFP', 27, 13],
-  ['FF', 'FF', 50, 9],
-  ['RFP', 'RFP', 73, 13],
+  ['LFP', 'LFP', 20, 11],
+  ['FF', 'FF', 50, 5],
+  ['RFP', 'RFP', 80, 11],
 
   // Half Forward Line
-  ['LHF', 'LHF', 24, 26],
-  ['CHF', 'CHF', 50, 26],
-  ['RHF', 'RHF', 76, 26],
+  ['LHF', 'LHF', 14, 25],
+  ['CHF', 'CHF', 50, 25],
+  ['RHF', 'RHF', 86, 25],
 
   // Midfield 1 (Center Top)
-  ['C', 'C', 38, 39],
-  ['R', 'R', 62, 39],
+  ['C', 'C', 33, 39],
+  ['R', 'R', 67, 39],
 
   // Wings
-  ['LW', 'LW', 20, 50],
-  ['RW', 'RW', 80, 50],
+  ['LW', 'LW', 8, 51],
+  ['RW', 'RW', 92, 51],
 
   // Midfield 2 (Center Bottom)
-  ['RR', 'RR', 38, 61],
-  ['ROV', 'ROV', 62, 61],
+  ['RR', 'RR', 33, 63],
+  ['ROV', 'ROV', 67, 63],
 
   // Half Back Line
-  ['LBF', 'LBF', 24, 74],
-  ['CHB', 'CHB', 50, 74],
-  ['RBF', 'RBF', 76, 74],
+  ['LBF', 'LBF', 14, 77],
+  ['CHB', 'CHB', 50, 77],
+  ['RBF', 'RBF', 86, 77],
 
   // Full Back Line (Bottom End - Defending Goal)
-  ['LBP', 'LBP', 27, 87],
-  ['FB', 'FB', 50, 91],
-  ['RBP', 'RBP', 73, 87],
+  ['LBP', 'LBP', 20, 89],
+  ['FB', 'FB', 50, 97],
+  ['RBP', 'RBP', 80, 89],
 ];
 
 export const POSITION_GROUPS: Record<string, string[]> = {

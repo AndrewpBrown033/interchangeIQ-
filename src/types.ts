@@ -65,6 +65,15 @@ export interface Rotation {
   note: string;
   applied: boolean;
   status: 'scheduled' | 'applied';
+  // The exact lineup slot each side was made from/to at creation time.
+  // Player ids are not guaranteed unique per slot (a player can cover more
+  // than one position), so anything that needs to know "which position on
+  // the field does this move belong to" should read these instead of
+  // reverse-looking-up the lineup by outId/inId — that lookup can resolve
+  // to the wrong slot, or to every slot the player occupies, when a player
+  // id repeats across positions.
+  outSlot?: string;
+  inSlot?: string;
   groupId?: string;
   groupType?: '3-way' | 'pair' | string;
   groupP1Id?: string;
