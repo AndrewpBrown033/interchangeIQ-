@@ -214,6 +214,8 @@ export default function PlanModeView({
       type: isBenchSwap ? 'bench' : 'onfield',
       outId: pOut.id,
       inId: pIn.id,
+      outSlot: from.type === 'field' ? from.slot : undefined,
+      inSlot: to.type === 'field' ? to.slot : undefined,
       out: isBenchSwap
         ? `OFF (${from.slot || 'Bench'}) #${pOut.number} ${pOut.name}`
         : `FROM (${from.slot || 'Field'}) #${pOut.number} ${pOut.name}`,
@@ -227,7 +229,8 @@ export default function PlanModeView({
     };
 
     setPendingMoves((prev) => [...prev, newRot]);
-    setSelectedSource(null);
+    // Chain changes together: the destination player/slot automatically becomes the next source
+    setSelectedSource({ type: to.type, id: to.id, slot: to.slot });
     setSelectedMoveId(newRot.id);
   };
 
@@ -604,10 +607,7 @@ export default function PlanModeView({
               </div>
             </div>
 
-            {/* CONNECTING ARROW — only drawn for the currently selected move,
-                so the field stays readable instead of every queued move's
-                line overlapping at once. Tap a move in the side panel (or
-                its numbered badge on the field) to see its path here. */}
+            {/* CONNECTING ARROWS — renders all chained pending moves simultaneously, plus any selected planned move */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
               <defs>
                 <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.5" markerHeight="4.5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
@@ -619,36 +619,89 @@ export default function PlanModeView({
               </defs>
 
               {(() => {
-                const rot = [...plannedMoves, ...scheduledRotations, ...pendingMoves].find((r) => r.id === selectedMoveId);
-                if (!rot) return null;
-                const isPending = pendingMoves.some((r) => r.id === rot.id);
+                // Combine all pending moves and optionally a selected move from saved/scheduled
+                const movesToDraw = [...pendingMoves];
+                if (selectedMoveId) {
+                  const selRot = [...plannedMoves, ...scheduledRotations].find((r) => r.id === selectedMoveId);
+                  if (selRot && !movesToDraw.some((m) => m.id === selRot.id)) {
+                    movesToDraw.push(selRot);
+                  }
+                }
 
-                const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
-                const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
+                if (movesToDraw.length === 0) return null;
 
-                const outPosConfig = outSlot ? POSITIONS.find(([sn]) => sn === outSlot) : null;
-                const inPosConfig = inSlot ? POSITIONS.find(([sn]) => sn === inSlot) : null;
+                return movesToDraw.map((rot) => {
+                  const isPending = pendingMoves.some((r) => r.id === rot.id);
+                  const isSelected = selectedMoveId === rot.id;
+                  const moveSeq = planMoveNumberByRotId[rot.id];
 
-                const x1 = outPosConfig ? outPosConfig[2] : 5;
-                const y1 = outPosConfig ? outPosConfig[3] : 50;
-                const x2 = inPosConfig ? inPosConfig[2] : 50;
-                const y2 = inPosConfig ? inPosConfig[3] : 50;
+                  const outSlot = rot.outSlot || Object.keys(lineup).find((k) => lineup[k] === rot.outId);
+                  const inSlot = rot.inSlot || Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
-                return (
-                  <line
-                    x1={`${x1}%`}
-                    y1={`${y1}%`}
-                    x2={`${x2}%`}
-                    y2={`${y2}%`}
-                    stroke={isPending ? '#d97706' : '#0f172a'}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeDasharray="5,4"
-                    vectorEffect="non-scaling-stroke"
-                    markerEnd={isPending ? 'url(#afl-arrow-amber)' : 'url(#afl-arrow-dark)'}
-                    opacity="0.95"
-                  />
-                );
+                  const outPosConfig = outSlot ? POSITIONS.find(([sn]) => sn === outSlot) : null;
+                  const inPosConfig = inSlot ? POSITIONS.find(([sn]) => sn === inSlot) : null;
+
+                  let x1 = outPosConfig ? outPosConfig[2] : 5;
+                  let y1 = outPosConfig ? outPosConfig[3] : 50;
+                  let x2 = inPosConfig ? inPosConfig[2] : 50;
+                  let y2 = inPosConfig ? inPosConfig[3] : 50;
+
+                  if (outPosConfig && !inPosConfig) {
+                    x2 = 5;
+                    y2 = y1;
+                  } else if (!outPosConfig && inPosConfig) {
+                    x1 = 5;
+                    y1 = y2;
+                  } else if (!outPosConfig && !inPosConfig) {
+                    return null;
+                  }
+
+                  const mx = (x1 + x2) / 2;
+                  const my = (y1 + y2) / 2;
+                  const strokeColor = isPending ? '#d97706' : '#0f172a';
+                  const markerId = isPending ? 'url(#afl-arrow-amber)' : 'url(#afl-arrow-dark)';
+
+                  return (
+                    <g key={rot.id}>
+                      <line
+                        x1={`${x1}%`}
+                        y1={`${y1}%`}
+                        x2={`${x2}%`}
+                        y2={`${y2}%`}
+                        stroke={strokeColor}
+                        strokeWidth={isSelected ? '2.8' : '2'}
+                        strokeLinecap="round"
+                        strokeDasharray="5,4"
+                        vectorEffect="non-scaling-stroke"
+                        markerEnd={markerId}
+                        opacity={isSelected ? 1 : 0.85}
+                      />
+                      {moveSeq !== undefined && (
+                        <g>
+                          <circle
+                            cx={`${mx}%`}
+                            cy={`${my}%`}
+                            r="2.2"
+                            fill={isPending ? '#d97706' : '#0f172a'}
+                            stroke="#ffffff"
+                            strokeWidth="0.6"
+                          />
+                          <text
+                            x={`${mx}%`}
+                            y={`${my}%`}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fill="#ffffff"
+                            fontSize="2.4"
+                            fontWeight="900"
+                          >
+                            {moveSeq}
+                          </text>
+                        </g>
+                      )}
+                    </g>
+                  );
+                });
               })()}
             </svg>
 
