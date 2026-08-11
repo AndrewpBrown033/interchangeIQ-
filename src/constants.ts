@@ -1759,12 +1759,12 @@ export const DEMO_TEAM_SAMPLE_PLAYERS: Player[] = [
 // basis for the first saved lineup template below.
 export const DEMO_TEAM_SAMPLE_LINEUP: Record<string, string> = {
   LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
-  LHF: 'dp5', CHF: 'dp5', RHF: 'dp5',
+  LHF: 'dp5', CHF: 'dp17', RHF: 'dp19',
   C: 'dp1', R: 'dp7',
   LW: 'dp4', RW: 'dp14',
-  RR: 'dp11', ROV: 'dp11',
-  LBF: 'dp13', CHB: 'dp3', RBF: 'dp13',
-  LBP: 'dp10', FB: 'dp6', RBP: 'dp6',
+  RR: 'dp11', ROV: 'dp8',
+  LBF: 'dp13', CHB: 'dp3', RBF: 'dp18',
+  LBP: 'dp10', FB: 'dp6', RBP: 'dp16',
 };
 
 export const DEMO_TEAM_SAMPLE_SAVED_LINEUPS: LineupTemplate[] = [
@@ -1773,7 +1773,7 @@ export const DEMO_TEAM_SAMPLE_SAVED_LINEUPS: LineupTemplate[] = [
     name: 'Round 3 Best 18',
     slots: {
       LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
-      LHF: 'dp5', CHF: 'dp2', RHF: 'dp19',
+      LHF: 'dp5', CHF: 'dp17', RHF: 'dp19',
       C: 'dp1', R: 'dp7',
       LW: 'dp4', RW: 'dp14',
       RR: 'dp11', ROV: 'dp8',
@@ -1833,7 +1833,7 @@ export const DEMO_TEAM_SAMPLE_HISTORY: GameHistory[] = [
       away: { goals: 6, behinds: 5, quarters: [{ g: 1, b: 1 }, { g: 2, b: 1 }, { g: 1, b: 2 }, { g: 2, b: 1 }] },
     },
     rotations: [],
-    lineup: { ...DEMO_TEAM_SAMPLE_LINEUP, CHF: 'dp2', FF: 'dp5' },
+    lineup: { ...DEMO_TEAM_SAMPLE_LINEUP, CHF: 'dp2', FF: 'dp17' },
     players: [
       { id: 'dp1', name: 'Zoe Campbell', nick: '', number: '7', active: 1800, bench: 600, slot: 'C' },
       { id: 'dp3', name: 'Priya Anand', nick: '', number: '18', active: 2040, bench: 360, slot: 'CHB' },
@@ -1884,4 +1884,3 @@ export const POSITION_HEIGHT_FACTOR: Record<string, 'Small' | 'Medium' | 'Tall'>
   LBF: 'Medium', CHB: 'Tall', RBF: 'Medium',
   LBP: 'Medium', FB: 'Tall', RBP: 'Medium',
 };
-
