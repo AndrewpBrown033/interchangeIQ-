@@ -1000,8 +1000,6 @@ export default function GameDayScreen({
       return;
     }
 
-    setPendingActionPlayerId(null);
-    setPendingActionMode(null);
     setActionMenuPlayerId(pid);
   };
 
@@ -2064,14 +2062,14 @@ export default function GameDayScreen({
                 {/* Dynamic SVG Connecting Lines & Arrowhead Markers for Interchange / Swaps */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-15" viewBox="0 0 100 100" preserveAspectRatio="none">
                   <defs>
-                    <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
+                    <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.5" markerHeight="4.5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                      <path d="M 1.5 1.5 L 8 5 L 1.5 8.5" fill="none" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                     </marker>
-                    <marker id="afl-arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626" />
+                    <marker id="afl-arrow-red" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.5" markerHeight="4.5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                      <path d="M 1.5 1.5 L 8 5 L 1.5 8.5" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                     </marker>
-                    <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
+                    <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.5" markerHeight="4.5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                      <path d="M 1.5 1.5 L 8 5 L 1.5 8.5" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                     </marker>
                   </defs>
 
@@ -2094,8 +2092,10 @@ export default function GameDayScreen({
                             x2={`${x2}%`}
                             y2={`${y2}%`}
                             stroke="#0f172a"
-                            strokeWidth="1.8"
-                            strokeDasharray="4,4"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeDasharray="5,4"
+                            vectorEffect="non-scaling-stroke"
                             markerEnd="url(#afl-arrow-dark)"
                             opacity="0.6"
                           />
@@ -2131,14 +2131,14 @@ export default function GameDayScreen({
                       style={{ left: `${x}%`, top: `${y}%` }}
                     >
                       {p ? (
-                        <div className={`relative overflow-hidden w-full h-full rounded-md bg-white p-0.5 shadow-xs border flex items-center gap-1 transition-all select-none ${
+                        <div className={`relative overflow-hidden w-full h-full rounded-xl bg-white p-1 shadow-md border flex items-center gap-1.5 transition-all select-none ${
                           isSelected
                             ? 'border-2 border-slate-900 ring-2 ring-red-500'
                             : 'border-slate-300 hover:border-slate-400'
                         }`}>
                           {/* RookieMe Interchange Active Badges */}
                           {isSelected && (
-                            <div className="absolute top-0.5 right-0.5 z-20 bg-blue-600 text-white font-black text-[6.5px] px-0.5 py-0.2 rounded shadow-2xs flex items-center gap-0.5 animate-pulse">
+                            <div className="absolute top-0.5 right-0.5 z-20 bg-blue-600 text-white font-black text-[7px] px-1 py-0.5 rounded shadow-sm flex items-center gap-0.5 animate-pulse">
                               <span>SWAP</span>
                               <span>⇄</span>
                             </div>
@@ -2146,9 +2146,9 @@ export default function GameDayScreen({
 
                           {/* Swipe-to-bench background indicator */}
                           {swipingPlayerId === p.id && Math.abs(swipeOffset) > 10 && (
-                            <div className="absolute inset-0 bg-red-600 text-white flex items-center justify-center gap-1 animate-pulse z-10 rounded-md">
-                              <RotateCcw className="w-3 h-3" />
-                              <span className="text-[7.5px] font-black uppercase tracking-wider">Bench</span>
+                            <div className="absolute inset-0 bg-red-600 text-white flex items-center justify-center gap-1 animate-pulse z-10 rounded-xl">
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span className="text-[8px] font-black uppercase tracking-wider">Bench Player</span>
                             </div>
                           )}
 
@@ -2162,10 +2162,10 @@ export default function GameDayScreen({
                               transform: swipingPlayerId === p.id ? `translateX(${swipeOffset}px)` : 'none',
                               transition: swipingPlayerId === p.id ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                             }}
-                            className="w-full h-full flex items-center gap-1 bg-white rounded text-black select-none"
+                            className="w-full h-full flex items-center gap-1.5 bg-white rounded-lg text-black select-none"
                           >
                             {/* Square Jumper Number Badge */}
-                            <div className={`w-4.5 h-4.5 sm:w-5 sm:h-5 rounded font-black text-white text-[8px] sm:text-[9.5px] flex items-center justify-center shrink-0 shadow-2xs ${
+                            <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md font-black text-white text-[9px] sm:text-[11px] flex items-center justify-center shrink-0 shadow-xs ${
                               POSITION_GROUPS.FWD.includes(slotName) ? 'bg-[#ea580c]' :
                               POSITION_GROUPS.MID.includes(slotName) ? 'bg-[#1d4ed8]' :
                               POSITION_GROUPS.DEF.includes(slotName) ? 'bg-[#15803d]' : 'bg-[#7e22ce]'
@@ -2174,17 +2174,18 @@ export default function GameDayScreen({
                             </div>
 
                             {/* Player Name & Bottom Stats Row */}
-                            <div className="flex-1 min-w-0 flex flex-col justify-center h-full text-left leading-none">
-                              <div className="font-extrabold text-[7.5px] sm:text-[8.5px] text-slate-900 truncate" title={p.name}>
+                            <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5 text-left">
+                              <div className="font-extrabold text-[8px] sm:text-[9.5px] text-slate-900 truncate leading-none" title={p.name}>
                                 {p.nick || (p.name.split(' ').length > 1 ? `${p.name.split(' ')[0][0]}. ${p.name.split(' ').slice(1).join(' ')}` : p.name)}
                               </div>
 
-                              <div className="flex items-center justify-between gap-0.5 mt-0.5 text-[5.5px] sm:text-[6.5px] font-black text-slate-600">
-                                <span className="px-0.5 py-0.2 rounded bg-slate-100 text-slate-700 uppercase font-black tracking-tighter">
+                              <div className="flex items-center justify-between gap-0.5 leading-none text-[6.5px] sm:text-[7.5px] font-black text-slate-600">
+                                <span className="px-1 py-0.5 rounded bg-slate-100 text-slate-700 uppercase font-black tracking-tighter">
                                   {label}
                                 </span>
                                 <span>{fmt(p.active)}</span>
-                                <span className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full shrink-0 ${
+                                <span className="text-slate-800">{Math.min(100, Math.round((p.active / 1800) * 100))}%</span>
+                                <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${
                                   (p.active / 1800) > 0.85 ? 'bg-red-500 animate-pulse' :
                                   (p.active / 1800) > 0.5 ? 'bg-amber-400' : 'bg-emerald-500'
                                 }`} />

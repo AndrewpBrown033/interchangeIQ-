@@ -610,11 +610,11 @@ export default function PlanModeView({
                 its numbered badge on the field) to see its path here. */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
               <defs>
-                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="3.4" markerHeight="3.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
+                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.5" markerHeight="4.5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                  <path d="M 1.5 1.5 L 8 5 L 1.5 8.5" fill="none" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                 </marker>
-                <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="3.4" markerHeight="3.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
+                <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.5" markerHeight="4.5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                  <path d="M 1.5 1.5 L 8 5 L 1.5 8.5" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                 </marker>
               </defs>
 
@@ -641,9 +641,10 @@ export default function PlanModeView({
                     x2={`${x2}%`}
                     y2={`${y2}%`}
                     stroke={isPending ? '#d97706' : '#0f172a'}
-                    strokeWidth="2.6"
+                    strokeWidth="2"
                     strokeLinecap="round"
-                    strokeDasharray="7,5"
+                    strokeDasharray="5,4"
+                    vectorEffect="non-scaling-stroke"
                     markerEnd={isPending ? 'url(#afl-arrow-amber)' : 'url(#afl-arrow-dark)'}
                     opacity="0.95"
                   />

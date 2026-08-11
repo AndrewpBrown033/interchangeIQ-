@@ -16,36 +16,36 @@ export const DEMO_TEAM: TeamProfile = {
 
 export const POSITIONS: [string, string, number, number][] = [
   // Full Forward Line (Top End - Attacking Goal)
-  ['LFP', 'LFP', 20, 11],
-  ['FF', 'FF', 50, 5],
-  ['RFP', 'RFP', 80, 11],
+  ['LFP', 'LFP', 26, 18],
+  ['FF', 'FF', 50, 9],
+  ['RFP', 'RFP', 74, 18],
 
   // Half Forward Line
-  ['LHF', 'LHF', 14, 25],
-  ['CHF', 'CHF', 50, 25],
-  ['RHF', 'RHF', 86, 25],
+  ['LHF', 'LHF', 24, 26],
+  ['CHF', 'CHF', 50, 26],
+  ['RHF', 'RHF', 76, 26],
 
   // Midfield 1 (Center Top)
-  ['C', 'C', 33, 39],
-  ['R', 'R', 67, 39],
+  ['C', 'C', 38, 39],
+  ['R', 'R', 62, 39],
 
   // Wings
-  ['LW', 'LW', 8, 51],
-  ['RW', 'RW', 92, 51],
+  ['LW', 'LW', 20, 50],
+  ['RW', 'RW', 80, 50],
 
   // Midfield 2 (Center Bottom)
-  ['RR', 'RR', 33, 63],
-  ['ROV', 'ROV', 67, 63],
+  ['RR', 'RR', 38, 61],
+  ['ROV', 'ROV', 62, 61],
 
   // Half Back Line
-  ['LBF', 'LBF', 14, 77],
-  ['CHB', 'CHB', 50, 77],
-  ['RBF', 'RBF', 86, 77],
+  ['LBF', 'LBF', 24, 74],
+  ['CHB', 'CHB', 50, 74],
+  ['RBF', 'RBF', 76, 74],
 
   // Full Back Line (Bottom End - Defending Goal)
-  ['LBP', 'LBP', 20, 89],
-  ['FB', 'FB', 50, 97],
-  ['RBP', 'RBP', 80, 89],
+  ['LBP', 'LBP', 26, 82],
+  ['FB', 'FB', 50, 91],
+  ['RBP', 'RBP', 74, 82],
 ];
 
 export const POSITION_GROUPS: Record<string, string[]> = {
@@ -1759,12 +1759,12 @@ export const DEMO_TEAM_SAMPLE_PLAYERS: Player[] = [
 // basis for the first saved lineup template below.
 export const DEMO_TEAM_SAMPLE_LINEUP: Record<string, string> = {
   LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
-  LHF: 'dp5', CHF: 'dp17', RHF: 'dp19',
+  LHF: 'dp5', CHF: 'dp5', RHF: 'dp5',
   C: 'dp1', R: 'dp7',
   LW: 'dp4', RW: 'dp14',
-  RR: 'dp11', ROV: 'dp8',
-  LBF: 'dp13', CHB: 'dp3', RBF: 'dp18',
-  LBP: 'dp10', FB: 'dp6', RBP: 'dp16',
+  RR: 'dp11', ROV: 'dp11',
+  LBF: 'dp13', CHB: 'dp3', RBF: 'dp13',
+  LBP: 'dp10', FB: 'dp6', RBP: 'dp6',
 };
 
 export const DEMO_TEAM_SAMPLE_SAVED_LINEUPS: LineupTemplate[] = [
@@ -1773,7 +1773,7 @@ export const DEMO_TEAM_SAMPLE_SAVED_LINEUPS: LineupTemplate[] = [
     name: 'Round 3 Best 18',
     slots: {
       LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
-      LHF: 'dp5', CHF: 'dp17', RHF: 'dp19',
+      LHF: 'dp5', CHF: 'dp2', RHF: 'dp19',
       C: 'dp1', R: 'dp7',
       LW: 'dp4', RW: 'dp14',
       RR: 'dp11', ROV: 'dp8',
