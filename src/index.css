@@ -203,12 +203,12 @@ body {
 
 .slot {
   position: absolute;
-  width: 144px;
-  min-height: 58px;
-  height: 58px;
-  padding: 4px 6px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.1);
+  width: 98px;
+  min-height: 40px;
+  height: 40px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
   border: 1px dashed rgba(255, 255, 255, 0.55);
   color: #fff;
   transform: translate(-50%, -50%);
@@ -216,19 +216,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 3px;
   transition: all 0.2s ease;
 }
 
 @media (max-width: 640px) {
   .slot {
     width: 78px;
-    min-height: 54px;
-    height: 54px;
-    padding: 2px 4px;
-    border-radius: 8px;
-    flex-direction: column;
-    justify-content: center;
+    min-height: 36px;
+    height: 36px;
+    padding: 1px 2px;
+    border-radius: 7px;
+    flex-direction: row;
+    justify-content: flex-start;
     gap: 2px;
   }
 }

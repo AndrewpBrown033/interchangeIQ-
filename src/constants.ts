@@ -1759,12 +1759,12 @@ export const DEMO_TEAM_SAMPLE_PLAYERS: Player[] = [
 // basis for the first saved lineup template below.
 export const DEMO_TEAM_SAMPLE_LINEUP: Record<string, string> = {
   LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
-  LHF: 'dp5', CHF: 'dp5', RHF: 'dp5',
+  LHF: 'dp5', CHF: 'dp17', RHF: 'dp19',
   C: 'dp1', R: 'dp7',
   LW: 'dp4', RW: 'dp14',
-  RR: 'dp11', ROV: 'dp11',
-  LBF: 'dp13', CHB: 'dp3', RBF: 'dp13',
-  LBP: 'dp10', FB: 'dp6', RBP: 'dp6',
+  RR: 'dp11', ROV: 'dp8',
+  LBF: 'dp13', CHB: 'dp3', RBF: 'dp18',
+  LBP: 'dp10', FB: 'dp6', RBP: 'dp16',
 };
 
 export const DEMO_TEAM_SAMPLE_SAVED_LINEUPS: LineupTemplate[] = [
@@ -1773,7 +1773,7 @@ export const DEMO_TEAM_SAMPLE_SAVED_LINEUPS: LineupTemplate[] = [
     name: 'Round 3 Best 18',
     slots: {
       LFP: 'dp15', FF: 'dp2', RFP: 'dp9',
-      LHF: 'dp5', CHF: 'dp2', RHF: 'dp19',
+      LHF: 'dp5', CHF: 'dp17', RHF: 'dp19',
       C: 'dp1', R: 'dp7',
       LW: 'dp4', RW: 'dp14',
       RR: 'dp11', ROV: 'dp8',

@@ -113,28 +113,6 @@ export default function PlanModeView({
   // both the on-field arrow-in-context and the per-move Apply to Game button.
   const [selectedMoveId, setSelectedMoveId] = useState<string | null>(null);
 
-  // Measured pixel size of the pitch container. The connecting-arrow SVG
-  // below draws in this same pixel space (instead of a stretched 0-100
-  // viewBox) so the line thickness and arrowhead render undistorted
-  // regardless of the pitch's actual (non-square) aspect ratio.
-  const fieldRef = useRef<HTMLDivElement>(null);
-  const [fieldSize, setFieldSize] = useState({ width: 490, height: 650 });
-
-  useEffect(() => {
-    const el = fieldRef.current;
-    if (!el) return;
-    const measure = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setFieldSize({ width: rect.width, height: rect.height });
-      }
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   const currentPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || null;
 
   // Filter rotations for selected quarter
@@ -236,8 +214,6 @@ export default function PlanModeView({
       type: isBenchSwap ? 'bench' : 'onfield',
       outId: pOut.id,
       inId: pIn.id,
-      outSlot: from.type === 'field' ? from.slot : undefined,
-      inSlot: to.type === 'field' ? to.slot : undefined,
       out: isBenchSwap
         ? `OFF (${from.slot || 'Bench'}) #${pOut.number} ${pOut.name}`
         : `FROM (${from.slot || 'Field'}) #${pOut.number} ${pOut.name}`,
@@ -296,8 +272,8 @@ export default function PlanModeView({
     if (!rot) return;
 
     const nextLineup = { ...lineup };
-    const outSlot = rot.outSlot || Object.keys(lineup).find((k) => lineup[k] === rot.outId);
-    const inSlot = rot.inSlot || Object.keys(lineup).find((k) => lineup[k] === rot.inId);
+    const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
+    const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
     if (outSlot && inSlot) {
       nextLineup[outSlot] = rot.inId;
@@ -347,17 +323,11 @@ export default function PlanModeView({
   const orderedPlanMoves = [...plannedMoves].sort((a, b) => (a.planSeq || 0) - (b.planSeq || 0));
   const allDisplayedPlanMoves = [...orderedPlanMoves, ...pendingMoves];
   const planMoveNumberByPlayer: Record<string, number> = {};
-  // Keyed by the move's own recorded slot (outSlot/inSlot) — the reliable
-  // way to mark "this exact position", since a player id can legitimately
-  // occupy more than one slot at once.
-  const planMoveNumberBySlot: Record<string, number> = {};
   const planMoveNumberByRotId: Record<string, number> = {};
   allDisplayedPlanMoves.forEach((r, idx) => {
     const n = idx + 1;
     planMoveNumberByPlayer[r.outId] = n;
     planMoveNumberByPlayer[r.inId] = n;
-    if (r.outSlot) planMoveNumberBySlot[r.outSlot] = n;
-    if (r.inSlot) planMoveNumberBySlot[r.inSlot] = n;
     planMoveNumberByRotId[r.id] = n;
   });
 
@@ -601,7 +571,7 @@ export default function PlanModeView({
         }`}>
           
           {/* EXACT GAMEDAY PITCH CONTAINER WITH RADIAL TURF & 3D GOAL POSTS */}
-          <div ref={fieldRef} className="field relative select-none w-full max-w-[490px] my-auto">
+          <div className="field relative select-none w-full max-w-[490px] my-auto">
             <div className="centre-square"></div>
             <div className="centre-circle-inner"></div>
             <div className="fifty-arc-top"></div>
@@ -638,16 +608,12 @@ export default function PlanModeView({
                 so the field stays readable instead of every queued move's
                 line overlapping at once. Tap a move in the side panel (or
                 its numbered badge on the field) to see its path here. */}
-            <svg
-              className="absolute inset-0 w-full h-full pointer-events-none z-30"
-              viewBox={`0 0 ${fieldSize.width} ${fieldSize.height}`}
-              preserveAspectRatio="xMidYMid meet"
-            >
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
               <defs>
-                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="4" markerHeight="4" markerUnits="strokeWidth" orient="auto-start-reverse">
+                <marker id="afl-arrow-dark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="3.4" markerHeight="3.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a" />
                 </marker>
-                <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="4" markerHeight="4" markerUnits="strokeWidth" orient="auto-start-reverse">
+                <marker id="afl-arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="3.4" markerHeight="3.4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
                 </marker>
               </defs>
@@ -657,35 +623,27 @@ export default function PlanModeView({
                 if (!rot) return null;
                 const isPending = pendingMoves.some((r) => r.id === rot.id);
 
-                const outSlot = rot.outSlot || Object.keys(lineup).find((k) => lineup[k] === rot.outId);
-                const inSlot = rot.inSlot || Object.keys(lineup).find((k) => lineup[k] === rot.inId);
+                const outSlot = Object.keys(lineup).find((k) => lineup[k] === rot.outId);
+                const inSlot = Object.keys(lineup).find((k) => lineup[k] === rot.inId);
 
                 const outPosConfig = outSlot ? POSITIONS.find(([sn]) => sn === outSlot) : null;
                 const inPosConfig = inSlot ? POSITIONS.find(([sn]) => sn === inSlot) : null;
 
-                const xPct1 = outPosConfig ? outPosConfig[2] : 5;
-                const yPct1 = outPosConfig ? outPosConfig[3] : 50;
-                const xPct2 = inPosConfig ? inPosConfig[2] : 50;
-                const yPct2 = inPosConfig ? inPosConfig[3] : 50;
-
-                // Convert percentage-of-field coordinates into the SVG's real
-                // pixel viewBox (set above to fieldSize) so the stroke and
-                // arrowhead are never stretched/sheared by aspect ratio.
-                const x1 = (xPct1 / 100) * fieldSize.width;
-                const y1 = (yPct1 / 100) * fieldSize.height;
-                const x2 = (xPct2 / 100) * fieldSize.width;
-                const y2 = (yPct2 / 100) * fieldSize.height;
+                const x1 = outPosConfig ? outPosConfig[2] : 5;
+                const y1 = outPosConfig ? outPosConfig[3] : 50;
+                const x2 = inPosConfig ? inPosConfig[2] : 50;
+                const y2 = inPosConfig ? inPosConfig[3] : 50;
 
                 return (
                   <line
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
+                    x1={`${x1}%`}
+                    y1={`${y1}%`}
+                    x2={`${x2}%`}
+                    y2={`${y2}%`}
                     stroke={isPending ? '#d97706' : '#0f172a'}
-                    strokeWidth={1.75}
+                    strokeWidth="2.6"
                     strokeLinecap="round"
-                    strokeDasharray="6,5"
+                    strokeDasharray="7,5"
                     markerEnd={isPending ? 'url(#afl-arrow-amber)' : 'url(#afl-arrow-dark)'}
                     opacity="0.95"
                   />
@@ -700,31 +658,10 @@ export default function PlanModeView({
               const pid = lineup[slotName];
               const p = pid ? players.find((x) => x.id === pid) : null;
               const energyPct = p ? getEnergyPct(p) : 100;
-              // Match on the specific slot that was tapped, not just the
-              // player id — a player can legitimately appear in more than
-              // one slot (e.g. covering multiple line positions), and
-              // matching by id alone would highlight every slot that
-              // player occupies instead of just the one that was clicked.
-              const isSelected = selectedSource?.type === 'field' && selectedSource.slot === slotName;
-              // Prefer the move's own recorded slot; only fall back to
-              // matching by player id for older/"classic builder" rotations
-              // that never recorded outSlot/inSlot (those are created from a
-              // plain player-vs-player form with no slot context available).
-              const moveNum =
-                planMoveNumberBySlot[slotName] !== undefined
-                  ? planMoveNumberBySlot[slotName]
-                  : pid
-                    ? planMoveNumberByPlayer[pid]
-                    : undefined;
-              const isPendingMove = pendingMoves.some((r) => r.outSlot === slotName || r.inSlot === slotName);
-              const isScheduledOnly =
-                !moveNum &&
-                scheduledRotations.some(
-                  (r) =>
-                    r.outSlot === slotName ||
-                    r.inSlot === slotName ||
-                    (!r.outSlot && !r.inSlot && !!pid && (r.outId === pid || r.inId === pid))
-                );
+              const isSelected = selectedSource?.id === pid;
+              const moveNum = pid ? planMoveNumberByPlayer[pid] : undefined;
+              const isPendingMove = pid ? pendingMoves.some((r) => r.outId === pid || r.inId === pid) : false;
+              const isScheduledOnly = pid ? (scheduledRotations.some((r) => r.outId === pid || r.inId === pid) && !moveNum) : false;
 
               return (
                 <div
@@ -754,15 +691,15 @@ export default function PlanModeView({
                     ['R', 'ROV', 'RR', 'C', 'CHF', 'CHB', 'FF', 'FB'].includes(slotName) ? 'key' : ''
                   } ${
                     isSelected
-                      ? 'ring-4 ring-slate-900 shadow-[0_0_24px_rgba(15,23,42,0.9)] scale-105 z-40'
+                      ? 'ring-4 ring-inset ring-slate-900 shadow-[0_0_10px_rgba(15,23,42,0.6)] z-40'
                       : isPendingMove
-                        ? 'ring-2 ring-amber-500 scale-105 z-30'
+                        ? 'ring-2 ring-inset ring-amber-500 z-30'
                         : moveNum
-                          ? 'ring-2 ring-orange-500 scale-105 z-30'
+                          ? 'ring-2 ring-inset ring-orange-500 z-30'
                           : isScheduledOnly
-                            ? 'ring-2 ring-slate-400 scale-105 z-30'
+                            ? 'ring-2 ring-inset ring-slate-400 z-30'
                             : selectedSource
-                              ? 'hover:ring-2 hover:ring-emerald-400 cursor-pointer'
+                              ? 'hover:ring-2 hover:ring-inset hover:ring-emerald-400 cursor-pointer'
                               : ''
                   }`}
                   style={{ left: `${x}%`, top: `${y}%` }}
