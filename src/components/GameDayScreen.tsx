@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Score, Rotation, Plan, GameInfo, ApiKeySettings, TeamProfile } from '../types';
-import { POSITIONS, POSITION_GROUPS, normalizePosition, getZoneForPosition, matchPositions, stripSideFromPosition, detectRotationGaps, RotationGap, POSITION_FULL_NAMES } from '../constants';
+import { POSITIONS, POSITION_GROUPS, normalizePosition, getZoneForPosition, matchPositions, stripSideFromPosition, detectRotationGaps, RotationGap, POSITION_FULL_NAMES, PLAYING_TEMPLATES, getPositionsForTemplate, getPositionGroupsForTemplate, AGE_GROUPS, getDefaultTemplateForAgeGroup } from '../constants';
 import { Play, Pause, RotateCcw, AlertTriangle, Check, RefreshCw, X, Award, ChevronDown, ChevronUp, AlertCircle, Info, Ban, Volume2, VolumeX, Smartphone, Bell, Layers, Settings, Edit3, Save, Calendar, Clock, ArrowUp, Sparkles, Camera, Bot } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 import LineupPhotoImport from './LineupPhotoImport';
@@ -1310,11 +1310,13 @@ export default function GameDayScreen({
                       onClick={() => {
                         if (!isEditingGameDetails) {
                           setEditGameDraft({
-                            team: gameInfo.team || '',
+                            team: gameInfo.team || activeTeamProfile?.name || '',
                             opponent: gameInfo.opponent || '',
                             round: gameInfo.round || '',
                             date: gameInfo.date || new Date().toISOString().slice(0, 10),
                             time: gameInfo.time || '',
+                            ageGroup: gameInfo.ageGroup || activeTeamProfile?.ageGroup || 'Under 12',
+                            playingTemplateId: gameInfo.playingTemplateId || activeTeamProfile?.defaultPlayingTemplateId || '18-a-side',
                           });
                           setIsEditingGameDetails(true);
                         } else {
@@ -1471,6 +1473,44 @@ export default function GameDayScreen({
                             className="w-24 bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-[var(--cyan)]"
                           />
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+                          Age Group
+                        </label>
+                        <select
+                          value={editGameDraft.ageGroup || 'Under 12'}
+                          onChange={(e) => {
+                            const newAg = e.target.value;
+                            const newTpl = getDefaultTemplateForAgeGroup(newAg);
+                            setEditGameDraft({ ...editGameDraft, ageGroup: newAg, playingTemplateId: newTpl });
+                          }}
+                          className="w-full bg-slate-800 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-[var(--cyan)] cursor-pointer"
+                        >
+                          {AGE_GROUPS.map((ag) => (
+                            <option key={ag} value={ag}>
+                              {ag}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+                          Playing Field Template
+                        </label>
+                        <select
+                          value={editGameDraft.playingTemplateId || '18-a-side'}
+                          onChange={(e) => setEditGameDraft({ ...editGameDraft, playingTemplateId: e.target.value })}
+                          className="w-full bg-slate-800 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-[var(--cyan)] cursor-pointer"
+                        >
+                          {Object.values(PLAYING_TEMPLATES).map((tpl) => (
+                            <option key={tpl.id} value={tpl.id}>
+                              {tpl.name} ({tpl.teamSize} on pitch)
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
@@ -2075,12 +2115,13 @@ export default function GameDayScreen({
 
                   {/* Draw dashed lines connecting pending selected player to target swap positions */}
                   {pendingActionPlayerId && (() => {
+                    const activeFieldPositions = getPositionsForTemplate(gameInfo.playingTemplateId || activeTeamProfile?.defaultPlayingTemplateId);
                     const srcSlot = Object.keys(lineup).find((k) => lineup[k] === pendingActionPlayerId);
-                    const srcPosConfig = srcSlot ? POSITIONS.find(([sn]) => sn === srcSlot) : null;
+                    const srcPosConfig = srcSlot ? activeFieldPositions.find(([sn]) => sn === srcSlot) : null;
                     const x1 = srcPosConfig ? srcPosConfig[2] : 5;
                     const y1 = srcPosConfig ? srcPosConfig[3] : 50;
 
-                    return POSITIONS.map(([slotName, label, x2, y2]) => {
+                    return activeFieldPositions.map(([slotName, label, x2, y2]) => {
                       const targetPid = lineup[slotName];
                       if (targetPid === pendingActionPlayerId) return null;
 
@@ -2105,7 +2146,9 @@ export default function GameDayScreen({
                   })()}
                 </svg>
 
-                {POSITIONS.map(([slotName, label, x, y]) => {
+                {(() => {
+                  const activeFieldPositions = getPositionsForTemplate(gameInfo.playingTemplateId || activeTeamProfile?.defaultPlayingTemplateId);
+                  return activeFieldPositions.map(([slotName, label, x, y]) => {
                   const pid = lineup[slotName];
                   const p = pid ? players.find((x) => x.id === pid) : null;
                   const isSelected = pendingActionPlayerId === pid || pendingActionPlayerId === slotName;
@@ -2165,7 +2208,7 @@ export default function GameDayScreen({
                             className="w-full h-full flex items-center gap-1.5 bg-white rounded-lg text-black select-none"
                           >
                             {/* Square Jumper Number Badge */}
-                            <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md font-black text-white text-[9px] sm:text-[11px] flex items-center justify-center shrink-0 shadow-xs ${
+                            <div className={`w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-md font-black text-white text-[10px] sm:text-[12px] flex items-center justify-center shrink-0 shadow-xs ${
                               POSITION_GROUPS.FWD.includes(slotName) ? 'bg-[#ea580c]' :
                               POSITION_GROUPS.MID.includes(slotName) ? 'bg-[#1d4ed8]' :
                               POSITION_GROUPS.DEF.includes(slotName) ? 'bg-[#15803d]' : 'bg-[#7e22ce]'
@@ -2175,11 +2218,11 @@ export default function GameDayScreen({
 
                             {/* Player Name & Bottom Stats Row */}
                             <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5 text-left">
-                              <div className="font-extrabold text-[8px] sm:text-[9.5px] text-slate-900 truncate leading-none" title={p.name}>
+                              <div className="font-extrabold text-[9px] sm:text-[11px] text-slate-900 truncate leading-none" title={p.name}>
                                 {p.nick || (p.name.split(' ').length > 1 ? `${p.name.split(' ')[0][0]}. ${p.name.split(' ').slice(1).join(' ')}` : p.name)}
                               </div>
 
-                              <div className="flex items-center justify-between gap-0.5 leading-none text-[6.5px] sm:text-[7.5px] font-black text-slate-600">
+                              <div className="flex items-center justify-between gap-0.5 leading-none text-[7px] sm:text-[8.5px] font-black text-slate-600">
                                 <span className="px-1 py-0.5 rounded bg-slate-100 text-slate-700 uppercase font-black tracking-tighter">
                                   {label}
                                 </span>
@@ -2195,18 +2238,19 @@ export default function GameDayScreen({
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center w-full h-full text-center p-0.5 sm:p-1">
-                          <span className="text-amber-300 font-black text-[9px] sm:text-[11px] leading-none mb-0.5 tracking-wider uppercase">{label}</span>
-                          <span className="hidden sm:block text-[7px] text-white/70 font-extrabold truncate max-w-full leading-tight mb-1" title={POSITION_DESCRIPTIONS[slotName] || slotName}>
+                          <span className="text-amber-300 font-black text-[10px] sm:text-[12px] leading-none mb-0.5 tracking-wider uppercase">{label}</span>
+                          <span className="hidden sm:block text-[8px] text-white/70 font-extrabold truncate max-w-full leading-tight mb-1" title={POSITION_DESCRIPTIONS[slotName] || slotName}>
                             {POSITION_DESCRIPTIONS[slotName] || slotName}
                           </span>
-                          <span className="text-[6px] sm:text-[7px] font-black uppercase text-white/50 border border-dashed border-white/20 bg-white/5 px-1 py-0.5 rounded-sm sm:rounded-md hover:bg-white/15 transition-all">
+                          <span className="text-[7px] sm:text-[8px] font-black uppercase text-white/50 border border-dashed border-white/20 bg-white/5 px-1 py-0.5 rounded-sm sm:rounded-md hover:bg-white/15 transition-all">
                             + Assign
                           </span>
                         </div>
                       )}
                     </div>
                   );
-                })}
+                });
+              })()}
               </div>
             </div>
           )}
@@ -2807,7 +2851,7 @@ export default function GameDayScreen({
           onClose={() => setShowPlanMode(false)}
           onNavigateToGameDay={() => {
             setShowPlanMode(false);
-            if (onNavigate) onNavigate('gameday');
+            if (onNavigate) onNavigate('lineup');
           }}
           players={players}
           onUpdatePlayers={onUpdatePlayers}

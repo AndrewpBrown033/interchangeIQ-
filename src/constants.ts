@@ -55,6 +55,190 @@ export const POSITION_GROUPS: Record<string, string[]> = {
   RUCK: ['R'],
 };
 
+export const AGE_GROUPS = [
+  'Under 8',
+  'Under 9',
+  'Under 10',
+  'Under 11',
+  'Under 12',
+  'Under 13',
+  'Under 14',
+  'Under 15',
+  'Under 16',
+  'Under 17',
+  'Under 18',
+  'Seniors',
+] as const;
+
+export interface PlayingTemplate {
+  id: string;
+  name: string;
+  shortLabel: string;
+  teamSize: number;
+  description: string;
+  recommendedAgeGroups: string[];
+  positions: [string, string, number, number][];
+  groups: Record<string, string[]>;
+}
+
+export const PLAYING_TEMPLATES: Record<string, PlayingTemplate> = {
+  '18-a-side': {
+    id: '18-a-side',
+    name: '18-a-side (Full Field / AFL Standard)',
+    shortLabel: '18 Players',
+    teamSize: 18,
+    description: 'Standard 18 players on field (6 FWD, 6 MID/RUCK, 6 DEF). Used for U16, U18 & Seniors.',
+    recommendedAgeGroups: ['Under 16', 'Under 17', 'Under 18', 'Seniors'],
+    positions: POSITIONS,
+    groups: POSITION_GROUPS,
+  },
+  '16-a-side': {
+    id: '16-a-side',
+    name: '16-a-side (Youth / Junior AFL U13-U15)',
+    shortLabel: '16 Players',
+    teamSize: 16,
+    description: '16 players on field (5 FWD, 6 MID/RUCK, 5 DEF). Ideal for U13–U15 Youth football.',
+    recommendedAgeGroups: ['Under 13', 'Under 14', 'Under 15'],
+    positions: [
+      ['LFP', 'LFP', 26, 18],
+      ['FF', 'FF', 50, 9],
+      ['RFP', 'RFP', 74, 18],
+      ['CHF', 'CHF', 50, 26],
+      ['RHF', 'RHF', 76, 26],
+      ['C', 'C', 38, 39],
+      ['R', 'R', 62, 39],
+      ['LW', 'LW', 20, 50],
+      ['RW', 'RW', 80, 50],
+      ['RR', 'RR', 38, 61],
+      ['ROV', 'ROV', 62, 61],
+      ['LBF', 'LBF', 24, 74],
+      ['CHB', 'CHB', 50, 74],
+      ['LBP', 'LBP', 26, 82],
+      ['FB', 'FB', 50, 91],
+      ['RBP', 'RBP', 74, 82],
+    ],
+    groups: {
+      FWD: ['LFP', 'FF', 'RFP', 'CHF', 'RHF'],
+      MID: ['LW', 'C', 'RW', 'ROV', 'RR'],
+      DEF: ['LBF', 'CHB', 'LBP', 'FB', 'RBP'],
+      RUCK: ['R'],
+    },
+  },
+  '15-a-side': {
+    id: '15-a-side',
+    name: '15-a-side (15 Players Youth Structure)',
+    shortLabel: '15 Players',
+    teamSize: 15,
+    description: '15 players on field (5 FWD, 5 MID/RUCK, 5 DEF). Common for regional youth comps.',
+    recommendedAgeGroups: ['Under 13', 'Under 14', 'Under 15'],
+    positions: [
+      ['LFP', 'LFP', 26, 18],
+      ['FF', 'FF', 50, 9],
+      ['RFP', 'RFP', 74, 18],
+      ['LHF', 'LHF', 28, 26],
+      ['CHF', 'CHF', 50, 26],
+      ['C', 'C', 38, 45],
+      ['R', 'R', 62, 45],
+      ['LW', 'LW', 20, 52],
+      ['RW', 'RW', 80, 52],
+      ['ROV', 'ROV', 50, 60],
+      ['LBP', 'LBP', 26, 82],
+      ['FB', 'FB', 50, 91],
+      ['RBP', 'RBP', 74, 82],
+      ['LBF', 'LBF', 28, 74],
+      ['CHB', 'CHB', 50, 74],
+    ],
+    groups: {
+      FWD: ['LFP', 'FF', 'RFP', 'LHF', 'CHF'],
+      MID: ['LW', 'C', 'RW', 'ROV'],
+      DEF: ['LBP', 'FB', 'RBP', 'LBF', 'CHB'],
+      RUCK: ['R'],
+    },
+  },
+  '12-a-side': {
+    id: '12-a-side',
+    name: '12-a-side (Junior U11–U12 Modified Field)',
+    shortLabel: '12 Players',
+    teamSize: 12,
+    description: '12 players on field (4 FWD, 4 MID/RUCK, 4 DEF). Official for U11 & U12 Junior AFL.',
+    recommendedAgeGroups: ['Under 11', 'Under 12'],
+    positions: [
+      ['LFP', 'LFP', 28, 18],
+      ['FF', 'FF', 50, 10],
+      ['RFP', 'RFP', 72, 18],
+      ['CHF', 'CHF', 50, 28],
+      ['C', 'C', 38, 48],
+      ['R', 'R', 62, 48],
+      ['LW', 'LW', 22, 50],
+      ['RW', 'RW', 78, 50],
+      ['CHB', 'CHB', 50, 72],
+      ['LBP', 'LBP', 28, 82],
+      ['FB', 'FB', 50, 90],
+      ['RBP', 'RBP', 72, 82],
+    ],
+    groups: {
+      FWD: ['LFP', 'FF', 'RFP', 'CHF'],
+      MID: ['LW', 'C', 'RW'],
+      DEF: ['LBP', 'FB', 'RBP', 'CHB'],
+      RUCK: ['R'],
+    },
+  },
+  '9-a-side': {
+    id: '9-a-side',
+    name: '9-a-side (Junior U8–U10 / AFL Nines)',
+    shortLabel: '9 Players',
+    teamSize: 9,
+    description: '9 players on field (3 FWD, 3 MID/RUCK, 3 DEF). Official for U8–U10 Junior AFL & Nines.',
+    recommendedAgeGroups: ['Under 8', 'Under 9', 'Under 10'],
+    positions: [
+      ['LFP', 'LFP', 28, 20],
+      ['FF', 'FF', 50, 12],
+      ['RFP', 'RFP', 72, 20],
+      ['C', 'C', 38, 50],
+      ['R', 'R', 50, 50],
+      ['ROV', 'ROV', 62, 50],
+      ['LBP', 'LBP', 28, 80],
+      ['FB', 'FB', 50, 88],
+      ['RBP', 'RBP', 72, 80],
+    ],
+    groups: {
+      FWD: ['LFP', 'FF', 'RFP'],
+      MID: ['C', 'ROV'],
+      DEF: ['LBP', 'FB', 'RBP'],
+      RUCK: ['R'],
+    },
+  },
+};
+
+export function getDefaultTemplateForAgeGroup(ageGroup?: string): string {
+  if (!ageGroup) return '18-a-side';
+  const ag = ageGroup.toUpperCase();
+  if (ag.includes('8') || ag.includes('9') || ag.includes('10')) {
+    return '9-a-side';
+  }
+  if (ag.includes('11') || ag.includes('12')) {
+    return '12-a-side';
+  }
+  if (ag.includes('13') || ag.includes('14') || ag.includes('15')) {
+    return '16-a-side';
+  }
+  return '18-a-side';
+}
+
+export function getPositionsForTemplate(templateId?: string): [string, string, number, number][] {
+  if (templateId && PLAYING_TEMPLATES[templateId]) {
+    return PLAYING_TEMPLATES[templateId].positions;
+  }
+  return POSITIONS;
+}
+
+export function getPositionGroupsForTemplate(templateId?: string): Record<string, string[]> {
+  if (templateId && PLAYING_TEMPLATES[templateId]) {
+    return PLAYING_TEMPLATES[templateId].groups;
+  }
+  return POSITION_GROUPS;
+}
+
 export const POSITION_FULL_NAMES: Record<string, string> = {
   LFP: 'Left Forward Pocket',
   FF: 'Full Forward',

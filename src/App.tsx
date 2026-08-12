@@ -23,12 +23,13 @@ import TrainingScreen from './components/TrainingScreen';
 import AdminScreen from './components/AdminScreen';
 import SettingsScreen from './components/SettingsScreen';
 import LoginScreen from './components/LoginScreen';
+import JuniorRulesScreen from './components/JuniorRulesScreen';
 import { FirebaseDebugModal } from './components/FirebaseDebug';
 
 // Lucide Icons
 import {
   LayoutDashboard, Play, RefreshCw, Users, History, BarChart3,
-  BookOpen, Shield, ShieldCheck, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot, Landmark, Terminal
+  BookOpen, Shield, ShieldCheck, Settings, Menu, ChevronLeft, ChevronRight, X, Download, Lock, LogOut, TrendingUp, ShieldAlert, Bot, Landmark, Terminal, ArrowLeft
 } from 'lucide-react';
 
 // Helper functions to serialize/deserialize Drill steps to avoid nested arrays in Firestore
@@ -81,6 +82,7 @@ const parseDrillList = (drillsList: any[]) => {
 export default function App() {
   // Navigation active tab
   const [activeTab, setActiveTab] = useState<string>('summary');
+  const [previousTab, setPreviousTab] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -1746,12 +1748,37 @@ export default function App() {
     };
   }, [isAuthenticated, isTimedOut]);
 
+  const TAB_ALIASES: Record<string, string> = {
+    gameday: 'lineup',
+    'game-day': 'lineup',
+    plan: 'lineup',
+  };
+
+  const TAB_BREADCRUMBS: Record<string, { label: string; icon: string }> = {
+    summary: { label: 'Summary Dashboard', icon: '📊' },
+    lineup: { label: 'Game Day Scorecard & Pitch', icon: '🏉' },
+    rotations: { label: 'Rotations & Plan Builder', icon: '🔄' },
+    rules: { label: 'Junior AFL Rules Reference', icon: '📖' },
+    jarvis: { label: 'JARVIS AI Assistant', icon: '🤖' },
+    team: { label: 'Team Roster & Squad', icon: '👥' },
+    growth: { label: 'Player Growth & Testing', icon: '📈' },
+    training: { label: 'Training & Tactical Drills', icon: '📘' },
+    history: { label: 'Saved Game History', icon: '📜' },
+    scoring: { label: 'Scoring & Game Analytics', icon: '📊' },
+    admin: { label: 'Admin & Cloud Security', icon: '🛡️' },
+    settings: { label: 'Settings & Preferences', icon: '⚙️' },
+  };
+
   // Click & Focus Tab Reset logic (Training button opens library view!)
   const handleSelectTab = (tabId: string) => {
-    setActiveTab(tabId);
+    const resolvedTab = TAB_ALIASES[tabId] || tabId;
+    if (activeTab !== resolvedTab) {
+      setPreviousTab(activeTab);
+      setActiveTab(resolvedTab);
+    }
     setMobileMenuOpen(false);
 
-    if (tabId === 'training') {
+    if (resolvedTab === 'training') {
       setTrainingState((prev) => ({
         ...prev,
         view: 'library', // Always opens library view when Training tab is clicked!
@@ -1982,6 +2009,7 @@ export default function App() {
     { id: 'summary', label: 'Summary', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'lineup', label: 'Game Day', icon: <Play className="w-5 h-5 text-[var(--green)]" /> },
     { id: 'rotations', label: 'Rotations', icon: <RefreshCw className="w-5 h-5 text-[var(--cyan)]" /> },
+    { id: 'rules', label: 'Junior Rules', icon: <BookOpen className="w-5 h-5 text-amber-500" /> },
     { id: 'jarvis', label: 'JARVIS AI', icon: <Bot className="w-5 h-5 text-purple-600" /> },
     { id: 'team', label: 'Team View', icon: <Users className="w-5 h-5 text-blue-600" /> },
     { id: 'growth', label: 'Player Growth', icon: <TrendingUp className="w-5 h-5 text-emerald-500" /> },
@@ -2261,6 +2289,39 @@ export default function App() {
 
         {/* Global Debugger Modal */}
         <FirebaseDebugModal isOpen={isDebugModalOpen} onClose={() => setIsDebugModalOpen(false)} />
+
+        {/* Interactive Breadcrumb Navigation Bar */}
+        <div className="bg-white border border-[var(--line)] rounded-xl px-4 py-2.5 shadow-2xs flex items-center justify-between gap-3 text-xs font-bold text-slate-600">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
+            <button
+              onClick={() => handleSelectTab('team')}
+              className="flex items-center gap-1.5 text-slate-700 hover:text-blue-600 font-extrabold transition cursor-pointer shrink-0"
+              title="View Active Squad Roster"
+            >
+              <Users className="w-3.5 h-3.5 text-blue-600" />
+              <span>{activeTeamProfile?.name || 'Active Squad'}</span>
+            </button>
+
+            <span className="text-slate-300 font-normal">/</span>
+
+            <div className="flex items-center gap-1.5 text-[var(--navy)] font-black shrink-0">
+              <span>{TAB_BREADCRUMBS[activeTab]?.icon}</span>
+              <span>{TAB_BREADCRUMBS[activeTab]?.label || activeTab}</span>
+            </div>
+          </div>
+
+          {previousTab && previousTab !== activeTab && (
+            <button
+              onClick={() => handleSelectTab(previousTab)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg text-xs font-black transition shrink-0 cursor-pointer border border-slate-200"
+              title={`Return to ${TAB_BREADCRUMBS[previousTab]?.label || previousTab}`}
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Back to</span>
+              <span>{TAB_BREADCRUMBS[previousTab]?.label.split(' ')[0] || 'Previous'}</span>
+            </button>
+          )}
+        </div>
         {activeTab === 'summary' && (
           <SummaryScreen
             players={players}
@@ -2328,6 +2389,9 @@ export default function App() {
             activeTeamId={activeTeamId}
             onSelectTeam={requestSwitchTeam}
           />
+        )}
+        {activeTab === 'rules' && (
+          <JuniorRulesScreen activeTeamProfile={activeTeamProfile} />
         )}
         {activeTab === 'jarvis' && (
           <JarvisScreen

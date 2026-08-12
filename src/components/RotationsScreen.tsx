@@ -1380,7 +1380,7 @@ export default function RotationsScreen({
           onClose={() => setShowPlanMode(false)}
           onNavigateToGameDay={() => {
             setShowPlanMode(false);
-            if (onNavigate) onNavigate('gameday');
+            if (onNavigate) onNavigate('lineup');
           }}
           players={players}
           onUpdatePlayers={() => {}}

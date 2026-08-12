@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Upload, Shield, Shirt, Image as ImageIcon, Trash2, Check, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Upload, Shield, Shirt, Image as ImageIcon, Trash2, Check, Sparkles, AlertCircle, Users } from 'lucide-react';
 import { TeamProfile } from '../types';
+import { AGE_GROUPS, PLAYING_TEMPLATES, getDefaultTemplateForAgeGroup } from '../constants';
 
 interface TeamEditModalProps {
   isOpen?: boolean;
@@ -63,6 +64,8 @@ export default function TeamEditModal({ isOpen = true, onClose, team, onSave }: 
   const [logoUrl, setLogoUrl] = useState('');
   const [iconUrl, setIconUrl] = useState('');
   const [jumperUrl, setJumperUrl] = useState('');
+  const [ageGroup, setAgeGroup] = useState<string>('Under 12');
+  const [defaultPlayingTemplateId, setDefaultPlayingTemplateId] = useState<string>('12-a-side');
   const [errorMsg, setErrorMsg] = useState('');
 
   const logoFileRef = useRef<HTMLInputElement>(null);
@@ -76,15 +79,26 @@ export default function TeamEditModal({ isOpen = true, onClose, team, onSave }: 
       setLogoUrl(team.logoUrl || '');
       setIconUrl(team.iconUrl || '');
       setJumperUrl(team.jumperUrl || '');
+      const teamAg = team.ageGroup || 'Under 12';
+      setAgeGroup(teamAg);
+      setDefaultPlayingTemplateId(team.defaultPlayingTemplateId || getDefaultTemplateForAgeGroup(teamAg));
     } else {
       setName('');
       setIsInactive(false);
       setLogoUrl(PRESET_LOGOS[0].url);
       setIconUrl(PRESET_LOGOS[0].url);
       setJumperUrl(PRESET_JUMPERS[0].url);
+      setAgeGroup('Under 12');
+      setDefaultPlayingTemplateId('12-a-side');
     }
     setErrorMsg('');
   }, [team, isOpen]);
+
+  const handleAgeGroupChange = (newAg: string) => {
+    setAgeGroup(newAg);
+    const suggestedTemplate = getDefaultTemplateForAgeGroup(newAg);
+    setDefaultPlayingTemplateId(suggestedTemplate);
+  };
 
   if (!isOpen) return null;
 
@@ -130,6 +144,8 @@ export default function TeamEditModal({ isOpen = true, onClose, team, onSave }: 
       logoUrl,
       iconUrl: iconUrl || logoUrl, // Fallback icon to logo if iconUrl not specified
       jumperUrl,
+      ageGroup,
+      defaultPlayingTemplateId,
     };
 
     onSave(updatedTeam);
@@ -200,6 +216,58 @@ export default function TeamEditModal({ isOpen = true, onClose, team, onSave }: 
                 <option value="active">Active (Live Season)</option>
                 <option value="inactive">Inactive / Archived</option>
               </select>
+            </div>
+          </div>
+
+          {/* Age Group & Playing Field Template Setup */}
+          <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl space-y-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-indigo-600" />
+              <h4 className="text-xs font-black uppercase text-indigo-950 tracking-wider">
+                Age Group & Match Format Defaults
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-black uppercase text-slate-700">
+                  Competition Age Group
+                </label>
+                <select
+                  value={ageGroup}
+                  onChange={(e) => handleAgeGroupChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {AGE_GROUPS.map((ag) => (
+                    <option key={ag} value={ag}>
+                      {ag}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  Sets default match rules & recommended playing template.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-black uppercase text-slate-700">
+                  Default Field Playing Template
+                </label>
+                <select
+                  value={defaultPlayingTemplateId}
+                  onChange={(e) => setDefaultPlayingTemplateId(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {Object.values(PLAYING_TEMPLATES).map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.name} ({tpl.teamSize} on pitch)
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-indigo-700 font-semibold">
+                  {PLAYING_TEMPLATES[defaultPlayingTemplateId]?.description || 'Custom positional layout.'}
+                </p>
+              </div>
             </div>
           </div>
 

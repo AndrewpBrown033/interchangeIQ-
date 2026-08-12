@@ -342,23 +342,36 @@ export default function PlanModeView({
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-start">
           <button
             onClick={() => {
-              if (onNavigateToGameDay) {
-                onNavigateToGameDay();
-              }
               onClose();
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition cursor-pointer shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition cursor-pointer shrink-0 border border-slate-200"
+            title="Return to previous screen"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-slate-700" />
-            <span>Back to Game Day</span>
+            <span>Back</span>
           </button>
+
+          {onNavigateToGameDay && (
+            <button
+              onClick={() => {
+                onNavigateToGameDay();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition cursor-pointer shrink-0 border border-emerald-200"
+              title="Navigate to Game Day Scorecard"
+            >
+              <Play className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Game Day</span>
+            </button>
+          )}
 
           <div className="text-slate-600 text-xs font-bold flex items-center gap-1.5 overflow-x-auto">
             <span className="px-2 py-0.5 rounded-full bg-slate-900 text-amber-400 font-black text-[10px] border border-slate-700 shrink-0">
               {teamName}
             </span>
-            <span className="text-slate-300">•</span>
-            <span className="shrink-0 font-black text-slate-900">Q{selectedQuarter} Plan</span>
+            <span className="text-slate-300">/</span>
+            <span className="text-slate-500 font-bold">Rotations</span>
+            <span className="text-slate-300">/</span>
+            <span className="shrink-0 font-black text-slate-900">Q{selectedQuarter} Plan Preview</span>
           </div>
         </div>
 
@@ -574,7 +587,7 @@ export default function PlanModeView({
         }`}>
           
           {/* EXACT GAMEDAY PITCH CONTAINER WITH RADIAL TURF & 3D GOAL POSTS */}
-          <div className="field relative select-none w-full max-w-[490px] my-auto">
+          <div className="field relative select-none w-full max-w-[550px] my-auto">
             <div className="centre-square"></div>
             <div className="centre-circle-inner"></div>
             <div className="fifty-arc-top"></div>
@@ -781,7 +794,7 @@ export default function PlanModeView({
                               : 'border-slate-300 hover:border-slate-400'
                     }`}>
                       {/* Jumper Number Box */}
-                      <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md font-black text-white text-[9px] sm:text-[11px] flex items-center justify-center shrink-0 shadow-xs ${
+                      <div className={`w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-md font-black text-white text-[10px] sm:text-[12px] flex items-center justify-center shrink-0 shadow-xs ${
                         POSITION_GROUPS.FWD.includes(slotName) ? 'bg-[#ea580c]' :
                         POSITION_GROUPS.MID.includes(slotName) ? 'bg-[#1d4ed8]' :
                         POSITION_GROUPS.DEF.includes(slotName) ? 'bg-[#15803d]' : 'bg-[#7e22ce]'
@@ -791,11 +804,11 @@ export default function PlanModeView({
 
                       {/* Player Name & Bottom Stats Row */}
                       <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5 text-left">
-                        <div className="font-extrabold text-[8px] sm:text-[9.5px] text-slate-900 truncate leading-none" title={p.name}>
+                        <div className="font-extrabold text-[9px] sm:text-[11px] text-slate-900 truncate leading-none" title={p.name}>
                           {p.nick || (p.name.split(' ').length > 1 ? `${p.name.split(' ')[0][0]}. ${p.name.split(' ').slice(1).join(' ')}` : p.name)}
                         </div>
 
-                        <div className="flex items-center justify-between gap-0.5 leading-none text-[6.5px] sm:text-[7.5px] font-black text-slate-600">
+                        <div className="flex items-center justify-between gap-0.5 leading-none text-[7px] sm:text-[8.5px] font-black text-slate-600">
                           <span className="px-1 py-0.5 rounded bg-slate-100 text-slate-700 uppercase font-black tracking-tighter">
                             {label}
                           </span>
@@ -810,11 +823,11 @@ export default function PlanModeView({
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center w-full h-full text-center p-0.5 sm:p-1 cursor-pointer">
-                      <span className="text-amber-300 font-black text-[9px] sm:text-[11px] leading-none mb-0.5 tracking-wider uppercase">{label}</span>
-                      <span className="hidden sm:block text-[7px] text-white/70 font-extrabold truncate max-w-full leading-tight mb-1" title={POSITION_DESCRIPTIONS[slotName] || slotName}>
+                      <span className="text-amber-300 font-black text-[10px] sm:text-[12px] leading-none mb-0.5 tracking-wider uppercase">{label}</span>
+                      <span className="hidden sm:block text-[8px] text-white/70 font-extrabold truncate max-w-full leading-tight mb-1" title={POSITION_DESCRIPTIONS[slotName] || slotName}>
                         {POSITION_DESCRIPTIONS[slotName] || slotName}
                       </span>
-                      <span className="text-[6px] sm:text-[7px] font-black uppercase text-white/50 border border-dashed border-white/20 bg-white/5 px-1 py-0.5 rounded-sm sm:rounded-md hover:bg-white/15 transition-all">
+                      <span className="text-[7px] sm:text-[8px] font-black uppercase text-white/50 border border-dashed border-white/20 bg-white/5 px-1 py-0.5 rounded-sm sm:rounded-md hover:bg-white/15 transition-all">
                         + Assign
                       </span>
                     </div>

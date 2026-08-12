@@ -203,11 +203,11 @@ body {
 
 .slot {
   position: absolute;
-  width: 98px;
-  min-height: 40px;
-  height: 40px;
-  padding: 2px;
-  border-radius: 8px;
+  width: 116px;
+  min-height: 46px;
+  height: 46px;
+  padding: 3px;
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.12);
   border: 1px dashed rgba(255, 255, 255, 0.55);
   color: #fff;
@@ -222,11 +222,11 @@ body {
 
 @media (max-width: 640px) {
   .slot {
-    width: 78px;
-    min-height: 36px;
-    height: 36px;
-    padding: 1px 2px;
-    border-radius: 7px;
+    width: 90px;
+    min-height: 40px;
+    height: 40px;
+    padding: 2px;
+    border-radius: 8px;
     flex-direction: row;
     justify-content: flex-start;
     gap: 2px;

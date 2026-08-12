@@ -109,6 +109,8 @@ export interface GameInfo {
   round: string;
   date: string;
   time?: string;
+  ageGroup?: string;
+  playingTemplateId?: string;
 }
 
 export interface GameHistory {
@@ -247,6 +249,8 @@ export interface TeamProfile {
   logoUrl?: string;
   jumperUrl?: string;
   iconUrl?: string;
+  ageGroup?: string;
+  defaultPlayingTemplateId?: string;
 }
 
 export interface SkillAssessment {
