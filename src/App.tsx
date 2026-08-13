@@ -2247,10 +2247,10 @@ export default function App() {
       {/* Main Content Area */}
       <main className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6 ios-main pb-24 lg:pb-6">
         
-        {/* Global Squad & Real-Time Sync Status Bar */}
+        {/* Global Squad & Real-Time Sync Status Bar with Integrated Breadcrumbs */}
         <div className="bg-white border border-[var(--line)] rounded-2xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-          {/* Squad Switcher */}
-          <div className="flex items-center gap-2.5 min-w-0">
+          {/* Squad Switcher & Breadcrumb Trail */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 text-[var(--blue)] flex items-center justify-center font-black text-xs shrink-0 shadow-2xs overflow-hidden p-0.5">
               {activeTeamProfile?.logoUrl || activeTeamProfile?.iconUrl ? (
                 <img src={activeTeamProfile.logoUrl || activeTeamProfile.iconUrl} alt={activeTeamProfile.name || 'Team Logo'} className="w-full h-full object-contain" />
@@ -2258,12 +2258,27 @@ export default function App() {
                 <ShieldCheck className="w-4.5 h-4.5" />
               )}
             </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-extrabold text-[var(--muted)] uppercase tracking-wider block leading-tight">
-                Active Squad
-              </span>
+
+            <div className="min-w-0 flex-1 space-y-0.5">
+              {/* Breadcrumb Trail */}
+              <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)] overflow-x-auto scrollbar-none">
+                <button
+                  onClick={() => handleSelectTab('team')}
+                  className="hover:text-blue-600 transition cursor-pointer shrink-0"
+                  title="View Active Squad Roster"
+                >
+                  Active Squad
+                </button>
+                <span className="text-slate-300 font-normal">/</span>
+                <span className="font-black text-blue-600 shrink-0 flex items-center gap-1 text-[11px] normal-case">
+                  <span>{TAB_BREADCRUMBS[activeTab]?.icon}</span>
+                  <span>{TAB_BREADCRUMBS[activeTab]?.label || activeTab}</span>
+                </span>
+              </div>
+
+              {/* Squad Name */}
               <div className="flex items-center gap-2">
-                <span className="font-black text-sm text-[var(--navy)] truncate block py-0.5">
+                <span className="font-black text-sm text-[var(--navy)] truncate block">
                   {activeTeamProfile?.name || 'Unnamed Squad'}
                 </span>
                 {activeTeamProfile?.jumperUrl && (
@@ -2273,8 +2288,21 @@ export default function App() {
             </div>
           </div>
 
-          {isDebugEnabled && (
-            <div className="flex items-center gap-2 ml-auto">
+          {/* Action Buttons: Back Navigation & Debugger */}
+          <div className="flex items-center gap-2 shrink-0">
+            {previousTab && previousTab !== activeTab && (
+              <button
+                onClick={() => handleSelectTab(previousTab)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-black transition cursor-pointer border border-slate-200 shadow-2xs active:scale-95"
+                title={`Return to ${TAB_BREADCRUMBS[previousTab]?.label || previousTab}`}
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+                <span className="hidden sm:inline">Back to</span>
+                <span>{TAB_BREADCRUMBS[previousTab]?.label.split(' ')[0] || 'Previous'}</span>
+              </button>
+            )}
+
+            {isDebugEnabled && (
               <button
                 onClick={() => setIsDebugModalOpen(true)}
                 title="Open Firebase & System Diagnostics Debugger"
@@ -2283,45 +2311,12 @@ export default function App() {
                 <Terminal className="w-3.5 h-3.5 text-blue-600" />
                 <span className="hidden sm:inline">Debug</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Global Debugger Modal */}
         <FirebaseDebugModal isOpen={isDebugModalOpen} onClose={() => setIsDebugModalOpen(false)} />
-
-        {/* Interactive Breadcrumb Navigation Bar */}
-        <div className="bg-white border border-[var(--line)] rounded-xl px-4 py-2.5 shadow-2xs flex items-center justify-between gap-3 text-xs font-bold text-slate-600">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
-            <button
-              onClick={() => handleSelectTab('team')}
-              className="flex items-center gap-1.5 text-slate-700 hover:text-blue-600 font-extrabold transition cursor-pointer shrink-0"
-              title="View Active Squad Roster"
-            >
-              <Users className="w-3.5 h-3.5 text-blue-600" />
-              <span>{activeTeamProfile?.name || 'Active Squad'}</span>
-            </button>
-
-            <span className="text-slate-300 font-normal">/</span>
-
-            <div className="flex items-center gap-1.5 text-[var(--navy)] font-black shrink-0">
-              <span>{TAB_BREADCRUMBS[activeTab]?.icon}</span>
-              <span>{TAB_BREADCRUMBS[activeTab]?.label || activeTab}</span>
-            </div>
-          </div>
-
-          {previousTab && previousTab !== activeTab && (
-            <button
-              onClick={() => handleSelectTab(previousTab)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg text-xs font-black transition shrink-0 cursor-pointer border border-slate-200"
-              title={`Return to ${TAB_BREADCRUMBS[previousTab]?.label || previousTab}`}
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Back to</span>
-              <span>{TAB_BREADCRUMBS[previousTab]?.label.split(' ')[0] || 'Previous'}</span>
-            </button>
-          )}
-        </div>
         {activeTab === 'summary' && (
           <SummaryScreen
             players={players}
