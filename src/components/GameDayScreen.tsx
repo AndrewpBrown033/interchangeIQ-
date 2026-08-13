@@ -141,6 +141,28 @@ export default function GameDayScreen({
   const [alerted5MinQuarters, setAlerted5MinQuarters] = useState<number[]>([]);
   const [dismissed5MinAlertQuarter, setDismissed5MinAlertQuarter] = useState<number | null>(null);
 
+  // Ignored AI Bench Rotation Combinations tracking
+  const [ignoredCombinationKeys, setIgnoredCombinationKeys] = useState<string[]>([]);
+
+  const isComboIgnored = (outId: string, inId: string, midId?: string) => {
+    if (!ignoredCombinationKeys.length) return false;
+    const key1 = `${outId}:${inId}`;
+    const key2 = midId ? `${outId}:${inId}:${midId}` : key1;
+    const key3 = `${inId}:${outId}`;
+    return ignoredCombinationKeys.some((k) => k === key1 || k === key2 || k === key3);
+  };
+
+  const handleIgnoreSuggestionItem = (item: RotationSuggestionItem) => {
+    const comboKey = item.midPlayer
+      ? `${item.outPlayer.id}:${item.inPlayer.id}:${item.midPlayer.id}`
+      : `${item.outPlayer.id}:${item.inPlayer.id}`;
+    setIgnoredCombinationKeys((prev) => [...prev, comboKey, `${item.outPlayer.id}:${item.inPlayer.id}`]);
+  };
+
+  const handleClearIgnoredSuggestions = () => {
+    setIgnoredCombinationKeys([]);
+  };
+
   // Drag State
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
 
@@ -613,7 +635,7 @@ export default function GameDayScreen({
       // 1. Direct Swap - Preferred Position Match (treating Left and Right positions as equivalent)
       const prefCandidates = availBench.filter((p) => {
         const normPos = getNormPositions(p);
-        return outSlot && normPos.some((pos) => matchPositions(pos, outSlot));
+        return outSlot && normPos.some((pos) => matchPositions(pos, outSlot)) && !isComboIgnored(outPlayer.id, p.id);
       });
       if (prefCandidates.length > 0) {
         const inPlayer = prefCandidates[0];
@@ -634,7 +656,7 @@ export default function GameDayScreen({
       }
 
       // 2. Direct Swap - Primary Zone Match in remaining bench
-      const primaryCandidates = availBench.filter((p) => p.primaryZone === outZone);
+      const primaryCandidates = availBench.filter((p) => p.primaryZone === outZone && !isComboIgnored(outPlayer.id, p.id));
       if (primaryCandidates.length > 0) {
         const inPlayer = primaryCandidates[0];
         suggestionsList.push({
@@ -665,6 +687,7 @@ export default function GameDayScreen({
 
         if (mMatchesOut) {
           const benchForMid = availBench.filter((b) => {
+            if (isComboIgnored(outPlayer.id, b.id, mPlayer.id)) return false;
             const bNormPos = getNormPositions(b);
             return b.primaryZone === midZone || bNormPos.includes(normalizePosition(midSlot)) || bNormPos.some((p) => getZoneForPosition(p) === midZone);
           });
@@ -694,18 +717,21 @@ export default function GameDayScreen({
       if (matched) continue;
 
       // 4. Heatmap Experience Option
-      const benchWithHeatmap = [...availBench].map((p) => {
-        const slotSecs = (outSlot && p.slotTimes?.[outSlot]) || 0;
-        let zoneSecs = 0;
-        if (p.slotTimes) {
-          Object.entries(p.slotTimes).forEach(([posKey, secs]) => {
-            if (getZoneForPosition(posKey) === outZone) {
-              zoneSecs += secs || 0;
-            }
-          });
-        }
-        return { player: p, score: slotSecs * 2 + zoneSecs };
-      }).sort((a, b) => b.score - a.score || b.player.bench - a.player.bench);
+      const benchWithHeatmap = [...availBench]
+        .filter((p) => !isComboIgnored(outPlayer.id, p.id))
+        .map((p) => {
+          const slotSecs = (outSlot && p.slotTimes?.[outSlot]) || 0;
+          let zoneSecs = 0;
+          if (p.slotTimes) {
+            Object.entries(p.slotTimes).forEach(([posKey, secs]) => {
+              if (getZoneForPosition(posKey) === outZone) {
+                zoneSecs += secs || 0;
+              }
+            });
+          }
+          return { player: p, score: slotSecs * 2 + zoneSecs };
+        })
+        .sort((a, b) => b.score - a.score || b.player.bench - a.player.bench);
 
       if (benchWithHeatmap.length > 0 && benchWithHeatmap[0].score > 0) {
         const inPlayer = benchWithHeatmap[0].player;
@@ -721,23 +747,34 @@ export default function GameDayScreen({
         });
         availOnGround = availOnGround.filter((p) => p.id !== outPlayer.id);
         availBench = availBench.filter((p) => p.id !== inPlayer.id);
+        matched = true;
         continue;
       }
 
       // 5. Default Fresh Legs Swap
-      const defaultInPlayer = availBench[0];
-      suggestionsList.push({
-        id: `sug-fl-${outPlayer.id}-${defaultInPlayer.id}-${suggestionsList.length}`,
-        type: 'direct',
-        priorityLabel: 'Fresh Legs Swap',
-        outPlayer,
-        inPlayer: defaultInPlayer,
-        outSlot,
-        reason: `General rest rotation based on longest bench rest (${fmt(defaultInPlayer.bench)})`,
-        suggestionText: `OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || 'Field'}) ➔ IN #${defaultInPlayer.number} ${defaultInPlayer.nick || defaultInPlayer.name}`,
-      });
-      availOnGround = availOnGround.filter((p) => p.id !== outPlayer.id);
-      availBench = availBench.filter((p) => p.id !== defaultInPlayer.id);
+      const freshLegsCandidates = availBench.filter((p) => !isComboIgnored(outPlayer.id, p.id));
+      if (freshLegsCandidates.length > 0) {
+        const defaultInPlayer = freshLegsCandidates[0];
+        suggestionsList.push({
+          id: `sug-fl-${outPlayer.id}-${defaultInPlayer.id}-${suggestionsList.length}`,
+          type: 'direct',
+          priorityLabel: 'Fresh Legs Swap',
+          outPlayer,
+          inPlayer: defaultInPlayer,
+          outSlot,
+          reason: `General rest rotation based on longest bench rest (${fmt(defaultInPlayer.bench)})`,
+          suggestionText: `OUT #${outPlayer.number} ${outPlayer.nick || outPlayer.name} (${outSlot || 'Field'}) ➔ IN #${defaultInPlayer.number} ${defaultInPlayer.nick || defaultInPlayer.name}`,
+        });
+        availOnGround = availOnGround.filter((p) => p.id !== outPlayer.id);
+        availBench = availBench.filter((p) => p.id !== defaultInPlayer.id);
+        matched = true;
+        continue;
+      }
+
+      // If no candidate matched for outPlayer, remove outPlayer from availOnGround so algorithm evaluates next player
+      if (!matched) {
+        availOnGround = availOnGround.filter((p) => p.id !== outPlayer.id);
+      }
     }
 
     const firstItem = suggestionsList[0];
@@ -1633,13 +1670,23 @@ export default function GameDayScreen({
                           <span>{item.reason}</span>
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleApplySuggestionItem(item)}
-                        className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-lg transition shadow-sm flex items-center gap-1 shrink-0 self-start md:self-center cursor-pointer"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Apply Swap</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0 self-start md:self-center">
+                        <button
+                          onClick={() => handleIgnoreSuggestionItem(item)}
+                          className="px-2.5 py-1.5 bg-white/10 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-400/30 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                          title="Ignore this suggested combination and calculate another option"
+                        >
+                          <Ban className="w-3.5 h-3.5 text-rose-300" />
+                          <span>Ignore</span>
+                        </button>
+                        <button
+                          onClick={() => handleApplySuggestionItem(item)}
+                          className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-lg transition shadow-sm flex items-center gap-1 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Apply Swap</span>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1753,6 +1800,16 @@ export default function GameDayScreen({
                   <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
                   <span>AI Bench Rotation Suggestions ({insights.suggestionsList.length} Changes)</span>
                 </span>
+                {ignoredCombinationKeys.length > 0 && (
+                  <button
+                    onClick={handleClearIgnoredSuggestions}
+                    className="px-2 py-0.5 text-[10px] font-black bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md transition flex items-center gap-1 cursor-pointer"
+                    title="Reset ignored combinations and recalculate AI options"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset Ignored Combinations ({ignoredCombinationKeys.length})</span>
+                  </button>
+                )}
               </div>
 
               {/* Rule explanation bar */}
@@ -1797,13 +1854,23 @@ export default function GameDayScreen({
                         </span>
                       </div>
 
-                      <button
-                        onClick={() => handleApplySuggestionItem(item)}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] rounded-lg transition flex items-center gap-1 cursor-pointer"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        <span>Apply This Swap</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleIgnoreSuggestionItem(item)}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-300 hover:border-rose-300 font-extrabold text-[11px] rounded-lg transition flex items-center gap-1 cursor-pointer"
+                          title="Ignore this suggested combination and calculate another option"
+                        >
+                          <Ban className="w-3 h-3 text-rose-500" />
+                          <span>Ignore</span>
+                        </button>
+                        <button
+                          onClick={() => handleApplySuggestionItem(item)}
+                          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] rounded-lg transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Apply This Swap</span>
+                        </button>
+                      </div>
                     </div>
 
                     <p className="text-xs font-black text-gray-900 leading-snug">
