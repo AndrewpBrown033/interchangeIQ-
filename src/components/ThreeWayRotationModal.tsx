@@ -148,36 +148,108 @@ export default function ThreeWayRotationModal({
     if (!p1 || !p2 || !p3) return [];
     if (p1Id === p2Id || p1Id === p3Id || p2Id === p3Id) return [];
 
-    const scheduleByQuarter: { quarter: number; minute: number; outP: Player; inP: Player; note: string }[] = [];
+    const p1PosLabel = getPlayerPosLabel(p1.id);
+    const p2PosLabel = getPlayerPosLabel(p2.id);
+    const p3PosLabel = getPlayerPosLabel(p3.id);
+
+    // Initial positions for the 3 slots in the cycle
+    const spot1Name = p1PosLabel.isOnField ? p1PosLabel.slotKey! : 'Bench';
+    const spot2Name = p2PosLabel.isOnField ? p2PosLabel.slotKey! : 'Bench';
+    const spot3Name = p3PosLabel.isOnField ? p3PosLabel.slotKey! : 'Bench';
+
+    const spots = [spot1Name, spot2Name, spot3Name];
+
+    const scheduleByQuarter: {
+      quarter: number;
+      minute: number;
+      outP: Player;
+      inP: Player;
+      out: string;
+      inn: string;
+      type: 'bench' | 'onfield';
+      note: string;
+      outSlot?: string;
+      inSlot?: string;
+    }[] = [];
 
     // For each quarter, calculate 3-way rotation steps
     selectedQuarters.forEach((q) => {
-      let field = [p1, p2];
-      let bench = p3;
-      let offIndex = 0; // Alternates which of the 2 field players goes off to bench
-
+      let step = 0;
       for (let min = intervalMinutes; min <= quarterLength; min += intervalMinutes) {
-        const outPlayer = field[offIndex];
-        const inPlayer = bench;
-        const outPos = getPlayerPosLabel(outPlayer.id);
+        step += 1;
+
+        // Player 1 goes from spots[(0 + step - 1) % 3] -> spots[(0 + step) % 3]
+        // Player 2 goes from spots[(1 + step - 1) % 3] -> spots[(1 + step) % 3]
+        // Player 3 goes from spots[(2 + step - 1) % 3] -> spots[(2 + step) % 3]
+
+        const p1From = spots[(0 + step - 1) % 3];
+        const p1To = spots[(0 + step) % 3];
+
+        const p2From = spots[(1 + step - 1) % 3];
+        const p2To = spots[(1 + step) % 3];
+
+        const p3From = spots[(2 + step - 1) % 3];
+        const p3To = spots[(2 + step) % 3];
+
+        // Determine if any move involves bench
+        const hasBenchSpot = spots.includes('Bench');
+
+        let outP = p1;
+        let inP = p2;
+        let type: 'bench' | 'onfield' = 'onfield';
+        let outText = `FROM #${p1.number} ${p1.name} (${p1From}➔${p1To})`;
+        let innText = `TO #${p2.number} ${p2.name} (${p2From}➔${p2To})`;
+        let outSlot = p1From !== 'Bench' ? p1From : undefined;
+        let inSlot = p1To !== 'Bench' ? p1To : undefined;
+
+        if (hasBenchSpot) {
+          type = 'bench';
+          // Find player who goes to bench (from field slot -> Bench)
+          if (p1To === 'Bench') {
+            outP = p1;
+          } else if (p2To === 'Bench') {
+            outP = p2;
+          } else if (p3To === 'Bench') {
+            outP = p3;
+          }
+
+          // Find player who comes off bench (Bench -> field slot)
+          if (p1From === 'Bench') {
+            inP = p1;
+          } else if (p2From === 'Bench') {
+            inP = p2;
+          } else if (p3From === 'Bench') {
+            inP = p3;
+          }
+
+          const outPFrom = outP.id === p1.id ? p1From : outP.id === p2.id ? p2From : p3From;
+          const inPTo = inP.id === p1.id ? p1To : inP.id === p2.id ? p2To : p3To;
+
+          outText = `OFF #${outP.number} ${outP.name} (${outPFrom})`;
+          innText = `ON #${inP.number} ${inP.name} (${inPTo})`;
+          outSlot = outPFrom !== 'Bench' ? outPFrom : undefined;
+          inSlot = inPTo !== 'Bench' ? inPTo : undefined;
+        }
+
+        const noteText = `#${p1.number} ${p1.name} (${p1From}➔${p1To}), #${p2.number} ${p2.name} (${p2From}➔${p2To}), #${p3.number} ${p3.name} (${p3From}➔${p3To})`;
 
         scheduleByQuarter.push({
           quarter: q,
           minute: min,
-          outP: outPlayer,
-          inP: inPlayer,
-          note: `3-Way Rotation${outPos.slotKey ? ` [${outPos.slotKey}]` : ''}: #${outPlayer.number} ${outPlayer.name} ➔ Bench | #${inPlayer.number} ${inPlayer.name} ➔ Field`,
+          outP,
+          inP,
+          out: outText,
+          inn: innText,
+          type,
+          note: noteText,
+          outSlot,
+          inSlot,
         });
-
-        // Update active positions for next interval
-        field[offIndex] = inPlayer;
-        bench = outPlayer;
-        offIndex = (offIndex + 1) % 2; // Next time, swap the other field player
       }
     });
 
     return scheduleByQuarter;
-  }, [p1, p2, p3, p1Id, p2Id, p3Id, intervalMinutes, quarterLength, selectedQuarters]);
+  }, [p1, p2, p3, p1Id, p2Id, p3Id, intervalMinutes, quarterLength, selectedQuarters, lineup]);
 
   if (!isOpen) return null;
 
@@ -219,11 +291,11 @@ export default function ThreeWayRotationModal({
       planId: planIdToUse,
       quarter: item.quarter,
       minute: item.minute,
-      type: 'bench',
+      type: item.type,
       outId: item.outP.id,
       inId: item.inP.id,
-      out: `OFF #${item.outP.number} ${item.outP.name}`,
-      inn: `ON #${item.inP.number} ${item.inP.name}`,
+      out: item.out,
+      inn: item.inn,
       note: item.note,
       applied: false,
       status: 'scheduled',
@@ -233,6 +305,8 @@ export default function ThreeWayRotationModal({
       groupP2Id: p2.id,
       groupP3Id: p3.id,
       groupInterval: intervalMinutes,
+      outSlot: item.outSlot,
+      inSlot: item.inSlot,
     }));
 
     if (editingGroupData?.groupId) {
@@ -328,10 +402,10 @@ export default function ThreeWayRotationModal({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Player 1 (Field) */}
+              {/* Player 1 (Player A) */}
               <div>
-                <label className="block mb-1 text-[10px] font-black uppercase text-emerald-700">
-                  Player A (Field Pos 1)
+                <label className="block mb-1 text-[10px] font-black uppercase text-indigo-700">
+                  Player A (1st Spot)
                 </label>
                 <select
                   value={p1Id}
@@ -349,21 +423,21 @@ export default function ThreeWayRotationModal({
                   })}
                 </select>
                 {p1 && p1Pos && (
-                  <div className="mt-1.5 p-2 bg-emerald-50/90 border border-emerald-200 rounded-lg text-[11px] font-bold text-emerald-950 flex items-center justify-between shadow-2xs">
+                  <div className="mt-1.5 p-2 bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900 flex items-center justify-between shadow-2xs">
                     <span className="truncate pr-1">
                       📍 {p1Pos.isOnField ? `${p1Pos.slotKey} - ${p1Pos.fullName}` : p1Pos.text}
                     </span>
-                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p1Pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>
-                      {p1Pos.isOnField ? 'Field' : 'Bench'}
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p1Pos.isOnField ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                      {p1Pos.isOnField ? `Field (${p1Pos.slotKey})` : 'Bench'}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Player 2 (Field) */}
+              {/* Player 2 (Player B) */}
               <div>
-                <label className="block mb-1 text-[10px] font-black uppercase text-emerald-700">
-                  Player B (Field Pos 2)
+                <label className="block mb-1 text-[10px] font-black uppercase text-indigo-700">
+                  Player B (2nd Spot)
                 </label>
                 <select
                   value={p2Id}
@@ -381,21 +455,21 @@ export default function ThreeWayRotationModal({
                   })}
                 </select>
                 {p2 && p2Pos && (
-                  <div className="mt-1.5 p-2 bg-emerald-50/90 border border-emerald-200 rounded-lg text-[11px] font-bold text-emerald-950 flex items-center justify-between shadow-2xs">
+                  <div className="mt-1.5 p-2 bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900 flex items-center justify-between shadow-2xs">
                     <span className="truncate pr-1">
                       📍 {p2Pos.isOnField ? `${p2Pos.slotKey} - ${p2Pos.fullName}` : p2Pos.text}
                     </span>
-                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p2Pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>
-                      {p2Pos.isOnField ? 'Field' : 'Bench'}
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p2Pos.isOnField ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                      {p2Pos.isOnField ? `Field (${p2Pos.slotKey})` : 'Bench'}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Player 3 (Bench) */}
+              {/* Player 3 (Player C) */}
               <div>
-                <label className="block mb-1 text-[10px] font-black uppercase text-amber-700">
-                  Player C (Bench Spot)
+                <label className="block mb-1 text-[10px] font-black uppercase text-indigo-700">
+                  Player C (3rd Spot)
                 </label>
                 <select
                   value={p3Id}
@@ -413,12 +487,12 @@ export default function ThreeWayRotationModal({
                   })}
                 </select>
                 {p3 && p3Pos && (
-                  <div className="mt-1.5 p-2 bg-amber-50/90 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-950 flex items-center justify-between shadow-2xs">
+                  <div className="mt-1.5 p-2 bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900 flex items-center justify-between shadow-2xs">
                     <span className="truncate pr-1">
                       📍 {p3Pos.isOnField ? `${p3Pos.slotKey} - ${p3Pos.fullName}` : p3Pos.text}
                     </span>
-                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p3Pos.isOnField ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'}`}>
-                      {p3Pos.isOnField ? 'Field' : 'Bench'}
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${p3Pos.isOnField ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                      {p3Pos.isOnField ? `Field (${p3Pos.slotKey})` : 'Bench'}
                     </span>
                   </div>
                 )}
@@ -429,6 +503,60 @@ export default function ThreeWayRotationModal({
               <p className="text-[11px] font-bold text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
                 ⚠️ Warning: Please pick 3 different players.
               </p>
+            )}
+
+            {/* Clear Rotation Movement Definition Box */}
+            {p1 && p2 && p3 && p1Pos && p2Pos && p3Pos && p1Id !== p2Id && p1Id !== p3Id && p2Id !== p3Id && (
+              <div className="bg-slate-900 text-white p-4 rounded-xl border border-indigo-500/40 space-y-3 shadow-md">
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-indigo-500/30 pb-2">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-amber-400" />
+                    <span className="font-black text-xs text-amber-300 uppercase tracking-wide">
+                      Rotation Movement Definition
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                    Rotates Every {intervalMinutes} Mins
+                  </span>
+                </div>
+
+                <p className="text-slate-300 text-xs font-semibold">
+                  At each <b className="text-amber-300 font-bold">{intervalMinutes}-minute interval</b>, players move in a continuous 3-way rotation:
+                </p>
+
+                <div className="space-y-2 text-xs font-medium">
+                  <div className="flex items-start gap-2 bg-slate-800/90 p-2.5 rounded-lg border border-slate-700/80">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black flex items-center justify-center shrink-0 border border-emerald-500/30">1</span>
+                    <div>
+                      <b className="text-white font-black">#{p1.number} {p1.name}</b> is moving from{' '}
+                      <span className="text-emerald-300 font-bold">{p1Pos.isOnField ? `${p1Pos.slotKey} (${p1Pos.fullName})` : 'Bench'}</span> to{' '}
+                      <span className="text-emerald-300 font-bold">{p2Pos.isOnField ? `${p2Pos.slotKey} (${p2Pos.fullName})` : 'Bench'}</span>.
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 bg-slate-800/90 p-2.5 rounded-lg border border-slate-700/80">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black flex items-center justify-center shrink-0 border border-emerald-500/30">2</span>
+                    <div>
+                      <b className="text-white font-black">#{p2.number} {p2.name}</b> is moving from{' '}
+                      <span className="text-emerald-300 font-bold">{p2Pos.isOnField ? `${p2Pos.slotKey} (${p2Pos.fullName})` : 'Bench'}</span> to{' '}
+                      <span className="text-emerald-300 font-bold">{p3Pos.isOnField ? `${p3Pos.slotKey} (${p3Pos.fullName})` : 'Bench'}</span>.
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 bg-slate-800/90 p-2.5 rounded-lg border border-slate-700/80">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black flex items-center justify-center shrink-0 border border-amber-500/30">3</span>
+                    <div>
+                      <b className="text-white font-black">#{p3.number} {p3.name}</b>{' '}
+                      <span className="text-slate-400 font-normal">
+                        ({p3Pos.isOnField ? `currently on field at ${p3Pos.slotKey}` : 'currently on bench'})
+                      </span>{' '}
+                      is moving from{' '}
+                      <span className="text-amber-300 font-bold">{p3Pos.isOnField ? `${p3Pos.slotKey} (${p3Pos.fullName})` : 'Bench'}</span> to{' '}
+                      <span className="text-amber-300 font-bold">{p1Pos.isOnField ? `${p1Pos.slotKey} (${p1Pos.fullName})` : 'Bench'}</span>.
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 

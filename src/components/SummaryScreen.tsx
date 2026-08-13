@@ -178,16 +178,16 @@ export default function SummaryScreen({
         {/* Current Match */}
         <div
           onClick={() => onNavigate('lineup')}
-          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-indigo-200 cursor-pointer transition shadow-sm space-y-4 group flex flex-col justify-between"
+          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-blue-300 cursor-pointer transition shadow-sm space-y-4 group flex flex-col justify-between"
         >
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-100 transition">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-100 transition">
                 <Trophy className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-black text-[var(--navy)] group-hover:text-indigo-950 transition">Current Match Details</h3>
+              <h3 className="text-base font-black text-[var(--navy)] group-hover:text-blue-900 transition">Current Match Details</h3>
             </div>
-            <div className="bg-[#FAFBFF] p-4 rounded-xl border border-gray-100">
+            <div className="bg-[#FAFBFF] p-4 rounded-xl border border-blue-100/60">
               {gameInfo.round || gameInfo.team ? (
                 <div className="space-y-1">
                   <span className="text-[10px] font-black tracking-widest text-[var(--blue)] uppercase">
@@ -210,7 +210,7 @@ export default function SummaryScreen({
               e.stopPropagation();
               onNavigate('lineup');
             }}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2 shadow-xs"
           >
             Open Current Match
           </button>
@@ -220,20 +220,20 @@ export default function SummaryScreen({
         {isTrainingEnabled && (
           <div
             onClick={() => onNavigate('training')}
-            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-indigo-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-orange-300 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
           >
             <div className="space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-100 transition">
+                <div className="p-2 bg-orange-50 text-orange-600 rounded-xl group-hover:bg-orange-100 transition">
                   <BookOpen className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-black text-[var(--navy)] group-hover:text-indigo-950 transition">Training & Tactical Drills</h3>
+                <h3 className="text-base font-black text-[var(--navy)] group-hover:text-orange-950 transition">Training & Tactical Drills</h3>
               </div>
-              <p className="text-sm text-indigo-950 font-extrabold">
+              <p className="text-sm text-orange-950 font-extrabold">
                 Drill Library & Session Builder
               </p>
               <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
-                Build tactical training plans, manage drill drills catalog, create practice sessions, and share field exercises.
+                Build tactical training plans, manage drill catalog, create practice sessions, and share field exercises.
               </p>
             </div>
             <button
@@ -241,7 +241,7 @@ export default function SummaryScreen({
                 e.stopPropagation();
                 onNavigate('training');
               }}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+              className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2 shadow-xs"
             >
               Open Training Module
             </button>
@@ -252,7 +252,7 @@ export default function SummaryScreen({
         {isGrowthEnabled && (
           <div
             onClick={() => onNavigate('growth')}
-            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-emerald-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-emerald-300 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
           >
             <div className="space-y-3">
               <div className="flex items-center gap-2.5">
@@ -273,7 +273,7 @@ export default function SummaryScreen({
                 e.stopPropagation();
                 onNavigate('growth');
               }}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2 shadow-xs"
             >
               View Player Growth & Assessments
             </button>
@@ -284,7 +284,7 @@ export default function SummaryScreen({
         {isJarvisEnabled && (
           <div
             onClick={() => onNavigate('jarvis')}
-            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-purple-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+            className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-purple-300 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
           >
             <div className="space-y-3">
               <div className="flex items-center gap-2.5">
@@ -305,7 +305,7 @@ export default function SummaryScreen({
                 e.stopPropagation();
                 onNavigate('jarvis');
               }}
-              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2 shadow-xs"
             >
               Launch JARVIS AI
             </button>
@@ -315,7 +315,7 @@ export default function SummaryScreen({
         {/* Junior Rules */}
         <div
           onClick={() => onNavigate('rules')}
-          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-amber-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-amber-300 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
         >
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
@@ -336,7 +336,7 @@ export default function SummaryScreen({
               e.stopPropagation();
               onNavigate('rules');
             }}
-            className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+            className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2 shadow-xs"
           >
             Open Junior Rules
           </button>
@@ -345,17 +345,17 @@ export default function SummaryScreen({
         {/* Saved Game History */}
         <div
           onClick={() => onNavigate('history')}
-          className="bg-white p-6 rounded-2xl border border-[var(--line)] hover:border-amber-200 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
+          className="bg-slate-50/80 p-6 rounded-2xl border border-slate-200 hover:border-slate-300 cursor-pointer transition shadow-sm space-y-4 flex flex-col justify-between group"
         >
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl group-hover:bg-amber-100 transition">
+              <div className="p-2 bg-slate-200/80 text-slate-700 rounded-xl group-hover:bg-slate-300/80 transition">
                 <History className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-black text-[var(--navy)] group-hover:text-amber-950 transition">Game History</h3>
+              <h3 className="text-base font-black text-[var(--navy)] group-hover:text-slate-900 transition">Game History</h3>
             </div>
-            <p className="text-sm text-[var(--ink)] font-bold">
-              You have <span className="text-[var(--blue)] font-black">{historyCount}</span> matches saved.
+            <p className="text-sm text-slate-800 font-extrabold">
+              Saved Matches ({historyCount})
             </p>
             <p className="text-xs text-[var(--muted)] font-semibold leading-relaxed">
               Historical performance, quarters scoreboards, applied rotations, and detailed player usage statistics.
@@ -366,7 +366,7 @@ export default function SummaryScreen({
               e.stopPropagation();
               onNavigate('history');
             }}
-            className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-[var(--ink)] font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+            className="w-full py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition cursor-pointer mt-2 shadow-xs"
           >
             Open Match History
           </button>
