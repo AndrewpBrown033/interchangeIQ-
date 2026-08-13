@@ -1131,6 +1131,26 @@ export default function GameDayScreen({
 
   const totalPoints = (sDetail: any) => sDetail.goals * 6 + sDetail.behinds;
 
+  if (showPlanMode) {
+    return (
+      <PlanModeView
+        onClose={() => setShowPlanMode(false)}
+        onNavigateToGameDay={() => setShowPlanMode(false)}
+        players={players}
+        onUpdatePlayers={onUpdatePlayers}
+        lineup={lineup}
+        onUpdateLineup={onUpdateLineup}
+        rotations={rotations}
+        onUpdateRotations={onUpdateRotations}
+        plans={plans}
+        onUpdatePlans={onUpdatePlans}
+        currentQuarter={score.quarter}
+        activePlanIds={activePlanIds}
+        onTogglePlanRunning={onTogglePlanRunning}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 relative">
       {/* Top action header */}
@@ -2910,28 +2930,6 @@ export default function GameDayScreen({
             </div>
           </div>
         </div>
-      )}
-
-      {/* Plan Mode View Modal */}
-      {showPlanMode && (
-        <PlanModeView
-          onClose={() => setShowPlanMode(false)}
-          onNavigateToGameDay={() => {
-            setShowPlanMode(false);
-            if (onNavigate) onNavigate('lineup');
-          }}
-          players={players}
-          onUpdatePlayers={onUpdatePlayers}
-          lineup={lineup}
-          onUpdateLineup={onUpdateLineup}
-          rotations={rotations}
-          onUpdateRotations={onUpdateRotations}
-          plans={plans}
-          onUpdatePlans={onUpdatePlans}
-          currentQuarter={score.quarter}
-          activePlanIds={activePlanIds}
-          onTogglePlanRunning={onTogglePlanRunning}
-        />
       )}
 
       {/* Scan Team Sheet Modal */}

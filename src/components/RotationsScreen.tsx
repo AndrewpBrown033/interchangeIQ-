@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Player, Rotation, Plan, LineupTemplate, TeamProfile } from '../types';
 import { POSITIONS, POSITION_GROUPS, POSITION_FULL_NAMES, matchPositions, detectRotationGaps, RotationGap } from '../constants';
-import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, AlertTriangle, Sparkles, FolderOpen, Save, Layers, ArrowLeft, ShieldCheck, Users, Bot } from 'lucide-react';
+import { Plus, Trash, Copy, Edit3, Check, RefreshCw, AlertCircle, AlertTriangle, Sparkles, FolderOpen, Save, Layers, ArrowLeft, ShieldCheck, Users, Bot, List } from 'lucide-react';
 import PlanModeView from './PlanModeView';
 import ThreeWayRotationModal, { ThreeWayGroupEditData } from './ThreeWayRotationModal';
 
@@ -575,6 +575,32 @@ export default function RotationsScreen({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* View Mode Switcher */}
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 shrink-0">
+            <button
+              onClick={() => setShowPlanMode(false)}
+              className={`px-3 py-1.5 text-xs font-black rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+                !showPlanMode
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>Rotations Table</span>
+            </button>
+            <button
+              onClick={() => setShowPlanMode(true)}
+              className={`px-3 py-1.5 text-xs font-black rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+                showPlanMode
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Visual Oval Plan</span>
+            </button>
+          </div>
+
           {onNavigate && (
             <button
               onClick={() => onNavigate('gameday')}
@@ -592,15 +618,8 @@ export default function RotationsScreen({
             <span>3-Way Rotation Builder</span>
           </button>
           <button
-            onClick={() => setShowPlanMode(true)}
-            className="px-3.5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-600 text-black rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
-          >
-            <Layers className="w-4 h-4" />
-            <span>Visual Oval Plan Mode</span>
-          </button>
-          <button
             onClick={handleCreatePlan}
-            className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-2 text-xs font-bold bg-[var(--green)] text-white rounded-xl hover:opacity-95 transition flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>New Plan</span>
@@ -608,7 +627,28 @@ export default function RotationsScreen({
         </div>
       </div>
 
-      {/* Rotation Gap Alert Card */}
+      {showPlanMode ? (
+        <PlanModeView
+          onClose={() => setShowPlanMode(false)}
+          onNavigateToGameDay={() => {
+            setShowPlanMode(false);
+            if (onNavigate) onNavigate('lineup');
+          }}
+          players={players}
+          onUpdatePlayers={() => {}}
+          lineup={lineup}
+          onUpdateLineup={onUpdateLineup}
+          rotations={rotations}
+          onUpdateRotations={onUpdateRotations}
+          plans={plans}
+          onUpdatePlans={onUpdatePlans}
+          activePlanIds={activePlanIds}
+          onTogglePlanRunning={onTogglePlanRunning}
+          teamName={activeTeamName}
+        />
+      ) : (
+        <>
+          {/* Rotation Gap Alert Card */}
       {rotationGaps.length > 0 && (
         <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-sm">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1373,27 +1413,7 @@ export default function RotationsScreen({
         editingGroupData={editingThreeWayData}
         teamName={activeTeamName}
       />
-
-      {/* Visual Oval Plan Mode View Modal */}
-      {showPlanMode && (
-        <PlanModeView
-          onClose={() => setShowPlanMode(false)}
-          onNavigateToGameDay={() => {
-            setShowPlanMode(false);
-            if (onNavigate) onNavigate('lineup');
-          }}
-          players={players}
-          onUpdatePlayers={() => {}}
-          lineup={lineup}
-          onUpdateLineup={onUpdateLineup}
-          rotations={rotations}
-          onUpdateRotations={onUpdateRotations}
-          plans={plans}
-          onUpdatePlans={onUpdatePlans}
-          activePlanIds={activePlanIds}
-          onTogglePlanRunning={onTogglePlanRunning}
-          teamName={activeTeamName}
-        />
+        </>
       )}
     </div>
   );
